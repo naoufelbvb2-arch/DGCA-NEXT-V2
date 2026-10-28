@@ -1,0 +1,169 @@
+{
+  "schema_version": "DGCA-R1-F02-EVIDENCE-CLOSURE-MANIFEST-V1",
+  "audit_case": "R1-F02-EVIDENCE-CLOSURE",
+  "pinned_baseline_sha": "31721fd1ba7559b72d9fe11f037ea0c0d1e91ed2",
+  "r1_f01_audit_sha": "dd52b1bb148b3ad4eb3fa91c98d214c4939aad3e",
+  "audit_branch": "audit/r1-f02-evidence-closure",
+  "environment": {
+    "os": "Microsoft Windows 11 Pro (Build 26200)",
+    "python_version": "3.14.4",
+    "pytest_version": "9.0.3",
+    "pluggy_version": "1.6.0"
+  },
+  "test_execution_summary": {
+    "baseline_suite": {
+      "command": "python -m pytest tests/test_*.py -q",
+      "exit_code": 0,
+      "collected": 76,
+      "passed": 76,
+      "failed": 0
+    },
+    "forensics_suite": {
+      "command": "python -m pytest tests/forensics -v",
+      "exit_code": 0,
+      "collected": 17,
+      "passed": 17,
+      "failed": 0,
+      "duration_seconds": 35.95
+    },
+    "total_suite": {
+      "command": "python -m pytest -q",
+      "exit_code": 0,
+      "collected": 93,
+      "passed": 93,
+      "failed": 0,
+      "duration_seconds": 44.26
+    }
+  },
+  "task_evidence_closures": {
+    "TASK_1_REVERIFY_R1_H05": {
+      "verdict": "CONFIRMED",
+      "latent_mutation_occurred": true,
+      "mutations_survived_abort": true,
+      "committed_baseline_cells": 63,
+      "mutated_slots_count": 123,
+      "survived_mutations_count": 123,
+      "reverse_index_affected_cells": 39,
+      "sample_slot_mutation": {
+        "owner_cell_id": 9222,
+        "slot_index": 0,
+        "before_partner": null,
+        "after_partner": 9627,
+        "reason": "ORDINARY_COACTIVE"
+      },
+      "conclusion": "Rigorous re-verification confirms that co-active latent partner admissions into pre-existing committed cells directly survive ABORT_EXPOSURE without rollback."
+    },
+    "TASK_2_NATURAL_ASSEMBLY_DUPLICATION": {
+      "verdict": "PARTIALLY_CONFIRMED",
+      "fixture_exact_duplicate_merge": "BLOCKED_BY_DEFECT",
+      "natural_learning_exact_duplicates_count": 0,
+      "same_surface_different_structure_count": 3,
+      "surface_subcliques": {
+        "يشرب": [1, 3],
+        "حليب": [5, 8],
+        "ماء": [7, 9]
+      },
+      "checkpoints_evaluated": [34, 56, 80],
+      "conclusion": "Exact duplicate member sets fail to merge in fixture testing (THETA_OB=0.40 bug), but natural cold-start learning produces parallel feature sub-cliques (SAME_SURFACE_DIFFERENT_STRUCTURE) rather than exact duplicates."
+    },
+    "TASK_3_CONTEXTUAL_CELL_CONTAMINATION": {
+      "verdict": "CONFIRMED",
+      "z_cell_id": 8321,
+      "lexical_assembly_id": 1,
+      "lexical_surface": "يشرب",
+      "reciprocal_local_synapses": [
+        {"key": [8321, 8327, 0], "S": 0.8360, "state": "CONSOLIDATED", "ext_count": 22},
+        {"key": [8327, 8321, 0], "S": 0.8320, "state": "CONSOLIDATED", "ext_count": 24},
+        {"key": [8321, 9005, 0], "S": 0.8571, "state": "CONSOLIDATED", "ext_count": 22},
+        {"key": [9005, 8321, 0], "S": 0.8322, "state": "CONSOLIDATED", "ext_count": 24},
+        {"key": [8321, 10696, 0], "S": 0.8398, "state": "CONSOLIDATED", "ext_count": 22},
+        {"key": [10696, 8321, 0], "S": 0.8326, "state": "CONSOLIDATED", "ext_count": 24}
+      ],
+      "core_coverage_ab_context": 1.0,
+      "core_coverage_db_context": 0.80,
+      "z_activity_ab": 0.6069,
+      "z_activity_db": 0.0,
+      "conclusion": "Contextual cell 8321 physically entered Assembly 1 for 'يشرب' via reciprocal local links; silencing of z in rival context DB directly depresses CoreCoverage from 1.0 down to 0.80."
+    },
+    "TASK_4_READOUT_CAUSAL_ANALYSIS": {
+      "verdict": "CONFIRMED",
+      "target_assembly_id": 5,
+      "surface": "حليب",
+      "assembly_size": 4,
+      "direct_targets_count": 2,
+      "indirect_lateral_members_count": 2,
+      "member_measurements": [
+        {"cell_id": 9319, "P_T": 0.1947, "P_S": 0.3368, "A_FULL": 0.3368, "A_CTRL": 0.1774, "gain": 0.1594, "eligible": true},
+        {"cell_id": 9325, "P_T": 0.2122, "P_S": 0.5246, "A_FULL": 0.5630, "A_CTRL": 0.4579, "gain": 0.1052, "eligible": true},
+        {"cell_id": 10903, "P_T": 0.0, "P_S": 0.4835, "A_FULL": 0.3172, "A_CTRL": 0.2367, "gain": 0.0805, "eligible": false},
+        {"cell_id": 11220, "P_T": 0.0, "P_S": 0.5906, "A_FULL": 0.5404, "A_CTRL": 0.4579, "gain": 0.0826, "eligible": false}
+      ],
+      "production_score_root_34": 0.0661,
+      "theta_read": 0.08,
+      "production_status": "NO_MATCH",
+      "alternative_score_min3": 0.0882,
+      "alternative_score_all_gains_min3": 0.1426,
+      "negative_control_score_water_on_ab": 0.0,
+      "conclusion": "READOUT_V1 excludes genuine Pass-2 lateral causal gain due to the P_T > 0 requirement and dilutes scores by dividing by |G|=4, causing false NO_MATCH at root 34."
+    },
+    "TASK_5_STRENGTHEN_COLD_START": {
+      "verdict": "CONFIRMED",
+      "checkpoint_34": {
+        "committed_cells": 77,
+        "completed_context_owners": 2,
+        "active_bindings": [
+          {"z_cell_id": 8320, "anchor": 10696, "p_sources": [9205, 9369], "y_targets": [8242, 9854], "status": "ACTIVE"},
+          {"z_cell_id": 8321, "anchor": 10696, "p_sources": [11077, 11811], "y_targets": [9319, 9325], "status": "ACTIVE"}
+        ],
+        "pred_score_c_given_ab": 0.135637,
+        "pred_score_e_given_db": 0.107136,
+        "generation_ab_emitted": []
+      },
+      "checkpoint_56": {
+        "pred_score_c_given_ab": 0.273961,
+        "pred_score_e_given_db": 0.211272,
+        "generation_ab_emitted": ["حليب"],
+        "generation_db_emitted": ["ماء"]
+      },
+      "conclusion": "Cold-start learning authentically creates two distinct COMPLETE contextual owners and achieves complete neural separation from zero."
+    },
+    "TASK_6_EOS_AND_AUTOREGRESSIVE_ROLLOUT": {
+      "verdict": "CONFIRMED",
+      "append_eos_mode": true,
+      "native_eos_assemblies_formed": 2,
+      "sample_eos_assembly": {"assembly_id": 2, "marker": "EOS", "generation": 3, "members": [8336, 8553, 9191, 10496, 11580]},
+      "generation_from_prompt_ab": {
+        "prompt": ["القط", "يشرب"],
+        "step_0": {"surface": "حليب", "score": 0.0950, "marker": "NONE"},
+        "step_1": {"surface": "<EOS>", "score": 0.1156, "marker": "EOS"},
+        "stop_status": "GEN_STOP_EOS"
+      },
+      "multistep_rollout_from_single_cat": {
+        "prompt": ["القط"],
+        "step_0": {"surface": "يشرب", "score": 0.5138},
+        "step_1": {"surface": "حليب", "score": 0.0950},
+        "step_2": {"surface": "<EOS>", "score": 0.1156},
+        "surfaces_emitted": ["يشرب", "حليب"],
+        "stop_status": "GEN_STOP_EOS"
+      },
+      "conclusion": "When append_eos=True is trained, EOS naturally forms attested Assemblies, terminates rollouts with GEN_STOP_EOS, and successfully executes autonomous 2-step generation from a single prompt word."
+    },
+    "TASK_7_COMPLETE_OUTBOX_FAILURE_COVERAGE": {
+      "verdict": "CONFIRMED",
+      "scenarios_exercised": [
+        "1. Failure before notification processing -> Status remains OPEN, 0 notifications consumed",
+        "2. Failure after 1st notification -> Status remains OPEN, 1 partial attestation leaked",
+        "3. Failure during later notification (idx=2) -> Status remains OPEN, 2 partial attestations leaked",
+        "4. Failure immediately before W publication -> Status remains OPEN, all 3 notifications leaked ahead of W",
+        "5. Recovery/retry -> 3 duplicate delivery attempts rejected by idempotency, total accepted confirmations=3"
+      ],
+      "cross_process_persistence": "NOT_IMPLEMENTED"
+    },
+    "TASK_8_AUDIT_RECORD_CORRECTIONS": {
+      "verdict": "CONFIRMED",
+      "addendum_file": "R1-F02-R1F01-CORRECTIONS.md",
+      "corrected_items_count": 5
+    }
+  },
+  "overall_audit_disposition": "R1-F02 EVIDENCE CLOSED — READY FOR ARCHITECTURAL REMEDIATION"
+}

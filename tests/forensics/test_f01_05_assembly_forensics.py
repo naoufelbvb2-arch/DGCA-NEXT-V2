@@ -1,9 +1,10 @@
-"""Forensic Investigation Phase D: ASSEMBLY FORENSICS (R1-M01, R1-M02, R1-M03).
+"""Forensic Investigation Phase D: ASSEMBLY & READOUT FORENSICS (R1-M01, R1-M02, R1-M03 & Tasks 2, 3, 4).
 
 Investigates:
-- F01-05: Exact duplicate Assemblies and why they fail to merge (between_strength = 0.0)
-- F01-06: Contextual z cell contamination of lexical Assemblies
-- F01-07: Readout score dilution and exclusion of indirect causal gain (P_T > 0 requirement)
+- F01-05 (R1-M01): Duplicate Assemblies (Fixture exact duplicates cannot merge due to between_strength = 0.0)
+- Task 2: Natural Assembly inspection at roots 34, 56, 80 (EXACT_STRUCTURAL_DUPLICATE vs SAME_SURFACE_DIFFERENT_STRUCTURE)
+- Task 3 (R1-M02): Natural contextual z-cell contamination of lexical Assembly (CoreCoverage drops to 0.80 on DB)
+- Task 4 (R1-M03): Readout causal analysis (exclusion of indirect Pass-2 causal gain by P_T > 0 and |G| dilution)
 """
 
 from __future__ import annotations
@@ -11,24 +12,33 @@ from __future__ import annotations
 import pytest
 from dgca.common.hashing import Region
 from dgca.core.anatomy import Synapse, SynapseScope, SynapseState
-from dgca.core.assembly import _try_merge_pair, execute_assembly_end_pipeline, is_eligible_assembly_member_cell
-from dgca.core.generator import generate_episode
+from dgca.core.assembly import (
+    _is_in_merge_split_cooldown,
+    _try_merge_pair,
+    compute_core_coverage,
+    is_eligible_assembly_member_cell,
+)
+from dgca.core.dynamics import execute_two_pass_event
 from dgca.core.readout import evaluate_full_vs_control_readout
+from dgca.core.sic_v1 import project_core_event_v1
 from dgca.core.state import (
     Assembly,
     AssemblyStatus,
     BindingStatus,
+    EventOrigin,
     ExecutionMode,
     MachineState,
     StableBinding,
 )
+from dgca.encoder.envelope import encode_exposure, encode_lexical_token_event
 from dgca.experiments.gates import _wire_consolidated_synapse
+from dgca.lifecycle.exposure_tx import ExposureTransactionManager, run_read_only_episode
+from dgca.peripheral.readout_ledger import SurfaceReadoutLedgerV1
 
 
-def test_f01_05_exact_duplicate_assemblies_cannot_merge() -> None:
-    """F01-05 (R1-M01): Verify that exact duplicate assemblies (identical member sets) fail MERGE."""
+def test_f01_05_fixture_exact_duplicate_assemblies_cannot_merge() -> None:
+    """F01-05 (R1-M01 Mechanism Fixture): Verify that exact duplicate assemblies fail MERGE."""
     state = MachineState()
-    # Cells for triangle
     c1, c2, c3 = 8200, 8208, 8216
     for c in (c1, c2, c3):
         state.W.commit_cell(c, 0)
@@ -37,7 +47,6 @@ def test_f01_05_exact_duplicate_assemblies_cannot_merge() -> None:
             if u != v:
                 _wire_consolidated_synapse(state, u, v, SynapseScope.LOCAL, s_val=0.85)
 
-    # Create two identical live assemblies with the EXACT SAME member cells
     asm1 = Assembly(
         assembly_id=1,
         region=Region.LANGUAGE,
@@ -55,120 +64,193 @@ def test_f01_05_exact_duplicate_assemblies_cannot_merge() -> None:
     state.W.assemblies[1] = asm1
     state.W.assemblies[2] = asm2
 
-    # Attempt merge
     merged = _try_merge_pair(1, 2, state.W, {})
-
-    # Forensic analysis:
-    # Jaccard is 1.0 (>= THETA_MERGE 0.70).
-    # But assembly.py:539-540:
-    #   excl_a = set_a - set_b = []
-    #   excl_b = set_b - set_a = []
-    #   if not excl_a or not excl_b: between_strength = 0.0
-    # Because 0.0 < THETA_OB (0.50), _try_merge_pair returns False!
-    print(f"\n[F01-05] Did exact duplicates merge? {merged}")
+    # Jaccard = 1.0 >= 0.70, but excl_a and excl_b are empty -> between_strength = 0.0 < THETA_OB (0.40) -> False
     assert merged is False, "DEFECT NOT OBSERVED: exact duplicates unexpectedly merged"
     assert asm1.status == AssemblyStatus.LIVE
-    assert asm2.status == AssemblyStatus.LIVE, "Duplicate assembly survived MERGE!"
+    assert asm2.status == AssemblyStatus.LIVE
 
 
-def test_f01_06_contextual_z_cell_contamination() -> None:
-    """F01-06 (R1-M02): Verify that a graduated contextual cell z is permitted into an Assembly."""
+def test_f01_task2_natural_assembly_duplication_analysis() -> None:
+    """Task 2: Inspect Assemblies formed through natural cold-start learning across roots 34, 56, 80."""
     state = MachineState()
-    z_id = 8320
-    c0, c1 = 8200, 8208
-    state.W.commit_cell(z_id, 0)
-    state.W.commit_cell(c0, 0)
-    state.W.commit_cell(c1, 0)
-
-    # Add active stable binding for z
-    state.W.stable_bindings[z_id] = StableBinding(
-        schema_version=2,
-        z_cell_id=z_id,
-        anchor_id=c0,
-        owner_seq=1,
-        binding_generation=1,
-        p_keys=((8192, z_id, SynapseScope.ASSOCIATIVE), (8193, z_id, SynapseScope.ASSOCIATIVE)),
-        l_z_q6=500_000,
-        u_z_q6=100_000,
-        tau_ctx_q6=150_000,
-        c_keys=((c0, z_id, SynapseScope.LOCAL), (c1, z_id, SynapseScope.LOCAL)),
-        y_keys=((z_id, 8224, SynapseScope.ASSOCIATIVE),),
-        anchor_source_set=frozenset((c0, c1)),
-        status=BindingStatus.ACTIVE,
-        depth=1,
-    )
-    # Wire consolidated synapses so binding is legal
-    for k in state.W.stable_bindings[z_id].p_keys:
-        state.W.commit_cell(k[0], 0)
-        _wire_consolidated_synapse(state, k[0], k[1], k[2])
-    for k in state.W.stable_bindings[z_id].c_keys:
-        _wire_consolidated_synapse(state, k[0], k[1], k[2])
-    for k in state.W.stable_bindings[z_id].y_keys:
-        state.W.commit_cell(k[1], 0)
-        _wire_consolidated_synapse(state, k[0], k[1], k[2])
-
-    # Check eligibility of z_id for Assembly membership
-    is_eligible = is_eligible_assembly_member_cell(z_id, state.W)
-    print(f"\n[F01-06] Is contextual cell z eligible for assembly membership? {is_eligible}")
-    # assembly.py:78-84 explicitly allows graduated contextual cells with ACTIVE binding!
-    assert is_eligible is True, "DEFECT NOT OBSERVED: contextual z was rejected from assembly membership"
-
-
-def test_f01_07_readout_score_dilution_and_indirect_gain_exclusion() -> None:
-    """F01-07 (R1-M03): Verify that readout score is diluted by non-target members and indirect gain is zeroed."""
-    state = MachineState()
-    # Create an assembly with 3 members: 1 direct target, 2 indirect members
-    t1 = 8200
-    m2 = 8208
-    m3 = 8216
-    for c in (t1, m2, m3):
-        state.W.commit_cell(c, 0)
-    for u in (t1, m2, m3):
-        for v in (t1, m2, m3):
-            if u != v:
-                _wire_consolidated_synapse(state, u, v, SynapseScope.LOCAL, s_val=0.85)
-
-    asm = Assembly(
-        assembly_id=1,
-        region=Region.LANGUAGE,
-        member_cell_ids=frozenset((t1, m2, m3)),
-        structural_generation=1,
-        status=AssemblyStatus.LIVE,
-    )
-    state.W.assemblies[1] = asm
-
-    # Set up source cell that projects only to t1
-    src = 8300
-    state.W.commit_cell(src, 0)
-    _wire_consolidated_synapse(state, src, t1, SynapseScope.ASSOCIATIVE, s_val=0.80)
-
-    # Set state.R so P_T is generated to t1
-    state.R.A[src] = 0.90
-    state.R.F_step = frozenset((src,))
-    state.R.mu_source_mask = {src: 0}
-
-    # Evaluate readout
-    res = evaluate_full_vs_control_readout(
+    ledger = SurfaceReadoutLedgerV1()
+    tx = ExposureTransactionManager(
         state,
-        theta_read=0.08,
-        m_read=0.04,
+        enable_context_pipeline=True,
+        enable_assembly_pipeline=True,
+        readout_ledger=ledger,
     )
 
-    # Check gains: t1 has direct gain, m2 and m3 might have synchronous gain in Pass 2
-    gain_t1 = res.gain_by_cell.get(t1, 0.0)
-    gain_m2 = res.gain_by_cell.get(m2, 0.0)
-    gain_m3 = res.gain_by_cell.get(m3, 0.0)
+    branch_ab = encode_exposure("القط يشرب حليب", append_eos=False)
+    branch_db = encode_exposure("النسر يشرب ماء", append_eos=False)
 
-    print(f"\n[F01-07] Causal gains: t1={gain_t1:.4f}, m2={gain_m2:.4f}, m3={gain_m3:.4f}")
-    print(f"  Eligible next cells: {res.eligible_next_cells}")
-    print(f"  Top readout score: {res.top_score:.4f}")
+    for root_id in range(1, 81):
+        is_ab = (root_id % 2 != 0)
+        envs = branch_ab if is_ab else branch_db
+        tx.begin_exposure(root_id)
+        for env in envs:
+            core_ev = encode_lexical_token_event(
+                env.peripheral_surface.raw_surface_nfc_utf8,
+                exposure_id=root_id,
+                event_order=env.core_event.event_order,
+                boundary=env.core_event.boundary,
+            ).core_event
+            tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
+        tx.end_exposure(root_id)
 
-    # Because P_T > 0 is ONLY true for t1, eligible_next_cells contains ONLY t1!
-    # Even if m2/m3 had positive activity, their gain is excluded (eligibleNext = 0).
-    # And total_gain is divided by |G| = 3!
-    assert t1 in res.eligible_next_cells
-    assert m2 not in res.eligible_next_cells
-    assert m3 not in res.eligible_next_cells
+    # Inspect LIVE assemblies at root 80
+    live_asms = [a for a in state.W.assemblies.values() if a.status == AssemblyStatus.LIVE]
+    member_sets: dict[tuple[int, ...], list[int]] = {}
+    surface_map: dict[str, list[int]] = {}
 
-    expected_score = gain_t1 / 3.0
-    assert abs(res.top_score - expected_score) < 1e-6, "Score dilution confirmed: divided by |G|=3"
+    for a in live_asms:
+        m_tuple = tuple(sorted(a.member_cell_ids))
+        member_sets.setdefault(m_tuple, []).append(a.assembly_id)
+        res_r = ledger.resolve_readout(a.assembly_id, a.structural_generation, current_live_generation=a.structural_generation)
+        surf = getattr(res_r.envelope, "raw_surface_nfc_utf8", None)
+        if surf:
+            surface_map.setdefault(surf, []).append(a.assembly_id)
+
+    # 1. Check for EXACT_STRUCTURAL_DUPLICATE
+    exact_duplicates = [ids for m, ids in member_sets.items() if len(ids) > 1]
+    # In natural cold-start learning, exact structural duplicates do NOT occur (count = 0)
+    assert len(exact_duplicates) == 0, "Observed unexpected exact structural duplicates in natural learning"
+
+    # 2. Check for SAME_SURFACE_DIFFERENT_STRUCTURE
+    # Multiple distinct assemblies exist for "يشرب" (Asm 1 & Asm 3), "حليب" (Asm 5 & 8), "ماء" (Asm 7 & 9)
+    assert len(surface_map.get("يشرب", [])) >= 2
+    assert len(surface_map.get("حليب", [])) >= 2
+    assert len(surface_map.get("ماء", [])) >= 2
+
+
+def test_f01_task3_natural_contextual_z_contamination() -> None:
+    """Task 3 (R1-M02): Verify that graduated contextual z enters lexical Assembly and depresses CoreCoverage on rival branch."""
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=True,
+        enable_assembly_pipeline=True,
+        readout_ledger=ledger,
+    )
+
+    branch_ab = encode_exposure("القط يشرب حليب", append_eos=False)
+    branch_db = encode_exposure("النسر يشرب ماء", append_eos=False)
+
+    for root_id in range(1, 57):
+        is_ab = (root_id % 2 != 0)
+        envs = branch_ab if is_ab else branch_db
+        tx.begin_exposure(root_id)
+        for env in envs:
+            core_ev = encode_lexical_token_event(
+                env.peripheral_surface.raw_surface_nfc_utf8,
+                exposure_id=root_id,
+                event_order=env.core_event.event_order,
+                boundary=env.core_event.boundary,
+            ).core_event
+            tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
+        tx.end_exposure(root_id)
+
+    # In natural learning, Assembly 1 is formed for "يشرب"
+    asm1 = state.W.assemblies[1]
+    z_cells_in_asm1 = [cid for cid in asm1.member_cell_ids if cid in state.W.stable_bindings]
+    # Direct physical membership confirmed
+    assert len(z_cells_in_asm1) == 1
+    z_ab = z_cells_in_asm1[0]
+    assert z_ab == 8321
+
+    # Measure CoreCoverage under both contexts
+    ro_ab = run_read_only_episode(state, [branch_ab[0].core_event, branch_ab[1].core_event])
+    ro_db = run_read_only_episode(state, [branch_db[0].core_event, branch_db[1].core_event])
+    cov_ab = compute_core_coverage(asm1, ro_ab.event_results[1], state.H_slow)
+    cov_db = compute_core_coverage(asm1, ro_db.event_results[1], state.H_slow)
+
+    # In branch AB, z_ab is active (G_ctx=1) -> CoreCoverage = 1.0 (5/5 cells)
+    assert cov_ab == 1.0
+    # In branch DB, z_ab is gated off (G_ctx=0, A=0.0) -> CoreCoverage drops to 0.80 (4/5 cells)
+    assert cov_db == 0.80, "Expected CoreCoverage drop to 0.80 due to contextual z silencing on DB branch"
+
+
+def test_f01_task4_readout_causal_gain_and_dilution_analysis() -> None:
+    """Task 4 (R1-M03): Measure member-level gains, exclusion of Pass-2 lateral gain, and score dilution."""
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=True,
+        enable_assembly_pipeline=True,
+        readout_ledger=ledger,
+    )
+
+    branch_ab = encode_exposure("القط يشرب حليب", append_eos=False)
+    branch_db = encode_exposure("النسر يشرب ماء", append_eos=False)
+
+    for root_id in range(1, 35):
+        is_ab = (root_id % 2 != 0)
+        envs = branch_ab if is_ab else branch_db
+        tx.begin_exposure(root_id)
+        for env in envs:
+            core_ev = encode_lexical_token_event(
+                env.peripheral_surface.raw_surface_nfc_utf8,
+                exposure_id=root_id,
+                event_order=env.core_event.event_order,
+                boundary=env.core_event.boundary,
+            ).core_event
+            tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
+        tx.end_exposure(root_id)
+
+    # Ingest prompt 'القط يشرب'
+    scratch = state.clone()
+    scratch.R.reset_cold()
+    for idx, ev in enumerate([branch_ab[0].core_event, branch_ab[1].core_event]):
+        proj = project_core_event_v1(ev)
+        execute_two_pass_event(
+            scratch,
+            proj.x_fixed_by_global_id,
+            proj.x_float_by_global_id,
+            mode=ExecutionMode.RETRIEVE,
+            origin=EventOrigin.READ_ONLY_OBSERVED,
+            boundary=(idx == 0),
+            event_order=idx,
+            allow_candidate_probe=False,
+            admit_uncommitted_sensory=False,
+        )
+
+    # Run FULL vs CONTROL
+    scratch_full = scratch.clone()
+    scratch_ctrl = scratch.clone()
+    res_full = execute_two_pass_event(
+        scratch_full, {}, {},
+        mode=ExecutionMode.RETRIEVE, origin=EventOrigin.READ_ONLY_OBSERVED,
+        boundary=False, event_order=2, allow_candidate_probe=False,
+        admit_uncommitted_sensory=False, control_zero_pt=False,
+    )
+    res_ctrl = execute_two_pass_event(
+        scratch_ctrl, {}, {},
+        mode=ExecutionMode.RETRIEVE, origin=EventOrigin.READ_ONLY_OBSERVED,
+        boundary=False, event_order=2, allow_candidate_probe=False,
+        admit_uncommitted_sensory=False, control_zero_pt=True,
+    )
+
+    # Inspect Assembly 5 ("حليب", |G|=4)
+    asm5 = state.W.assemblies[5]
+    members = sorted(asm5.member_cell_ids)
+    assert len(members) == 4
+
+    gains = [max(res_full.a_plus_by_cell.get(m, 0.0) - res_ctrl.a_plus_by_cell.get(m, 0.0), 0.0) for m in members]
+    pts = [res_full.pt_by_cell.get(m, 0.0) for m in members]
+    pss = [res_full.ps_by_cell.get(m, 0.0) for m in members]
+    eligs = [(pt > 0.0 and g > 0.0) for pt, g in zip(pts, gains)]
+
+    # Exactly 2 members have P_T > 0 (direct targets)
+    assert sum(1 for pt in pts if pt > 0.0) == 2
+    # Exactly 2 members have P_T == 0 but P_S > 0 and positive causal gain!
+    excluded_gains = [g for g, pt in zip(gains, pts) if pt == 0.0 and g > 0.0]
+    assert len(excluded_gains) == 2, "Expected 2 members with positive causal gain to be excluded due to P_T == 0"
+
+    # Production score divides sum of eligible gains by |G| = 4
+    prod_readout = evaluate_full_vs_control_readout(scratch, theta_read=0.08, m_read=0.04)
+    assert prod_readout.status.name == "NO_MATCH"
+    assert prod_readout.top_score < 0.08
+    assert abs(prod_readout.top_score - (sum(g for g, e in zip(gains, eligs) if e) / 4.0)) < 1e-4
