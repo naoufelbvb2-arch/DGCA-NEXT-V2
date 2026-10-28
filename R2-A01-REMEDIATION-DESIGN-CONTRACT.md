@@ -1,13 +1,13 @@
-# DGCA NEXT V2 — R2-A01 REMEDIATION DESIGN CONTRACT (FINAL FREEZE CANDIDATE)
+# DGCA NEXT V2 — R2-A01 REMEDIATION DESIGN CONTRACT (FINAL TECHNICAL CONTRACT)
 ## Transaction Integrity, Provenance & State Atomicity Architecture
 
-**Document Version:** 1.2.0  
-**Audit Stage:** Final Engineering Freeze Closeout (R2-A01-C02)  
-**Author:** Principal Systems Architect & Independent Contract Verification Engineer  
-**Status:** **R2-A01-C02 FREEZE CANDIDATE — READY FOR LEAD ENGINEER RATIFICATION**  
+**Document Version:** 1.2.1  
+**Audit Stage:** Final Technical Addendum (R2-A01-ADDENDUM)  
+**Author:** Independent Systems Contract Verification Engineer  
+**Status:** **R2-A01 FINAL ADDENDUM SUBMITTED — AWAITING FREEZE DECISION**  
 **Repository Baseline Commit:** `31721fd1ba7559b72d9fe11f037ea0c0d1e91ed2` (`main`)  
-**Base Submitted Commit:** `941288753d1ccdc4da874322690b40eff4829ca4`  
-**Current Branch:** `design/r2-a01-c02-final-freeze-closeout`  
+**Base Submitted Commit:** `8a5d299eed294bd98f34bcf5604d2d5b3c3c9ce8`  
+**Current Branch:** `design/r2-a01-final-technical-addendum`  
 
 ---
 
@@ -15,12 +15,12 @@
 
 This contract specifies the final, implementable architectural remediation design for the transaction integrity, state immutability, event provenance, and outbox atomicity defects confirmed during forensic investigations R1-F01, R1-F02, and R1-F02-C01.
 
-This closeout incorporates all final contractual corrections mandated in review R2-A01-C02, including:
-1. Complete canonical envelope identity within `EventIdentityKey` and pre-replay provenance re-validation.
-2. Formal separation between private transaction pending outbox queues and pure neural read-only generation.
-3. A single, indivisible in-process atomic commit boundary with explicit interruption semantics.
-4. Rigorous analytical decomposition of latent snapshot memory and benchmark requirements.
-5. Exact 4-state lifecycle semantics for pre-commit failures and sensory preservation.
+This version incorporates the final technical clarifications from `R2-A01-FINAL-TECHNICAL-ADDENDUM.md`:
+1. Mechanical derivation of canonical feature bundles from normalized raw surface strings (`decompose_lexical_token()`), eliminating semantic-payload substitution attacks while keeping raw text strictly outside neural ranking.
+2. A single atomically-swapped publication state reference (`TransactionPublicationView`) replacing multi-statement assignments, with explicit fault injection semantics.
+3. Rigorous distinction of ledger failure semantics (`READOUT_UNKNOWN` vs `READOUT_UNAVAILABLE`) and generator safe stop mapping.
+4. Non-mutating virtual latent neighbor lookup (`get_slots_read_only()`) guaranteeing that read-only queries never write to permanent $W$.
+5. Test execution portability across platforms without shell glob dependencies.
 
 ### Governing Invariants:
 - **Zero Production Modification:** No production source code has been or will be modified under this assignment.
@@ -81,7 +81,7 @@ $$\forall \text{State } S = (W, R, H_{\text{slow}}), \quad \text{RETRIEVE}(S, \t
    - If validation fails, return `(False, StatusCode)`. Gate $G_z^{\text{ctx}}$ closes ($0$), diagnostic is recorded in `r.context_diagnostics`. **Zero mutations are written to `binding.status` during runtime event processing.**
 3. **Transactional STALE Transitions in `w_shadow`:**
    - Permanent `STALE` transitions occur strictly at `end_exposure()` during candidate and assembly maintenance passes operating on `w_shadow`.
-   - If the root commits, `self.state.W = w_shadow` persists the legitimate STALE transitions atomically.
+   - When `self._publication_view` commits, legitimate STALE transitions become permanent atomically.
    - If the root aborts, `w_shadow` is discarded. Permanent $W$ retains zero unauthorized STALE transitions.
 4. **Scratch Homeostasis Isolation:**
    In `run_read_only_episode()`:
@@ -90,36 +90,42 @@ $$\forall \text{State } S = (W, R, H_{\text{slow}}), \quad \text{RETRIEVE}(S, \t
 
 ---
 
-### 3.2 P2, C01 & F01: Event/Envelope Provenance & Exact EOS Identity
+### 3.2 P2, C01, F01 & Addendum: Surface-to-Feature Mechanical Provenance
 
-#### A. The Seven Mandatory Pre-Execution Provenance Checks
+#### A. Mechanical Reconstruction & 5-Step Provenance Validation
 Prior to neural execution, proposal staging, or journal modification, `process_event()` invokes `validate_event_envelope_provenance(core_event, envelope, projection)`:
-1. **Check 1 (Feature Bundle Identity):**
-   Compare `core_event.features` against `EOS_CANONICAL_FEATURES` ($((\texttt{"\textbackslash x1fEOS\#0"}, \texttt{"1.000000"}), (\texttt{"\textbackslash x1fEOS\#1"}, \texttt{"0.900000"}), (\texttt{"\textbackslash x1fEOS\#2"}, \texttt{"0.800000"}))$).
-   - If matching: event is canonical EOS.
-   - If not matching: features must NOT contain reserved byte `\x1f`.
-2. **Check 2 (Projection Digest Equality):**
-   `projection.feature_bundle_digest == core_event.feature_bundle_digest`.
-3. **Check 3 (Envelope Digest Equality):**
-   `envelope.feature_bundle_digest == core_event.feature_bundle_digest`.
-4. **Check 4 (Canonical Feature Copy Integrity):**
-   `envelope.canonical_features_copy == core_event.features`.
-5. **Check 5 (Marker Consistency):**
-   - Canonical EOS: `envelope.marker == Marker.EOS` ($0\text{x}01$).
-   - Lexical event: `envelope.marker == Marker.NONE` ($0\text{x}00$).
-6. **Check 6 (Surface SHA-256 Verification):**
+1. **Headless Check:**
+   If `envelope is None`:
+   - If `not allow_headless_events`: raise `ObservationError(code=StatusCode.PROVENANCE_ENVELOPE_MISSING)`.
+   - If `allow_headless_events`: return immediately (low-level synthetic test path).
+2. **Surface SHA-256 Integrity:**
    `envelope.surface_sha256 == hashlib.sha256(envelope.raw_surface_nfc_utf8.encode('utf-8')).digest()`.
-7. **Check 7 (EOS Surface & Boundary Consistency):**
-   If `envelope.marker == Marker.EOS`:
-   - `envelope.raw_surface_nfc_utf8 == "<EOS>"`.
-   - `core_event.boundary == False` (cannot be event_order 0 alone; raises `ObservationError(code=StatusCode.EMPTY_LEXICAL_EXPOSURE)` if violated).
+   If false: raise `ObservationError(code=StatusCode.INVALID_SURFACE_HASH)`.
+3. **Marker & Reserved Surface Validation:**
+   - If `envelope.marker == Marker.EOS`:
+     - Assert `envelope.raw_surface_nfc_utf8 == "<EOS>"`.
+     - Assert `core_event.boundary == False`.
+     - Assert `core_event.event_order > 0` (solitary EOS raises `ObservationError(code=StatusCode.EMPTY_LEXICAL_EXPOSURE)`).
+     - Expected features = `EOS_CANONICAL_FEATURES`.
+   - If `envelope.marker == Marker.NONE`:
+     - Assert `envelope.raw_surface_nfc_utf8 != "<EOS>"` and `"\x1f"` not in raw surface.
+     - **Mechanical Derivation:** `expected_features = decompose_lexical_token(envelope.raw_surface_nfc_utf8)` (using frozen Encoder §2.2 rules).
+   - If unrecognized marker: raise `ObservationError(code=StatusCode.PROVENANCE_MARKER_MISMATCH)`.
+4. **Exact Feature Equality:**
+   - Assert `core_event.features == expected_features` (raises `PROVENANCE_FEATURE_COPY_MISMATCH`).
+   - Assert `envelope.canonical_features_copy == expected_features` (raises `PROVENANCE_FEATURE_COPY_MISMATCH`).
+5. **Bundle Digest Equality:**
+   `expected_digest = compute_feature_bundle_digest(expected_features)`
+   - Assert `projection.feature_bundle_digest == expected_digest`.
+   - Assert `core_event.feature_bundle_digest == expected_digest`.
+   - Assert `envelope.feature_bundle_digest == expected_digest` (raises `PROVENANCE_DIGEST_MISMATCH`).
 
-#### B. Populating `EventExecutionResult.feature_bundle_digest` (D2)
-Add `feature_bundle_digest: bytes` to `EventExecutionResult`. In `execute_two_pass_event()`, assign directly from `projection.feature_bundle_digest`. In `outbox.py:104`, assert `ev.feature_bundle_digest == envelope.feature_bundle_digest`.
+#### B. Insulation of Neural Ranking and LLA
+No raw text strings ever enter neural ranking, activation calculation, or LLA wiring. Reconstruction is strictly a cryptographic provenance check. Downstream execution operates entirely on orthogonal sub-token feature tuples.
 
 ---
 
-### 3.3 P3 & F01: Exact Event Identity Key & Replay Validation
+### 3.3 P3, F01 & Addendum: Exact Event Identity Key & Replay Precedence
 
 #### A. Comprehensive Canonical Identity Structures
 ```python
@@ -146,19 +152,17 @@ class EventIdentityKey:
     envelope_identity: CanonicalEnvelopeIdentity | None
 ```
 
-#### B. Replay & Collision Evaluation Protocol
+#### B. Replay & Collision Evaluation Protocol (Error Precedence)
 When `core_event.event_order < journal.next_event_order`:
-1. **Mandatory Full Provenance Validation:** Incoming event and envelope MUST undergo complete structural validation `validate_event_envelope_provenance()` first.
-2. **Identity Comparison:** Construct `current_key` and compare against `journal.event_identities[core_event.event_order]`.
-3. **Rejection Semantics:**
-   - If core payload fields differ: raise `ObservationError("Payload conflict on retry", code=StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT)`.
-   - If envelope digest, marker, features copy, or raw surface differ: raise `ObservationError("Envelope conflict on retry", code=StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT)`.
-   - If original was headless and retry attaches envelope: raise `ObservationError("Cannot retroactively attach envelope", code=StatusCode.EVENT_RETRY_PROVENANCE_ALTERATION)`.
-4. **Idempotent Return:** If and only if `current_key == recorded_key`, return `journal.event_results[core_event.event_order]`. Zero mutations occur.
+1. **Precedence 1 (Structural Validation):** Execute `validate_event_envelope_provenance()`. Any corrupted or tampered envelope fails fast here.
+2. **Precedence 2 (Provenance Alteration):** If existing event was headless and retry attaches an envelope (or vice versa), raise `ObservationError(code=StatusCode.EVENT_RETRY_PROVENANCE_ALTERATION)`.
+3. **Precedence 3 (Core Payload Conflict):** If core features, boundary, or salience differ from recorded identity, raise `ObservationError(code=StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT)`.
+4. **Precedence 4 (Envelope Identity Conflict):** If envelope raw surface, marker, digest, or feature copy differ from recorded identity, raise `ObservationError(code=StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT)`.
+5. **Precedence 5 (Idempotent Return):** If and only if `current_key == recorded_key`, return cached `journal.event_results[core_event.event_order]`. Zero mutations occur.
 
 ---
 
-### 3.4 P4, C07 & F04: Latent Topology Rollback & Scaling Benchmark
+### 3.4 P4, C07, F04 & Addendum: Latent Topology Rollback & Read Immutability
 
 #### A. Rollback Mechanism
 In `OpenExposureJournal`, store `latent_table_begin = self.state.W.latent_table.clone()`.
@@ -167,89 +171,95 @@ On `abort_exposure()`:
 self.state.W.latent_table = journal.latent_table_begin.clone()
 ```
 
-#### B. Memory Overhead & Scaling Decomposition
-1. **Asymptotic Complexity:**
-   $$\text{Time} = \Theta(M_{\text{mat}} + |R_{\text{coactive}}| + P_{\text{pins}} + W_{\text{logs}})$$
-   $$\text{Memory} = \Theta(M_{\text{mat}} \times 24 \times 8\text{ bytes} + |R_{\text{coactive}}| + P_{\text{pins}} + W_{\text{logs}})$$
-2. **Theoretical Minimum Payload:**
-   - Raw slot integers: $M_{\text{mat}} \times 24 \times 2\text{ bytes} = 48 \times M_{\text{mat}}\text{ bytes}$ ($14.4\text{ KB}$ for 300 cells; $589.8\text{ KB}$ for 12,288 cells).
-3. **Python 64-bit Object Overhead:**
-   - List header + pointers: $\approx 440\text{ bytes/cell}$. Dict entry: $\approx 64\text{ bytes/cell}$. Total per cell: $\approx 504\text{ bytes}$.
-   - Dict of sets (`_coactive_reverse_index`): $\approx 216\text{ bytes/set} + 8\text{ bytes/entry}$.
-   - Estimated overhead for 56-root curriculum ($M_{\text{mat}} \approx 250..300$): $\approx 200..350\text{ KB}$.
-   - Full materialization stress ($M_{\text{mat}} = 12{,}288$, 6 links/cell): $\approx 8..15\text{ MB}$.
-4. **Benchmark Verification Requirement (`BENCH-R2-A01-P4`):**
-   No fixed latency or memory guarantees are asserted prior to execution. Patch 3 requires execution of `BENCH-R2-A01-P4` to measure actual memory usage and latency on the target Python 3.14 environment across small, medium, and high-occupancy loads, verifying zero leakage over 1,000 abort/commit cycles.
+#### B. Latent Read Immutability (Non-Mutating Virtual Lookup)
+In `LatentNeighborhoodTable`, calling `_ensure_cell_materialized(c)` on unmaterialized cells writes to `_slots_by_cell`, causing $\Delta W \ne 0$ during read-only inference.
+- Implement `get_slots_read_only(cell_id)`: for any unmaterialized cell, compute local and topographic neighbors virtually on the fly and return without writing to `self._slots_by_cell`.
+- In `ExecutionMode.RETRIEVE` and `ExecutionMode.GENERATE`, all latent queries route through read-only virtual lookups.
+- Invariant: $\text{set}(W_{\text{pre}}.\text{latent\_table.\_slots\_by\_cell.keys()}) == \text{set}(W_{\text{post}}.\text{latent\_table.\_slots\_by\_cell.keys()})$.
+
+#### C. Memory Overhead & Benchmark Requirement (`BENCH-R2-A01-P4`)
+- Asymptotic: $\Theta(M_{\text{mat}} + |R_{\text{coactive}}| + P_{\text{pins}} + W_{\text{logs}})$.
+- Benchmark: Execute `benchmarks/bench_r2_a01_p4_latent_scaling.py` across small, medium, and high-occupancy loads to verify 0 bytes net memory leakage across 1,000 abort/commit cycles.
 
 ---
 
-### 3.5 P5, C02, C04, C08, F02, F03, F05: Coherent In-Process Commit & Outbox Architecture
+### 3.5 P5, C02, C04, C08, F02, F03, F05 & Addendum: Atomic State Publication
 
-#### A. State Ownership Separation (C02 & F02)
+#### A. State Ownership Separation & Ledger Status Semantics
 - **Neural `WState`:** Pure neural state. Regular class. Zero peripheral envelope/notification storage.
-- **Transaction Manager:** Owns `self._pending_outbox_by_root: dict[int, tuple[OutboxNotificationV1, ...]]`.
+- **Transaction Manager:** Owns `self._publication_view: TransactionPublicationView`.
 - **Orchestration Readiness API:**
   - `tx.has_pending_outbox() -> bool`
   - `tx.pending_outbox_count() -> int`
   - `tx.assert_outbox_ready() -> None` (raises `ObservationError(code=StatusCode.OUTBOX_DELIVERY_PENDING)`)
 - **Explicit External Reconciliation:**
-  `tx.reconcile_outbox(ledger: SurfaceReadoutLedgerV1 | None = None) -> tuple[int, list[StatusCode]]` executes outside read-only generation.
-- **Generator Isolation:** `generate_episode()` never mutates the ledger. If winning assembly is not found in ledger, `ledger.resolve_readout()` returns `StatusCode.READOUT_UNAVAILABLE`, which generator maps to `StatusCode.GEN_STOP_READOUT_UNAVAILABLE`.
+  `tx.reconcile_outbox(ledger: SurfaceReadoutLedgerV1 | None = None)` executes strictly outside read-only generation.
+- **Ledger Status Taxonomy in Generation:**
+  - If candidate row is missing or unattested: `ledger.resolve_readout()` returns `StatusCode.READOUT_UNKNOWN`, mapped by generator to `StatusCode.GEN_STOP_READOUT_UNKNOWN`.
+  - If ledger is administratively unavailable (`available=False`): `ledger.resolve_readout()` returns `StatusCode.READOUT_UNAVAILABLE`, mapped to `StatusCode.GEN_STOP_READOUT_UNAVAILABLE`.
+  - Read-only generation performs zero mutations on `SurfaceReadoutLedgerV1`.
 
-#### B. Coherent In-Process Commit Sequence (F03)
+#### B. Single Atomically-Swapped Publication State Reference
 ```python
 @dataclass(frozen=True, slots=True)
-class PreparedRootCommit:
-    exposure_id: int
-    w_shadow: WState
-    end_report: EndExposureReport
-    pending_notifications: tuple[OutboxNotificationV1, ...]
+class TransactionPublicationView:
+    """Single atomically-swapped publication state reference."""
+    W: WState
+    completed_roots: frozendict[int, EndExposureReport]
+    pending_outbox_by_root: frozendict[int, tuple[OutboxNotificationV1, ...]]
+    completed_roots_high_watermark: int
+    active_exposure_id: int | None
 ```
+
 In `end_exposure(exposure_id)`:
 1. **Preparation Phase (Private Memory):**
    - Candidate settlements and assembly updates computed on `w_shadow`.
    - Outbox notifications built against `w_shadow` and `H_slow`.
-   - `PreparedRootCommit` created.
-   *Failure here:* `self.state.W` untouched, root remains `OPEN` (retryable or abortable), ledger untouched.
-2. **Synchronized In-Process Commit Boundary:**
+   - Construct `new_view = TransactionPublicationView(...)`.
+   *Failure here:* `self._publication_view` untouched, root remains `OPEN` (retryable or abortable), ledger untouched.
+2. **The Atomic Publication Point:**
    ```python
-   # THE ATOMIC IN-PROCESS COMMIT POINT
-   self.state.W = prepared.w_shadow
-   self.completed_roots[exposure_id] = prepared.end_report
-   self._pending_outbox_by_root[exposure_id] = prepared.pending_notifications
-   journal.status = ExposureStatus.COMPLETED
-   self.state.W.completed_roots_high_watermark = max(self.state.W.completed_roots_high_watermark, exposure_id)
+   # Single reference pointer assignment: atomic under Python runtime
+   self._publication_view = new_view
    self.open_journal = None
    ```
+   At this single instant, all readers observe the new $W$, completed report, pending outbox batch, and closed active exposure simultaneously.
 3. **Post-Commit Peripheral Dispatch Phase:**
    ```python
    if self.readout_ledger is not None and prepared.pending_notifications:
        try:
            self.readout_ledger.consume_outbox_batch(prepared.pending_notifications)
-           del self._pending_outbox_by_root[exposure_id]
+           # Update publication view with cleared pending queue for this root
        except Exception as exc:
-           # Root remains COMPLETED. W remains committed.
-           # Batch stays in _pending_outbox_by_root for later idempotent reconciliation.
+           # Root remains COMPLETED. W remains committed. Batch remains in pending view.
            logger.warning("Peripheral dispatch deferred for root %d: %s", exposure_id, exc)
    ```
 
-#### C. Pre-Commit Failure Semantics & Sensory Retention (F05)
+#### C. Pre-Commit Failure Semantics & Sensory Retention
 1. **$S_{\text{pre-begin}}$:** State before root begins.
 2. **$S_{\text{pre-end}}$:** Lawful sensory cells admitted during `process_event()` are in `state.W.committed_cells`.
-3. **$S_{\text{post-failed-end}}$:** Failure during preparation before commit. `self.state.W` not swapped. Lawful sensory commitments admitted during `process_event()` **remain** in `state.W.committed_cells`. Root is `OPEN` and **retryable** or **abortable**.
-4. **$S_{\text{post-abort}}$:** Root aborted. `latent_table` and `H_slow` restored. Sensory commitments admitted during `process_event()` **remain** (Core §10.1). High watermark updated. Root is not retryable.
+3. **$S_{\text{post-failed-end}}$:** Failure during preparation before commit. Publication view unswapped. Lawful sensory commitments admitted during `process_event()` **remain** in `state.W.committed_cells`. Root is `OPEN` and **retryable** or **abortable**.
+4. **$S_{\text{post-abort}}$:** Root aborted. Latent topology and `H_slow` restored. Sensory commitments admitted during `process_event()` **remain** (Core §10.1). High watermark updated. Root is not retryable.
+
+#### D. Precise Durable Persistence Boundaries
+In-process commit atomicity guarantees state consistency only within a single running process memory space. It explicitly **cannot** guarantee survivability against:
+- Process crash, `SIGKILL`, or OS segfault.
+- Host machine power failure.
+- Cross-process ledger desynchronization.
+- Restart rollforward without disk WAL.
+These guarantees are formally designated as the boundary for future R1-B03 (`DurablePersistenceService`).
 
 ---
 
-## 4. EXACT FAILURE INJECTION MATRIX (F03)
+## 4. EXACT FAILURE INJECTION MATRIX (ADDENDUM ALIGNED)
 
-| Failure Point | Timing | Observable $W$ | Observable Root Status | Completed Registry | Pending Outbox | Peripheral Ledger | Retry Eligibility |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **FP-01** | During `w_shadow` assembly updates (pre-commit) | Unchanged ($S_{\text{pre-end}}$); sensory cells preserved | `OPEN` | Not present | Not present | 0 attestations | **Eligible** (Retry `end_exposure` or call `abort_exposure`) |
-| **FP-02** | During outbox batch staging (pre-commit) | Unchanged ($S_{\text{pre-end}}$); sensory cells preserved | `OPEN` | Not present | Not present | 0 attestations | **Eligible** (Retry `end_exposure` or call `abort_exposure`) |
-| **FP-03** | During `consume_outbox_batch` (post-commit) | Committed (`w_shadow`) | `COMPLETED` | Present (`EndExposureReport`) | **Present** (`exposure_id` queued) | 0 attestations | **Ineligible** (Root committed; reconcile via `tx.reconcile_outbox()`) |
-| **FP-04** | Partial notification delivery in ledger (post-commit) | Committed (`w_shadow`) | `COMPLETED` | Present (`EndExposureReport`) | **Present** (`exposure_id` queued) | Partial attestations | **Ineligible** (Root committed; redelivery is idempotent via unique keys) |
+| Failure Point | Timing | Observable $W$ | Observable Root Status | Completed Registry | Pending Outbox | Peripheral Ledger | Client Recovery Action | Linked Tests |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **FP-01** | During `w_shadow` candidate/assembly preparation | Unchanged ($S_{\text{pre-end}}$); sensory cells preserved | `OPEN` | Not present | Not present | 0 attestations | **Eligible to Retry or Abort:** Retry `end_exposure()` or call `abort_exposure()`. | `P5-02` |
+| **FP-02** | During outbox batch staging against `w_shadow` | Unchanged ($S_{\text{pre-end}}$); sensory cells preserved | `OPEN` | Not present | Not present | 0 attestations | **Eligible to Retry or Abort:** Retry `end_exposure()` or call `abort_exposure()`. | `P5-02` |
+| **FP-03** | During `consume_outbox_batch` (post-publication) | Committed (`w_shadow`) | `COMPLETED` | Present (`EndExposureReport`) | **Present** (`exposure_id` queued) | 0 attestations | **Ineligible to Retry Exposure:** Call `tx.reconcile_outbox(exposure_id, ledger)`. | `P5-03`, `P5-04`, `P5-05` |
+| **FP-04** | Transient network or ledger error during `reconcile_outbox` | Committed (`w_shadow`) | `COMPLETED` | Present (`EndExposureReport`) | **Present** (`exposure_id` queued) | Partial / 0 attestations | **Idempotent Retry:** Redrive `tx.reconcile_outbox()`. | `P5-05` |
 
 ---
 
-# R2-A01-C02 FREEZE CANDIDATE — READY FOR LEAD ENGINEER RATIFICATION
+# R2-A01 FINAL ADDENDUM SUBMITTED — AWAITING FREEZE DECISION
