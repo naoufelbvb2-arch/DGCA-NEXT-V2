@@ -1,0 +1,183 @@
+{
+  "schema_version": "DGCA-R1-F01-FORENSIC-MANIFEST-V1",
+  "audit_case": "R1-F01-INDEPENDENT-FORENSIC-VERIFICATION",
+  "pinned_baseline_sha": "31721fd1ba7559b72d9fe11f037ea0c0d1e91ed2",
+  "audit_branch": "audit/r1-f01-forensic-verification",
+  "environment": {
+    "os": "Microsoft Windows 11 Pro (Build 26200)",
+    "python_version": "3.14.4",
+    "pytest_version": "9.0.3",
+    "pluggy_version": "1.6.0"
+  },
+  "baseline_test_suite": {
+    "command": "python -m pytest -q",
+    "exit_code": 0,
+    "total_collected": 76,
+    "passed": 76,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 6.99
+  },
+  "forensic_test_suite": {
+    "command": "python -m pytest tests/forensics -v",
+    "exit_code": 0,
+    "total_collected": 13,
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 7.11
+  },
+  "combined_test_suite": {
+    "command": "python -m pytest -q",
+    "exit_code": 0,
+    "total_collected": 89,
+    "passed": 89,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 13.27
+  },
+  "findings_summary": {
+    "R1-B01": {
+      "finding_id": "R1-B01",
+      "forensic_case": "F01-01",
+      "name": "READ_ONLY_W_IMMUTABILITY",
+      "verdict": "CONFIRMED",
+      "evidence": "w.last_referenced_event[cid] mutated at dynamics.py:678 during RETRIEVE; binding.status mutated from ACTIVE to STALE at context_gate.py:143-200 during RETRIEVE."
+    },
+    "R1-B02": {
+      "finding_id": "R1-B02",
+      "forensic_case": "F01-02",
+      "name": "OUTBOX_ATOMICITY_AND_FAILURE_INJECTION",
+      "verdict": "CONFIRMED",
+      "evidence": "consume_outbox_batch executed before self.state.W = w_shadow at exposure_tx.py:484; partial attestations survive failure and persist in ledger ahead of uncommitted/aborted W."
+    },
+    "R1-B03": {
+      "finding_id": "R1-B03",
+      "forensic_case": "Phase F",
+      "name": "MISSING_DURABLE_CROSS_PROCESS_PERSISTENCE",
+      "verdict": "NOT_IMPLEMENTED",
+      "evidence": "serialization.py contains only IEEE-754 binary64 and record envelope packers; no cross-process disk persistence for WState, HSlowState, RState, or transactions."
+    },
+    "R1-H01": {
+      "finding_id": "R1-H01",
+      "forensic_case": "Phase E",
+      "name": "INSUFFICIENT_GATE_C_ACCEPTANCE_CONDITIONS",
+      "verdict": "CONFIRMED",
+      "evidence": "gates.py:582 asserts len(recruited_cells) >= 2 rather than requiring two distinct COMPLETE graduated contextual owners in stable_bindings."
+    },
+    "R1-H02": {
+      "finding_id": "R1-H02",
+      "forensic_case": "Phase E",
+      "name": "FIXTURE_BASED_GATE_E_EVIDENCE_LIMITATIONS",
+      "verdict": "CONFIRMED",
+      "evidence": "Gate E manually wires all synapses, manually creates assemblies, and manually injects outbox notifications; does not test autonomous learning or native attestation."
+    },
+    "R1-H03": {
+      "finding_id": "R1-H03",
+      "forensic_case": "Phase E",
+      "name": "NON_EQUIVALENT_SCIENTIFIC_ABLATIONS",
+      "verdict": "CONFIRMED",
+      "evidence": "Gate D compares Gate B fixture network against an unrelated toy network with arbitrary s_val=0.45; B_i 64 vs 32 is pure arithmetic headroom; Replay is isolated function call."
+    },
+    "R1-H04": {
+      "finding_id": "R1-H04",
+      "forensic_case": "F01-03",
+      "name": "EVENT_RETRY_COLLISION",
+      "verdict": "CONFIRMED",
+      "evidence": "exposure_tx.py:282-283 checks only event_order < next_event_order; conflicting feature bundles and envelopes are silently accepted without digest verification."
+    },
+    "R1-H05": {
+      "finding_id": "R1-H05",
+      "forensic_case": "F01-04",
+      "name": "LATENT_TOPOLOGY_MUTATION_SURVIVING_ABORT",
+      "verdict": "CONFIRMED",
+      "evidence": "Coactive latent partner allocations and reverse index survive ABORT_EXPOSURE because abort_exposure only restores H_slow and resets R, leaving W.latent_table unrolled."
+    },
+    "R1-M01": {
+      "finding_id": "R1-M01",
+      "forensic_case": "F01-05",
+      "name": "DUPLICATE_IDENTICAL_ASSEMBLIES",
+      "verdict": "CONFIRMED",
+      "evidence": "assembly.py:539-548 sets between_strength = 0.0 when excl_a or excl_b is empty, causing _try_merge_pair to reject exact duplicate assemblies (0.0 < THETA_OB 0.50)."
+    },
+    "R1-M02": {
+      "finding_id": "R1-M02",
+      "forensic_case": "F01-06",
+      "name": "CONTEXTUAL_Z_ASSEMBLY_CONTAMINATION",
+      "verdict": "CONFIRMED",
+      "evidence": "assembly.py:78-84 explicitly permits completed contextual z cells with ACTIVE bindings to enter Assemblies; in cold-start run, cell 8321 (z_ab) entered Assembly 1 (يشرب)."
+    },
+    "R1-M03": {
+      "finding_id": "R1-M03",
+      "forensic_case": "F01-07",
+      "name": "READOUT_SCORE_DILUTION_AND_INDIRECT_GAIN_EXCLUSION",
+      "verdict": "CONFIRMED",
+      "evidence": "readout.py:108 requires P_j^T > 0 for eligibility, zeroing out indirect causal gain from synchronous pass 2; score is divided by |G|, diluting score below theta_read (0.08) at root 34."
+    }
+  },
+  "cold_start_telemetry": {
+    "checkpoint_34": {
+      "roots_completed": 34,
+      "committed_cells": 77,
+      "live_assemblies": 9,
+      "stable_bindings": 2,
+      "binding_details": [
+        {"z_cell_id": 8321, "p_sources": [11077, 11811], "c_sources": [9005, 10696], "y_targets": [9319, 9325], "status": "ACTIVE"},
+        {"z_cell_id": 8320, "p_sources": [9205, 9369], "c_sources": [8327, 10696], "y_targets": [8242, 9854], "status": "ACTIVE"}
+      ],
+      "pred_scores": {
+        "pred_c_given_ab": 0.135637,
+        "pred_e_given_ab": 0.0,
+        "margin_ab": 0.135637,
+        "pred_e_given_db": 0.107136,
+        "pred_c_given_db": 0.0,
+        "margin_db": 0.107136
+      },
+      "generation": {
+        "prompt_ab": {
+          "emitted_surfaces": [],
+          "stop_status": "GEN_STOP_NO_MATCH",
+          "reason": "Top score 0.0661 fell below theta_read (0.08) due to Assembly 5 dilution"
+        },
+        "prompt_db": {
+          "emitted_surfaces": ["ماء"],
+          "stop_status": "GEN_STOP_NO_MATCH",
+          "reason": "Emitted 'ماء' at step 0 (score 0.0884), stopped at step 1 with NO_MATCH"
+        }
+      }
+    },
+    "checkpoint_56": {
+      "roots_completed": 56,
+      "committed_cells": 77,
+      "live_assemblies": 9,
+      "stable_bindings": 2,
+      "pred_scores": {
+        "pred_c_given_ab": 0.273961,
+        "pred_e_given_ab": 0.0,
+        "margin_ab": 0.273961,
+        "pred_e_given_db": 0.211272,
+        "pred_c_given_db": 0.0,
+        "margin_db": 0.211272
+      },
+      "generation": {
+        "prompt_ab": {
+          "emitted_surfaces": ["حليب"],
+          "stop_status": "GEN_STOP_NO_MATCH",
+          "step_0": {"winner_assembly_id": 5, "score": 0.1058, "margin": 0.1058, "surface": "حليب"}
+        },
+        "prompt_db": {
+          "emitted_surfaces": ["ماء"],
+          "stop_status": "GEN_STOP_NO_MATCH",
+          "step_0": {"winner_assembly_id": 7, "score": 0.1323, "margin": 0.1323, "surface": "ماء"}
+        }
+      }
+    }
+  },
+  "scientific_gate_verdicts": {
+    "MECHANISM_FIXTURE_VERIFIED": "PASS",
+    "NEURAL_LEARNING_FROM_ZERO_VERIFIED": "PASS",
+    "LEARNED_SURFACE_GENERATION_VERIFIED": "CONDITIONAL_PARTIAL",
+    "COMPOSITIONAL_GENERALIZATION_VERIFIED": "NOT_ACHIEVED"
+  },
+  "audit_disposition": "R1-F01 PARTIALLY VERIFIED — EVIDENCE GAPS REMAIN"
+}
