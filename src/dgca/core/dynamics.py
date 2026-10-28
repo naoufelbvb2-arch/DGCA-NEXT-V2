@@ -84,6 +84,7 @@ class EventExecutionResult:
     typed_supports: dict[int, TypedSupportRecord]
     contributions: tuple[ContributionRecord, ...]
     diagnostics: tuple[StatusCode, ...]
+    feature_bundle_digest: bytes = b""
 
 
 def compute_next_step_temporal_drive(
@@ -802,6 +803,7 @@ def execute_two_pass_event(
         typed_supports=curr_supports,
         contributions=tuple(contributions),
         diagnostics=tuple(diagnostics),
+        feature_bundle_digest=feature_bundle_digest,
     )
 
 

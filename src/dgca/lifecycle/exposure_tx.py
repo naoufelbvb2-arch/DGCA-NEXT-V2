@@ -10,11 +10,14 @@ Normative references:
 
 from __future__ import annotations
 
+import hashlib
+import unicodedata
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from dgca.common.errors import DGCAError, ObservationError, StatusCode
+from dgca.common.hashing import Region
 from dgca.core.anatomy import SynapseKey, SynapseScope
 from dgca.core.dynamics import (
     EventExecutionResult,
@@ -22,13 +25,20 @@ from dgca.core.dynamics import (
     compute_next_step_temporal_drive,
     execute_two_pass_event,
 )
-from dgca.core.sic_v1 import project_core_event_v1
+from dgca.core.sic_v1 import SICProjectionResult, project_core_event_v1
 from dgca.core.state import ExecutionMode, HSlowState, MachineState, WState
+from dgca.encoder.decomposer import (
+    EOS_CANONICAL_FEATURES,
+    decompose_lexical_token,
+    finalize_feature_bundle,
+)
 from dgca.encoder.envelope import (
     CoreEventPayloadV1,
     EventOrigin,
+    Marker,
     PeripheralSurfaceEnvelopeV1,
 )
+from dgca.encoder.segmenter import EOS_RAW_SURFACE
 from dgca.lla.proposals import (
     LinkProposal,
     THETA_CREATE_CROSS,
@@ -43,6 +53,187 @@ from dgca.lla.synapse_ledger import (
     prune_expired_candidate_synapses,
 )
 from dgca.lla.witness import ObservationScope, ObservationWitness
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalEnvelopeIdentity:
+    """Immutable identity record for a peripheral surface envelope (Core §9.4, Encoder §4)."""
+
+    raw_surface_nfc_utf8: str
+    surface_sha256: bytes
+    feature_bundle_digest: bytes
+    canonical_features_copy: tuple[tuple[str, str], ...]
+    marker: Marker
+
+    @classmethod
+    def from_envelope(cls, envelope: PeripheralSurfaceEnvelopeV1) -> CanonicalEnvelopeIdentity:
+        return cls(
+            raw_surface_nfc_utf8=envelope.raw_surface_nfc_utf8,
+            surface_sha256=envelope.surface_sha256,
+            feature_bundle_digest=envelope.feature_bundle_digest,
+            canonical_features_copy=tuple(envelope.canonical_features_copy),
+            marker=envelope.marker,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EventIdentityKey:
+    """Comprehensive canonical identity covering both Core neural payload and peripheral envelope."""
+
+    exposure_id: int | None
+    event_order: int
+    modality: Region
+    origin: EventOrigin
+    boundary: bool
+    salience: str
+    features: tuple[tuple[str, str], ...]
+    feature_bundle_digest: bytes
+    observation_scope: ObservationScope
+    envelope_identity: CanonicalEnvelopeIdentity | None
+
+    @classmethod
+    def from_event(
+        cls,
+        core_event: CoreEventPayloadV1,
+        *,
+        observation_scope: ObservationScope,
+        envelope: PeripheralSurfaceEnvelopeV1 | None = None,
+    ) -> EventIdentityKey:
+        return cls(
+            exposure_id=core_event.exposure_id,
+            event_order=core_event.event_order,
+            modality=core_event.modality,
+            origin=core_event.origin,
+            boundary=core_event.boundary,
+            salience=core_event.salience,
+            features=tuple(core_event.features),
+            feature_bundle_digest=core_event.feature_bundle_digest,
+            observation_scope=observation_scope,
+            envelope_identity=(
+                CanonicalEnvelopeIdentity.from_envelope(envelope)
+                if envelope is not None
+                else None
+            ),
+        )
+
+
+def validate_event_envelope_provenance(
+    core_event: CoreEventPayloadV1,
+    envelope: PeripheralSurfaceEnvelopeV1 | None,
+    projection: SICProjectionResult,
+    *,
+    allow_headless_events: bool = False,
+) -> None:
+    """Validate mechanical provenance between raw surface envelope and Core neural event (R2-A01 Patch 1)."""
+    # 1. Headless check
+    if envelope is None:
+        if not allow_headless_events:
+            raise ObservationError(
+                "Peripheral envelope is required for external language events (allow_headless_events=False)",
+                code=StatusCode.PROVENANCE_ENVELOPE_MISSING,
+            )
+        return
+
+    # 2. Raw surface string type, UTF-8 validity, NFC normalization, and SHA-256 integrity
+    if not isinstance(envelope.raw_surface_nfc_utf8, str):
+        raise ObservationError(
+            f"Envelope raw_surface_nfc_utf8 must be str, got {type(envelope.raw_surface_nfc_utf8).__name__}",
+            code=StatusCode.INVALID_OBSERVATION,
+        )
+
+    for ch in envelope.raw_surface_nfc_utf8:
+        cp = ord(ch)
+        if 0xD800 <= cp <= 0xDFFF:
+            raise ObservationError(
+                f"Lone surrogate U+{cp:04X} rejected in envelope surface",
+                code=StatusCode.INVALID_OBSERVATION,
+            )
+
+    if not unicodedata.is_normalized("NFC", envelope.raw_surface_nfc_utf8):
+        raise ObservationError(
+            "Envelope raw_surface_nfc_utf8 is not canonical NFC",
+            code=StatusCode.INVALID_OBSERVATION,
+        )
+
+    computed_surface_hash = hashlib.sha256(
+        envelope.raw_surface_nfc_utf8.encode("utf-8")
+    ).digest()
+    if envelope.surface_sha256 != computed_surface_hash:
+        raise ObservationError(
+            "Envelope surface_sha256 does not match sha256(raw_surface_nfc_utf8)",
+            code=StatusCode.INVALID_SURFACE_HASH,
+        )
+
+    # 3. Marker & reserved surface validation
+    is_eos = (envelope.marker == Marker.EOS)
+    if is_eos:
+        if envelope.raw_surface_nfc_utf8 != EOS_RAW_SURFACE:
+            raise ObservationError(
+                f"Canonical EOS envelope raw surface must be {EOS_RAW_SURFACE!r}, got {envelope.raw_surface_nfc_utf8!r}",
+                code=StatusCode.PROVENANCE_MARKER_MISMATCH,
+            )
+        if core_event.boundary:
+            raise ObservationError(
+                "Canonical EOS event cannot have boundary=True",
+                code=StatusCode.PROVENANCE_MARKER_MISMATCH,
+            )
+        if core_event.event_order == 0:
+            raise ObservationError(
+                "Canonical EOS event cannot be event_order 0 alone (empty exposure)",
+                code=StatusCode.EMPTY_LEXICAL_EXPOSURE,
+            )
+        raw_expected_features = EOS_CANONICAL_FEATURES
+    elif envelope.marker == Marker.NONE:
+        if "\x1f" in envelope.raw_surface_nfc_utf8:
+            raise ObservationError(
+                "Lexical token envelope contains reserved control characters",
+                code=StatusCode.PROVENANCE_MARKER_MISMATCH,
+            )
+        try:
+            raw_expected_features = decompose_lexical_token(envelope.raw_surface_nfc_utf8)
+        except Exception as exc:
+            raise ObservationError(
+                f"Raw surface cannot be decomposed into valid lexical features: {exc}",
+                code=StatusCode.PROVENANCE_FEATURE_COPY_MISMATCH,
+            ) from exc
+    else:
+        raise ObservationError(
+            f"Unsupported envelope marker: {envelope.marker}",
+            code=StatusCode.PROVENANCE_MARKER_MISMATCH,
+        )
+
+    # 4. Finalize canonical features and bundle digest using core_event.salience
+    canonical_features, _, salience_u, expected_digest = finalize_feature_bundle(
+        raw_expected_features,
+        salience=core_event.salience,
+        allow_reserved_control=is_eos,
+    )
+
+    if core_event.features != canonical_features:
+        raise ObservationError(
+            "CoreEventPayload features do not match canonical features derived from raw surface",
+            code=StatusCode.PROVENANCE_FEATURE_COPY_MISMATCH,
+        )
+    if envelope.canonical_features_copy != canonical_features:
+        raise ObservationError(
+            "Envelope canonical_features_copy does not match canonical features derived from raw surface",
+            code=StatusCode.PROVENANCE_FEATURE_COPY_MISMATCH,
+        )
+    if core_event.feature_bundle_digest != expected_digest:
+        raise ObservationError(
+            "CoreEventPayload feature_bundle_digest does not match digest of derived features",
+            code=StatusCode.PROVENANCE_DIGEST_MISMATCH,
+        )
+    if envelope.feature_bundle_digest != expected_digest:
+        raise ObservationError(
+            "Envelope feature_bundle_digest does not match digest of derived features",
+            code=StatusCode.PROVENANCE_DIGEST_MISMATCH,
+        )
+    if projection.feature_bundle_digest != expected_digest:
+        raise ObservationError(
+            "SIC projection feature_bundle_digest does not match digest of derived features",
+            code=StatusCode.PROVENANCE_DIGEST_MISMATCH,
+        )
 
 
 class ExposureStatus(StrEnum):
@@ -71,6 +262,7 @@ class OpenExposureJournal:
     peripheral_envelopes_by_order: dict[int, PeripheralSurfaceEnvelopeV1] = field(
         default_factory=dict
     )
+    event_identities: dict[int, EventIdentityKey] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +372,7 @@ class ExposureTransactionManager:
         enable_assembly_pipeline: bool = True,
         min_additional_opportunities: int = 0,
         readout_ledger: object | None = None,
+        allow_headless_events: bool = False,
     ) -> None:
         self.state: MachineState = state
         self.theta_create: float = theta_create
@@ -191,6 +384,7 @@ class ExposureTransactionManager:
         self.enable_assembly_pipeline: bool = enable_assembly_pipeline
         self.min_additional_opportunities: int = min_additional_opportunities
         self.readout_ledger: object | None = readout_ledger
+        self.allow_headless_events: bool = allow_headless_events
 
         self.open_journal: OpenExposureJournal | None = None
         self.completed_roots: dict[int, EndExposureReport] = {}
@@ -278,9 +472,44 @@ class ExposureTransactionManager:
                 f"OPEN learning exposure requires EXTERNAL_DIRECT origin, got {core_event.origin}"
             )
 
-        # Crash/retry idempotency: if event_order was already committed in this OPEN root, return it
+        # 1. Project SIC-V1 (stateless mathematical projection)
+        projection = project_core_event_v1(core_event)
+
+        # 2. Strict Pre-Execution Provenance Validation (runs on ALL events, including retries)
+        validate_event_envelope_provenance(
+            core_event,
+            peripheral_envelope,
+            projection,
+            allow_headless_events=self.allow_headless_events,
+        )
+
+        current_identity = EventIdentityKey.from_event(
+            core_event,
+            observation_scope=observation_scope,
+            envelope=peripheral_envelope,
+        )
+
+        # 3. Crash/retry idempotency & conflict detection
         if core_event.event_order < journal.next_event_order:
+            recorded_identity = journal.event_identities[core_event.event_order]
+
+            # Detect a forbidden change in provenance channel
+            if (recorded_identity.envelope_identity is None) != (current_identity.envelope_identity is None):
+                raise ObservationError(
+                    "Cannot alter provenance channel on event retry (headless <-> enveloped)",
+                    code=StatusCode.EVENT_RETRY_PROVENANCE_ALTERATION,
+                )
+
+            # Compare accepted event identity
+            if current_identity != recorded_identity:
+                raise ObservationError(
+                    f"Conflicting event identity on retry for event_order {core_event.event_order}",
+                    code=StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT,
+                )
+
+            # Return cached result only for exact equality (zero side-effects)
             return journal.event_results[core_event.event_order]
+
         if core_event.event_order != journal.next_event_order:
             raise ObservationError(
                 f"Non-contiguous event_order {core_event.event_order}; expected {journal.next_event_order}"
@@ -289,8 +518,6 @@ class ExposureTransactionManager:
         # Core §10.1 & LLA §7 rule 1: first event boundary flag is normalized True
         effective_boundary = True if core_event.event_order == 0 else core_event.boundary
 
-        # 1. Project SIC-V1 and record ObservationWitness
-        projection = project_core_event_v1(core_event)
         witness = ObservationWitness.from_projection(
             projection,
             exposure_id=journal.exposure_id,
@@ -344,6 +571,7 @@ class ExposureTransactionManager:
 
         journal.observation_witnesses.append(witness)
         journal.event_results.append(ev_result)
+        journal.event_identities[core_event.event_order] = current_identity
         journal.staged_proposals.extend(new_proposals)
         if peripheral_envelope is not None:
             journal.peripheral_envelopes_by_order[core_event.event_order] = peripheral_envelope

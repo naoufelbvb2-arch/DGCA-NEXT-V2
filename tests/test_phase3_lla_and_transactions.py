@@ -382,7 +382,7 @@ class TestExposureTransactionsAndRollback:
 
     def test_lla_t13_t14_t24_fifr_b06_begin_abort_rollback_and_isolation(self) -> None:
         state = MachineState()
-        tx = ExposureTransactionManager(state)
+        tx = ExposureTransactionManager(state, allow_headless_events=True)
 
         # Populate residual attractor and activity before BEGIN_EXPOSURE
         state.R.A[8200] = 0.75
@@ -437,7 +437,7 @@ class TestExposureTransactionsAndRollback:
 
     def test_lla_t15_t16_end_idempotency_and_read_only_immutability(self) -> None:
         state = MachineState()
-        tx = ExposureTransactionManager(state)
+        tx = ExposureTransactionManager(state, allow_headless_events=True)
 
         # Root 1: commit cells for "A B."
         for env in encode_exposure("A B.", exposure_id=1):

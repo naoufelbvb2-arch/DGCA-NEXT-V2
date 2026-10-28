@@ -195,7 +195,7 @@ def run_gate_a_unit_and_transaction() -> GateAReport:
 
     # 4. ABORT H_slow rollback (FIFR-B06 LAB POLICY A) & Read-Only Episode immutability
     state = MachineState()
-    tx = ExposureTransactionManager(state)
+    tx = ExposureTransactionManager(state, allow_headless_events=True)
     h_initial = state.H_slow.clone()
     tx.begin_exposure(1)
     tx.process_event(env1.core_event)

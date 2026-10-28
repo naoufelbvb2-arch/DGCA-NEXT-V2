@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from dgca.common.errors import ObservationError, StatusCode
 from dgca.common.hashing import Region
 from dgca.core.assembly import (
     RHO_CORE,
@@ -100,9 +101,12 @@ def build_end_exposure_outbox_notifications(
         envelope = peripheral_envelopes_by_order.get(ev.event_order)
         if envelope is None:
             continue
-        ev_digest = getattr(ev, "feature_bundle_digest", None)
-        if ev_digest is not None and envelope.feature_bundle_digest != ev_digest:
-            continue
+        if not ev.feature_bundle_digest or envelope.feature_bundle_digest != ev.feature_bundle_digest:
+            raise ObservationError(
+                f"Mismatched feature_bundle_digest between event {ev.event_order} "
+                f"({ev.feature_bundle_digest!r}) and envelope ({envelope.feature_bundle_digest!r})",
+                code=StatusCode.PROVENANCE_DIGEST_MISMATCH,
+            )
 
         for asm in eligible_assemblies:
             cov = compute_core_coverage(asm, ev, h_slow)
