@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgca-v2"
+version = "1.0.0rc4.1"
+description = "DGCA v2 — Dynamic Core Reconstruction (Encoder RC4, Core RC4.1, LLA RC4.1)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-v"

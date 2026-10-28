@@ -1,0 +1,588 @@
+"""Atomic Exposure Transaction Lifecycle (BEGIN, EVENT, END, ABORT) and Read-Only Episodes.
+
+Normative references:
+- DGCA_CORE_RC4_1.md §9.1 (READ_ONLY_EPISODE contract and PredScore)
+- DGCA_CORE_RC4_1.md §10.1 (Learning exposure lifecycle and FIFR-B06 LAB POLICY A)
+- DGCA_CORE_RC4_1.md §10.2 (Canonical close order)
+- DGCA_CORE_RC4_1.md §11 (Cold reset, snapshots, serialization, and reproducibility)
+- DGCA_LLA_RC4_1.md §7 (Complete root/event execution contract for learning)
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from enum import StrEnum
+
+from dgca.common.errors import DGCAError, ObservationError, StatusCode
+from dgca.core.anatomy import SynapseKey, SynapseScope
+from dgca.core.dynamics import (
+    EventExecutionResult,
+    K_R_PER_EVENT,
+    compute_next_step_temporal_drive,
+    execute_two_pass_event,
+)
+from dgca.core.sic_v1 import project_core_event_v1
+from dgca.core.state import ExecutionMode, HSlowState, MachineState, WState
+from dgca.encoder.envelope import (
+    CoreEventPayloadV1,
+    EventOrigin,
+    PeripheralSurfaceEnvelopeV1,
+)
+from dgca.lla.proposals import (
+    LinkProposal,
+    THETA_CREATE_CROSS,
+    THETA_CREATE_DEFAULT,
+    generate_event_link_proposals,
+)
+from dgca.lla.synapse_ledger import (
+    ProposalApplicationOutcome,
+    W_CONF_CONTEXT,
+    W_CONF_ORDINARY,
+    apply_root_proposals_to_shadow_w,
+    prune_expired_candidate_synapses,
+)
+from dgca.lla.witness import ObservationScope, ObservationWitness
+
+
+class ExposureStatus(StrEnum):
+    """Lifecycle state of an exposure transaction (Core §10.1)."""
+
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    COMPLETED = "COMPLETED"
+    ABORTED = "ABORTED"
+
+
+@dataclass(slots=True)
+class OpenExposureJournal:
+    """Durable checkpoint journal for an currently OPEN learning exposure (Core §10.1, §11)."""
+
+    exposure_id: int
+    status: ExposureStatus
+    h_slow_begin: HSlowState
+    h_slow_event: HSlowState
+    next_event_order: int = 0
+    next_proposal_ordinal: int = 0
+    last_event_remaining_k_r: int = K_R_PER_EVENT
+    event_results: list[EventExecutionResult] = field(default_factory=list)
+    observation_witnesses: list[ObservationWitness] = field(default_factory=list)
+    staged_proposals: list[LinkProposal] = field(default_factory=list)
+    peripheral_envelopes_by_order: dict[int, PeripheralSurfaceEnvelopeV1] = field(
+        default_factory=dict
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class EndExposureReport:
+    """Comprehensive atomic publication report returned by END_EXPOSURE (Core §10.2)."""
+
+    exposure_id: int
+    status: ExposureStatus
+    events_processed: int
+    proposal_outcomes: tuple[ProposalApplicationOutcome, ...]
+    pruned_synapses: tuple[SynapseKey, ...]
+    last_event_remaining_k_r: int
+    diagnostics: tuple[StatusCode, ...]
+    candidate_settlements: tuple[object, ...] = ()
+    recruitments: tuple[object, ...] = ()
+    assembly_report: object | None = None
+    outbox_notifications: tuple[object, ...] = ()
+
+
+# Optional hook signature for Phase 4/5/6 END_EXPOSURE extensions:
+# (w_pre_close, w_shadow, h_slow, open_journal, diagnostics_list) -> None
+EndExposureHook = Callable[
+    [WState, WState, HSlowState, OpenExposureJournal, list[StatusCode]],
+    None,
+]
+
+
+def _update_coactive_latent_neighborhoods_for_event(
+    w: WState,
+    curr_event: EventExecutionResult,
+    prev_event: EventExecutionResult | None,
+    protected_in_open_root: set[tuple[int, int]],
+) -> None:
+    """Populate co-active latent neighborhood slots (0..5 intra, 12..17 inter) for active cells (Core §1.3, Encoder §2.1).
+
+    Follows Core §1.3 priority:
+        legal live-link protection > committed contextual pin > open-root proposal protection > unprotected slot.
+    Ranks same-event L_t peers and prior-event F_step(t-1) peers by (-activity, cell_id) so that
+    Tier-0 (F0) cells deterministically win top co-active intra slots of one another.
+    """
+    active_curr = sorted(
+        curr_event.l_frontier & curr_event.obs_eligible_cells,
+        key=lambda cid: (-curr_event.a_plus_by_cell.get(cid, 0.0), cid),
+    )
+    active_prev = (
+        sorted(
+            prev_event.f_step & prev_event.obs_eligible_cells,
+            key=lambda cid: (-prev_event.a_plus_by_cell.get(cid, 0.0), cid),
+        )
+        if (prev_event is not None and not curr_event.boundary)
+        else []
+    )
+
+    top_curr_clique = active_curr[:4]
+    secondary_curr_clique = active_curr[4:]
+
+    for cid in active_curr:
+        if w.is_contextual_cell(cid):
+            # Contextual cells manage their 6 co-active intra slots via §7.3 2/2/2 pinning
+            continue
+
+        protected = w.get_protected_bidirectional_neighbors(cid) | {
+            partner for src, partner in protected_in_open_root if src == cid
+        }
+
+        # Partition top-4 F0 clique from secondary sub-lexical peers so F0 cells maintain high Spec(x, A) >= 0.20
+        peer_pool = top_curr_clique if cid in top_curr_clique else secondary_curr_clique
+        same_event_limit = 3 if active_prev else 6
+        same_peers = [p for p in peer_pool if p != cid][:same_event_limit]
+        prev_peers = [p for p in active_prev if p != cid and p not in same_peers][:3]
+        desired_partners = same_peers + prev_peers
+
+        for partner_id in desired_partners:
+            if w.latent_table.is_eligible(cid, partner_id):
+                protected_in_open_root.add((cid, partner_id))
+                protected_in_open_root.add((partner_id, cid))
+                continue
+            try:
+                w.latent_table.admit_or_recycle_coactive_partner(
+                    cid,
+                    partner_id,
+                    protected_bidirectional_neighbors=protected,
+                    event_clock=w.global_event_clock,
+                    reason="ORDINARY_COACTIVE",
+                )
+                protected.add(partner_id)
+                protected_in_open_root.add((cid, partner_id))
+                protected_in_open_root.add((partner_id, cid))
+            except DGCAError:
+                # If all co-active slots are protected or pinned, skip without error
+                continue
+
+
+class ExposureTransactionManager:
+    """Manages atomic BEGIN_EXPOSURE, EVENT, END_EXPOSURE, and ABORT_EXPOSURE transactions (Core §10, LLA §7)."""
+
+    def __init__(
+        self,
+        state: MachineState,
+        *,
+        theta_create: float = THETA_CREATE_DEFAULT,
+        theta_create_x: float = THETA_CREATE_CROSS,
+        w_conf: int = W_CONF_ORDINARY,
+        w_conf_context: int = W_CONF_CONTEXT,
+        auto_coactive_latent: bool = True,
+        enable_context_pipeline: bool = True,
+        enable_assembly_pipeline: bool = True,
+        min_additional_opportunities: int = 0,
+        readout_ledger: object | None = None,
+    ) -> None:
+        self.state: MachineState = state
+        self.theta_create: float = theta_create
+        self.theta_create_x: float = theta_create_x
+        self.w_conf: int = w_conf
+        self.w_conf_context: int = w_conf_context
+        self.auto_coactive_latent: bool = auto_coactive_latent
+        self.enable_context_pipeline: bool = enable_context_pipeline
+        self.enable_assembly_pipeline: bool = enable_assembly_pipeline
+        self.min_additional_opportunities: int = min_additional_opportunities
+        self.readout_ledger: object | None = readout_ledger
+
+        self.open_journal: OpenExposureJournal | None = None
+        self.completed_roots: dict[int, EndExposureReport] = {}
+        self.aborted_roots: dict[int, HSlowState] = {}
+        self._protected_open_root_pairs: set[tuple[int, int]] = set()
+        self._end_exposure_hooks: list[EndExposureHook] = []
+
+    @property
+    def status(self) -> ExposureStatus:
+        if self.open_journal is not None:
+            return ExposureStatus.OPEN
+        return ExposureStatus.CLOSED
+
+    def register_end_exposure_hook(self, hook: EndExposureHook) -> None:
+        """Register a post-evidence shadow transaction hook (used by Phase 4/5/6 operators)."""
+        self._end_exposure_hooks.append(hook)
+
+    def begin_exposure(self, exposure_id: int) -> OpenExposureJournal:
+        """Execute atomic BEGIN_EXPOSURE(root) (Core §10.1, LLA §7 rule 1).
+
+        - Retry of an already-OPEN root with the same exposure_id does NOT reset twice.
+        - Otherwise requires status == CLOSED and strictly increasing exposure_id.
+        - Atomically captures H_slow_BEGIN (FIFR-B06 LAB POLICY A) and resets R to R_cold.
+        """
+        if not isinstance(exposure_id, int) or isinstance(exposure_id, bool) or exposure_id <= 0:
+            raise ObservationError(f"exposure_id must be a positive integer, got {exposure_id!r}")
+
+        if self.open_journal is not None:
+            if self.open_journal.exposure_id == exposure_id:
+                # Core §10.1: Retry OPEN root does not reset twice
+                return self.open_journal
+            raise ObservationError(
+                f"Cannot BEGIN_EXPOSURE({exposure_id}) while root {self.open_journal.exposure_id} is OPEN"
+            )
+
+        if (
+            exposure_id <= self.state.W.completed_roots_high_watermark
+            or exposure_id in self.completed_roots
+            or exposure_id in self.aborted_roots
+        ):
+            raise ObservationError(
+                f"Root ID {exposure_id} is not strictly increasing (watermark={self.state.W.completed_roots_high_watermark})"
+            )
+
+        # FIFR-B06 LAB POLICY A: capture immutable H_slow_BEGIN before any root-local adaptation
+        h_begin = self.state.H_slow.clone()
+        self.state.R.reset_cold()
+        self._protected_open_root_pairs.clear()
+
+        self.open_journal = OpenExposureJournal(
+            exposure_id=exposure_id,
+            status=ExposureStatus.OPEN,
+            h_slow_begin=h_begin,
+            h_slow_event=h_begin.clone(),
+            next_event_order=0,
+            next_proposal_ordinal=0,
+            last_event_remaining_k_r=K_R_PER_EVENT,
+        )
+        return self.open_journal
+
+    def process_event(
+        self,
+        core_event: CoreEventPayloadV1,
+        *,
+        observation_scope: ObservationScope = ObservationScope.COMPLETE_NEXT_EVENT,
+        allow_candidate_probe: bool = True,
+        peripheral_envelope: PeripheralSurfaceEnvelopeV1 | None = None,
+    ) -> EventExecutionResult:
+        """Process a single contiguous EVENT(order=0..n-1) inside an OPEN exposure (Core §10.1, LLA §7 rule 2).
+
+        - Recovery of an already processed event_order returns the checkpointed result without re-adapting H_slow.
+        - Event 0 always enforces boundary = True.
+        - Stages LINK_PROPOSALs in open_journal without mutating W synapse evidence (S, E_ext, external_count).
+        """
+        if self.open_journal is None:
+            raise ObservationError("Cannot process EVENT when no exposure is OPEN")
+        journal = self.open_journal
+
+        if core_event.exposure_id is not None and core_event.exposure_id != journal.exposure_id:
+            raise ObservationError(
+                f"Event exposure_id {core_event.exposure_id} does not match OPEN root {journal.exposure_id}"
+            )
+        if core_event.origin != EventOrigin.EXTERNAL_DIRECT:
+            raise ObservationError(
+                f"OPEN learning exposure requires EXTERNAL_DIRECT origin, got {core_event.origin}"
+            )
+
+        # Crash/retry idempotency: if event_order was already committed in this OPEN root, return it
+        if core_event.event_order < journal.next_event_order:
+            return journal.event_results[core_event.event_order]
+        if core_event.event_order != journal.next_event_order:
+            raise ObservationError(
+                f"Non-contiguous event_order {core_event.event_order}; expected {journal.next_event_order}"
+            )
+
+        # Core §10.1 & LLA §7 rule 1: first event boundary flag is normalized True
+        effective_boundary = True if core_event.event_order == 0 else core_event.boundary
+
+        # 1. Project SIC-V1 and record ObservationWitness
+        projection = project_core_event_v1(core_event)
+        witness = ObservationWitness.from_projection(
+            projection,
+            exposure_id=journal.exposure_id,
+            event_order=core_event.event_order,
+            origin=core_event.origin,
+            scope=observation_scope,
+        )
+
+        # Snapshot pre-event H_slow for proposal y_positive calculation (before event's slow adaptation)
+        h_slow_pre_event = self.state.H_slow.clone()
+
+        # 2. Execute two-pass neural dynamics
+        ev_result = execute_two_pass_event(
+            self.state,
+            projection.x_fixed_by_global_id,
+            projection.x_float_by_global_id,
+            mode=ExecutionMode.LEARN,
+            origin=EventOrigin.EXTERNAL_DIRECT,
+            boundary=effective_boundary,
+            exposure_id=journal.exposure_id,
+            event_order=core_event.event_order,
+            feature_bundle_digest=projection.feature_bundle_digest,
+            allow_candidate_probe=allow_candidate_probe,
+            admit_uncommitted_sensory=True,
+            k_r_budget=K_R_PER_EVENT,
+        )
+
+        prev_event = journal.event_results[-1] if journal.event_results else None
+        prev_prev_event = journal.event_results[-2] if len(journal.event_results) >= 2 else None
+
+        # 3. Populate ordinary co-active latent slots if enabled
+        if self.auto_coactive_latent:
+            _update_coactive_latent_neighborhoods_for_event(
+                self.state.W,
+                ev_result,
+                prev_event,
+                self._protected_open_root_pairs,
+            )
+
+        # 4. Generate and stage LINK_PROPOSALs in the OPEN journal
+        new_proposals, next_ord = generate_event_link_proposals(
+            ev_result,
+            prev_event,
+            prev_prev_event,
+            self.state.W,
+            h_slow_pre_event,
+            theta_create=self.theta_create,
+            theta_create_x=self.theta_create_x,
+            starting_ordinal=journal.next_proposal_ordinal,
+        )
+
+        journal.observation_witnesses.append(witness)
+        journal.event_results.append(ev_result)
+        journal.staged_proposals.extend(new_proposals)
+        if peripheral_envelope is not None:
+            journal.peripheral_envelopes_by_order[core_event.event_order] = peripheral_envelope
+        journal.next_proposal_ordinal = next_ord
+        journal.next_event_order += 1
+        journal.last_event_remaining_k_r = max(
+            0, K_R_PER_EVENT - len(ev_result.newly_committed_sensory_cells)
+        )
+        journal.h_slow_event = self.state.H_slow.clone()
+
+        return ev_result
+
+    def abort_exposure(self, exposure_id: int) -> ExposureStatus:
+        """Execute atomic ABORT_EXPOSURE (Core §10.1, LLA §7 rule 4, FIFR-B06 LAB POLICY A).
+
+        - Restores H_slow = H_slow_BEGIN atomically.
+        - Discards pending link proposals and uncommitted root staging.
+        - Resets working R to R_cold.
+        - Lawful sensory cell commitments in W.committed_cells remain.
+        - Duplicate ABORT for the same root is idempotent status-only and never overwrites later roots.
+        """
+        if exposure_id in self.aborted_roots:
+            # Core §10.1: Duplicate ABORT request for the same root is idempotent status-only
+            return ExposureStatus.ABORTED
+        if exposure_id in self.completed_roots:
+            raise ObservationError(f"Cannot ABORT already COMPLETED root {exposure_id}")
+        if self.open_journal is None or self.open_journal.exposure_id != exposure_id:
+            raise ObservationError(f"Root {exposure_id} is not currently OPEN")
+
+        journal = self.open_journal
+        # FIFR-B06 LAB POLICY A: restore exact H_slow_BEGIN
+        self.state.H_slow = journal.h_slow_begin.clone()
+        self.state.R.reset_cold()
+        self._protected_open_root_pairs.clear()
+
+        self.aborted_roots[exposure_id] = journal.h_slow_begin.clone()
+        self.state.W.completed_roots_high_watermark = max(
+            self.state.W.completed_roots_high_watermark, exposure_id
+        )
+        self.open_journal = None
+        return ExposureStatus.ABORTED
+
+    def end_exposure(self, exposure_id: int) -> EndExposureReport:
+        """Execute atomic END_EXPOSURE in canonical close order (Core §10.2, LLA §7 rule 3).
+
+        - Idempotent if exposure_id was already COMPLETED (crash/retry safety, LLA-T15).
+        - Executes all updates on an isolated shadow W* before swapping into state.W atomically.
+        """
+        if exposure_id in self.completed_roots:
+            return self.completed_roots[exposure_id]
+        if exposure_id in self.aborted_roots:
+            raise ObservationError(f"Cannot END already ABORTED root {exposure_id}")
+        if self.open_journal is None or self.open_journal.exposure_id != exposure_id:
+            raise ObservationError(f"Root {exposure_id} is not currently OPEN")
+        if not self.open_journal.event_results:
+            raise ObservationError(f"Cannot END_EXPOSURE({exposure_id}) with zero processed events")
+
+        journal = self.open_journal
+        w_pre_close = self.state.W.clone()
+        w_shadow = self.state.W.clone()
+        diagnostics: list[StatusCode] = []
+
+        # Step 1 & 2 & 3 (Core §10.2): Reduce proposals by (link_key, root) and apply to w_shadow
+        outcomes, prop_diags = apply_root_proposals_to_shadow_w(
+            journal.staged_proposals,
+            w_pre_close,
+            w_shadow,
+            w_conf=self.w_conf,
+            w_conf_context=self.w_conf_context,
+        )
+        diagnostics.extend(prop_diags)
+
+        # Advance completed external events count and close serial on w_shadow
+        w_shadow.completed_external_events_count += len(journal.event_results)
+        w_shadow.close_serial += 1
+        w_shadow.completed_roots_high_watermark = max(
+            w_shadow.completed_roots_high_watermark, exposure_id
+        )
+
+        # Prune expired unpinned candidate synapses
+        pruned_keys = prune_expired_candidate_synapses(w_shadow)
+
+        # Step 3 & 4 (Core §10.2): Contextual candidate settlement, graduation, contrast discovery & recruitment
+        accepted_keys = {
+            out.proposal.link_key for out in outcomes if out.status == StatusCode.OK
+        }
+        settlements: list[object] = []
+        recruitments: list[object] = []
+        if self.enable_context_pipeline:
+            from dgca.lla.candidate_fsm import execute_contextual_close_pipeline
+
+            cand_res, rec_res, ctx_diags = execute_contextual_close_pipeline(
+                w_shadow,
+                self.state.H_slow,
+                journal.event_results,
+                journal.observation_witnesses,
+                accepted_keys,
+                exposure_id=exposure_id,
+                remaining_k_r=journal.last_event_remaining_k_r,
+                discover_and_recruit=True,
+                min_additional_opportunities=self.min_additional_opportunities,
+            )
+            settlements.extend(cand_res)
+            recruitments.extend(rec_res)
+            diagnostics.extend(ctx_diags)
+
+        # Step 5 (Core §10.2 & §2.0): Bounded Assembly MAINTAIN -> GROW -> FORM -> MERGE -> SPLIT
+        asm_report: object | None = None
+        if self.enable_assembly_pipeline:
+            from dgca.core.assembly import execute_assembly_end_pipeline
+
+            asm_report = execute_assembly_end_pipeline(
+                w_shadow,
+                self.state.H_slow,
+                journal.event_results,
+            )
+
+        # Execute registered post-evidence shadow hooks (e.g. Phase 6 peripheral outbox)
+        for hook in self._end_exposure_hooks:
+            hook(w_pre_close, w_shadow, self.state.H_slow, journal, diagnostics)
+
+        # Build idempotent peripheral outbox notifications for pre-existing LIVE assemblies (no backdating)
+        outbox_notifs: tuple[object, ...] = ()
+        if journal.peripheral_envelopes_by_order:
+            from dgca.peripheral.outbox import build_end_exposure_outbox_notifications
+
+            outbox_notifs = build_end_exposure_outbox_notifications(
+                exposure_id,
+                w_shadow,
+                self.state.H_slow,
+                journal.event_results,
+                journal.peripheral_envelopes_by_order,
+                preexisting_live_assemblies=tuple(w_pre_close.assemblies.values()),
+            )
+            if self.readout_ledger is not None and hasattr(
+                self.readout_ledger, "consume_outbox_batch"
+            ):
+                self.readout_ledger.consume_outbox_batch(outbox_notifs)  # type: ignore[attr-defined]
+
+        # Step 6: Atomic commit of w_shadow
+        self.state.W = w_shadow
+        journal.status = ExposureStatus.COMPLETED
+        report = EndExposureReport(
+            exposure_id=exposure_id,
+            status=ExposureStatus.COMPLETED,
+            events_processed=len(journal.event_results),
+            proposal_outcomes=tuple(outcomes),
+            pruned_synapses=tuple(pruned_keys),
+            last_event_remaining_k_r=journal.last_event_remaining_k_r,
+            diagnostics=tuple(diagnostics),
+            candidate_settlements=tuple(settlements),
+            recruitments=tuple(recruitments),
+            assembly_report=asm_report,
+            outbox_notifications=outbox_notifs,
+        )
+        self.completed_roots[exposure_id] = report
+        self._protected_open_root_pairs.clear()
+        self.open_journal = None
+        return report
+
+
+@dataclass(frozen=True, slots=True)
+class ReadOnlyEpisodeResult:
+    """Result of a standalone READ_ONLY_EPISODE execution (Core §9.1)."""
+
+    event_results: tuple[EventExecutionResult, ...]
+    next_step_pt_by_cell: dict[int, float]
+    final_f_step: frozenset[int]
+    final_mu_source_mask: dict[int, int]
+
+
+def run_read_only_episode(
+    state: MachineState,
+    events: Sequence[CoreEventPayloadV1],
+    *,
+    mask_nonconsolidated_candidate_links: bool = False,
+) -> ReadOnlyEpisodeResult:
+    """Execute an isolated READ_ONLY_EPISODE on a scratch R_cold clone (Core §9.1, LLA-T16).
+
+    - Frozen W, H_slow, and caller R are strictly untouched.
+    - No dynamic admissions, no learning/evidence updates, no slow adaptation, no probe.
+    - Computes the post-last-event one-step temporal drive P_T(next) with frozen mu(last).
+    """
+    if not events:
+        raise ObservationError("READ_ONLY_EPISODE requires at least one event")
+
+    scratch_state = MachineState(
+        w=state.W,  # read-only reference; never mutated when mode == RETRIEVE
+        r=state.R.clone(),
+        h_slow=state.H_slow,
+    )
+    scratch_state.R.reset_cold()
+
+    results: list[EventExecutionResult] = []
+    for idx, ev in enumerate(events):
+        proj = project_core_event_v1(ev)
+        res = execute_two_pass_event(
+            scratch_state,
+            proj.x_fixed_by_global_id,
+            proj.x_float_by_global_id,
+            mode=ExecutionMode.RETRIEVE,
+            origin=EventOrigin.READ_ONLY_OBSERVED,
+            boundary=(idx == 0 or ev.boundary),
+            exposure_id=None,
+            event_order=idx,
+            feature_bundle_digest=proj.feature_bundle_digest,
+            allow_candidate_probe=False,
+            mask_nonconsolidated_candidate_links=mask_nonconsolidated_candidate_links,
+            admit_uncommitted_sensory=False,
+        )
+        results.append(res)
+
+    last_res = results[-1]
+    next_pt, _ = compute_next_step_temporal_drive(
+        scratch_state,
+        f_step_prev=last_res.f_step,
+        a_prev_by_cell=scratch_state.R.A,
+        mu_prev_source_mask=last_res.mu_source_mask,
+        mask_nonconsolidated=mask_nonconsolidated_candidate_links,
+    )
+    return ReadOnlyEpisodeResult(
+        event_results=tuple(results),
+        next_step_pt_by_cell=next_pt,
+        final_f_step=last_res.f_step,
+        final_mu_source_mask=last_res.mu_source_mask,
+    )
+
+
+def compute_pred_score(
+    next_step_pt_by_cell: dict[int, float],
+    evaluator_target_cells: Sequence[int] | set[int] | frozenset[int],
+) -> tuple[StatusCode, float]:
+    """Compute PredScore_W(Y | P, B) = |Y|^-1 * sum_{j in Y} P_j^T(next) (Core §9.1).
+
+    Y is an evaluator-only observed footprint, never supplied as current input nor looked up by Core.
+    If Y is empty -> (StatusCode.UNRESOLVED, 0.0).
+    """
+    target_set = sorted(set(evaluator_target_cells))
+    if not target_set:
+        return StatusCode.UNRESOLVED, 0.0
+    total_pt = sum(next_step_pt_by_cell.get(cid, 0.0) for cid in target_set)
+    return StatusCode.OK, total_pt / float(len(target_set))

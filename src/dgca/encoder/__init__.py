@@ -1,0 +1,73 @@
+"""Stateless Mechanical Orthographic Transducer (DGCA-DCR-ENCODER-SPEC v1.0.0-RC4)."""
+
+from dgca.encoder.decomposer import (
+    ENCODER_VERSION,
+    EOS_CANONICAL_FEATURES,
+    MAX_FEATURES_PER_EVENT,
+    MAX_TOKEN_UTF8_BYTES,
+    MIN_FEATURES_PER_EVENT,
+    SUPPORT_TIER_0,
+    SUPPORT_TIER_1,
+    SUPPORT_TIER_2,
+    SUPPORT_TIER_3,
+    decompose_eos_event,
+    decompose_lexical_token,
+    finalize_feature_bundle,
+)
+from dgca.encoder.envelope import (
+    CoreEventPayloadV1,
+    EncodedEventEnvelopeV1,
+    EventOrigin,
+    Marker,
+    PeripheralSurfaceEnvelopeV1,
+    build_event_envelope,
+    encode_eos_event,
+    encode_exposure,
+    encode_lexical_token_event,
+    reinject_attested_bundle,
+)
+from dgca.encoder.normalizer import (
+    ALLOWED_WHITESPACE_CHARS,
+    normalize_and_strip_exposure_text,
+    validate_strict_utf8_and_nfc,
+)
+from dgca.encoder.segmenter import (
+    EOS_RAW_SURFACE,
+    INTERNAL_PUNCTUATION_DELIMITERS,
+    TERMINAL_SENTENCE_DELIMITERS,
+    SegmentedEventToken,
+    segment_exposure_text,
+)
+
+__all__ = [
+    "ALLOWED_WHITESPACE_CHARS",
+    "CoreEventPayloadV1",
+    "ENCODER_VERSION",
+    "EOS_CANONICAL_FEATURES",
+    "EOS_RAW_SURFACE",
+    "EncodedEventEnvelopeV1",
+    "EventOrigin",
+    "INTERNAL_PUNCTUATION_DELIMITERS",
+    "MAX_FEATURES_PER_EVENT",
+    "MAX_TOKEN_UTF8_BYTES",
+    "MIN_FEATURES_PER_EVENT",
+    "Marker",
+    "PeripheralSurfaceEnvelopeV1",
+    "SUPPORT_TIER_0",
+    "SUPPORT_TIER_1",
+    "SUPPORT_TIER_2",
+    "SUPPORT_TIER_3",
+    "SegmentedEventToken",
+    "TERMINAL_SENTENCE_DELIMITERS",
+    "build_event_envelope",
+    "decompose_eos_event",
+    "decompose_lexical_token",
+    "encode_eos_event",
+    "encode_exposure",
+    "encode_lexical_token_event",
+    "finalize_feature_bundle",
+    "normalize_and_strip_exposure_text",
+    "reinject_attested_bundle",
+    "segment_exposure_text",
+    "validate_strict_utf8_and_nfc",
+]

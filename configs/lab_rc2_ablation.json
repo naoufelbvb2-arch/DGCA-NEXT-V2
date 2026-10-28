@@ -1,0 +1,16 @@
+{
+  "schema_version": "v1.0.0-RC2-ABLATION",
+  "inherits_from": "lab_rc4_1_default.json",
+  "overrides": {
+    "core": {
+      "B_i": 32,
+      "probe_matches_max": 8,
+      "consolidation_matches_max": 0,
+      "candidate_age_events_max": 200,
+      "W_conf_context": 100
+    },
+    "lla": {
+      "theta_create": 0.30
+    }
+  }
+}
