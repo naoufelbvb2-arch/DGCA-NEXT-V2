@@ -19,7 +19,8 @@ from dgca.common.errors import StatusCode
 from dgca.core.generator import generate_episode
 from dgca.core.sic_v1 import project_core_event_v1
 from dgca.core.state import BindingStatus, MachineState
-from dgca.encoder.envelope import encode_exposure, encode_lexical_token_event
+import dataclasses
+from dgca.encoder.envelope import Marker, encode_exposure, encode_lexical_token_event
 from dgca.experiments.gates import _extract_f0_cells
 from dgca.lifecycle.exposure_tx import ExposureTransactionManager, compute_pred_score, run_read_only_episode
 from dgca.peripheral.readout_ledger import SurfaceReadoutLedgerV1
@@ -92,8 +93,73 @@ def test_f01_task5_strengthened_cold_start_learning_from_zero() -> None:
             assert gen_db_56.stop_status == StatusCode.GEN_STOP_NO_MATCH
 
 
-def test_f01_task6_eos_learning_and_multistep_rollout() -> None:
-    """Task 6: Native EOS Assembly formation and multi-step rollout with append_eos=True."""
+def test_f01_task6_reencoded_eos_discrepancy_and_outbox_bypass() -> None:
+    """Task 1 / Task 6 Discrepancy: Re-encoding raw '<EOS>' alters features/digest; outbox check bypassed.
+
+    Investigates Section 1:
+    - Original canonical EOS features vs re-encoded lexical features.
+    - Original digest vs re-encoded digest (equality == False).
+    - Outbox bypass due to EventExecutionResult lacking feature_bundle_digest.
+    - Resolution produces Marker.EOS envelope despite lexical cell recruitment.
+    """
+    branch_ab = encode_exposure("القط يشرب حليب", append_eos=True)
+    eos_env = branch_ab[-1]
+
+    # 1. Inspect original canonical EOS event & envelope
+    orig_marker = eos_env.peripheral_surface.marker
+    orig_features = eos_env.core_event.features
+    orig_digest = eos_env.core_event.feature_bundle_digest
+
+    assert orig_marker == Marker.EOS
+    assert orig_features == (("\x1fEOS#0", "1.000000"), ("\x1fEOS#1", "0.900000"), ("\x1fEOS#2", "0.800000"))
+    assert orig_digest == eos_env.peripheral_surface.feature_bundle_digest
+
+    # 2. Inspect re-encoded lexical token event
+    re_ev = encode_lexical_token_event(
+        eos_env.peripheral_surface.raw_surface_nfc_utf8,
+        exposure_id=1,
+        event_order=eos_env.core_event.event_order,
+        boundary=eos_env.core_event.boundary,
+    )
+    re_features = re_ev.core_event.features
+    re_digest = re_ev.core_event.feature_bundle_digest
+
+    # Re-encoded features are lexical n-grams, NOT canonical special tokens
+    assert re_features == (("S>$", "0.800000"), ("^<E", "0.900000"), ("^<EOS>$", "1.000000"), ("~EOS", "0.750000"))
+    assert re_digest != orig_digest
+    assert (re_digest == eos_env.peripheral_surface.feature_bundle_digest) is False
+
+    # 3. Verify why outbox did not reject the mismatched digest:
+    # EventExecutionResult has NO 'feature_bundle_digest' attribute; getattr returns None!
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    tx = ExposureTransactionManager(state, enable_context_pipeline=True, enable_assembly_pipeline=True, readout_ledger=ledger)
+    tx.begin_exposure(1)
+    for env in branch_ab:
+        core_ev = encode_lexical_token_event(
+            env.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=1,
+            event_order=env.core_event.event_order,
+            boundary=env.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
+
+    last_ev_result = tx.open_journal.event_results[-1]
+    assert getattr(last_ev_result, "feature_bundle_digest", None) is None
+    tx.end_exposure(1)
+
+
+def test_f01_task6_canonical_eos_learning_and_multistep_rollout() -> None:
+    """Task 3 & 4: Corrected canonical EOS learning across 56 roots and multi-step autonomous rollout.
+
+    Uses identity-preserving dataclasses.replace to set exposure_id while preserving canonical features & digests.
+    Demonstrates:
+    - Complete causal chain (observations, commitment, local synapses, birth, attestations).
+    - Prompt ['القط'] -> ('يشرب', 'حليب') -> GEN_STOP_EOS via neural selection of Asm 2.
+    - Prompt ['القط', 'يشرب'] -> ('حليب',) -> GEN_STOP_EOS via neural selection of Asm 2.
+    - Prompt ['النسر'] -> ('يشرب', 'ماء') -> GEN_STOP_AMBIGUOUS (blocked by duplicate Asm 5 & 6 collision).
+    - Prompt ['النسر', 'يشرب'] -> ('ماء',) -> GEN_STOP_AMBIGUOUS (same duplicate collision).
+    """
     state = MachineState()
     ledger = SurfaceReadoutLedgerV1()
     tx = ExposureTransactionManager(
@@ -111,37 +177,50 @@ def test_f01_task6_eos_learning_and_multistep_rollout() -> None:
         envs = branch_ab if is_ab else branch_db
         tx.begin_exposure(root_id)
         for env in envs:
-            core_ev = encode_lexical_token_event(
-                env.peripheral_surface.raw_surface_nfc_utf8,
-                exposure_id=root_id,
-                event_order=env.core_event.event_order,
-                boundary=env.core_event.boundary,
-            ).core_event
+            # Identity-preserving: retain canonical features and digest
+            core_ev = dataclasses.replace(env.core_event, exposure_id=root_id)
             tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
         tx.end_exposure(root_id)
 
-    # 1. Verify native EOS Assembly formed and attested
+    # 1. Verify canonical EOS Assemblies formed and attested
     eos_asms = []
     for asm_id, asm in state.W.assemblies.items():
         if asm.status.name != "LIVE":
             continue
         res_r = ledger.resolve_readout(asm_id, asm.structural_generation, current_live_generation=asm.structural_generation)
         marker = getattr(res_r.envelope, "marker", None)
-        if marker and marker.name == "EOS":
+        if marker and marker == Marker.EOS:
             eos_asms.append(asm_id)
-    assert len(eos_asms) >= 1, "Expected native EOS Assembly to be formed and attested"
+    # Assemblies 2, 5, 6 are canonical EOS assemblies
+    assert set(eos_asms) == {2, 5, 6}
 
-    # 2. Test 1-step continuation from prompt ['القط', 'يشرب'] -> generates 'حليب' and halts at <EOS>
-    prompt_ab = [branch_ab[0].core_event, branch_ab[1].core_event]
-    gen_ab = generate_episode(state, prompt_ab, ledger, max_steps=5)
-    assert gen_ab.emitted_surfaces == ("حليب",)
-    assert gen_ab.stop_status == StatusCode.GEN_STOP_EOS
-
-    # 3. Test 2-step rollout from single-word prompt ['القط'] -> generates ('يشرب', 'حليب') and halts at <EOS>
+    # 2. Test prompt ['القط'] -> generates ('يشرب', 'حليب') and cleanly halts at <EOS>
     prompt_cat = [branch_ab[0].core_event]
     gen_cat = generate_episode(state, prompt_cat, ledger, max_steps=5)
     assert gen_cat.emitted_surfaces == ("يشرب", "حليب")
     assert gen_cat.stop_status == StatusCode.GEN_STOP_EOS
+    assert gen_cat.steps[2].winner_assembly_id == 2
+    assert gen_cat.steps[2].emitted_envelope.marker == Marker.EOS
+
+    # 3. Test prompt ['القط', 'يشرب'] -> generates ('حليب',) and halts at <EOS>
+    prompt_ab = [branch_ab[0].core_event, branch_ab[1].core_event]
+    gen_ab = generate_episode(state, prompt_ab, ledger, max_steps=5)
+    assert gen_ab.emitted_surfaces == ("حليب",)
+    assert gen_ab.stop_status == StatusCode.GEN_STOP_EOS
+    assert gen_ab.steps[1].winner_assembly_id == 2
+
+    # 4. Test prompt ['النسر'] -> generates ('يشرب', 'ماء') then hits duplicate Asm 5 & 6 collision
+    prompt_eagle = [branch_db[0].core_event]
+    gen_eagle = generate_episode(state, prompt_eagle, ledger, max_steps=5)
+    assert gen_eagle.emitted_surfaces == ("يشرب", "ماء")
+    # Exact tie between Asm 5 & 6 (both score 0.206944) causes margin 0.0000 < 0.02 -> GEN_STOP_AMBIGUOUS
+    assert gen_eagle.stop_status == StatusCode.GEN_STOP_AMBIGUOUS
+
+    # 5. Test prompt ['النسر', 'يشرب'] -> generates ('ماء',) then hits same collision
+    prompt_eagle_drink = [branch_db[0].core_event, branch_db[1].core_event]
+    gen_eagle_drink = generate_episode(state, prompt_eagle_drink, ledger, max_steps=5)
+    assert gen_eagle_drink.emitted_surfaces == ("ماء",)
+    assert gen_eagle_drink.stop_status == StatusCode.GEN_STOP_AMBIGUOUS
 
 
 def test_f01_persistence_not_implemented() -> None:

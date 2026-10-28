@@ -1,0 +1,1382 @@
+{
+  "manifest_version": "R1-F02-C01-V1",
+  "timestamp_iso": "2026-10-28T20:10:00Z",
+  "pinned_production_baseline": "31721fd1ba7559b72d9fe11f037ea0c0d1e91ed2",
+  "r1_f02_audit_commit": "87ef197ee0f8183ba6e7ceb94b701b73e1a0bc56",
+  "audit_branch": "audit/r1-f02-c01-eos-verification",
+  "overall_disposition": "R1-F02-C01 PARTIALLY VERIFIED — OPEN EVIDENCE GAPS",
+  "python_environment": {
+    "executable": "C:\\Python314\\python.exe",
+    "version": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "win32"
+  },
+  "pytest_suite": {
+    "total_collected": 95,
+    "passed": 95,
+    "failed": 0,
+    "duration_seconds": 44.9,
+    "clean_exit_code": 0
+  },
+  "reproduction_of_previous_claim": {
+    "claimed_commit": "87ef197ee0f8183ba6e7ceb94b701b73e1a0bc56",
+    "test_f01_task6_reproduced_exit_code": 0,
+    "scientific_validity": "FLAWED_PREMISE_IN_TASK6",
+    "explanation": "The test passed because encode_lexical_token_event('<EOS>') was used, generating lexical n-grams, and outbox digest check was bypassed because EventExecutionResult lacks feature_bundle_digest."
+  },
+  "discrepancy_investigation": {
+    "canonical_marker": "EOS",
+    "canonical_features": [
+      [
+        "\u001fEOS#0",
+        "1.000000"
+      ],
+      [
+        "\u001fEOS#1",
+        "0.900000"
+      ],
+      [
+        "\u001fEOS#2",
+        "0.800000"
+      ]
+    ],
+    "canonical_digest": "d3b8e3133be9eb13bbb4438b661e2e3c1067369e17d995809b8115b821f007f8",
+    "envelope_surface_sha256": "d0967b936bd2e29fdf4fae028f43511e253abbcb59b0ea81024fbefaffa0433d",
+    "envelope_feature_bundle_digest": "d3b8e3133be9eb13bbb4438b661e2e3c1067369e17d995809b8115b821f007f8",
+    "reencoded_features": [
+      [
+        "S>$",
+        "0.800000"
+      ],
+      [
+        "^<E",
+        "0.900000"
+      ],
+      [
+        "^<EOS>$",
+        "1.000000"
+      ],
+      [
+        "~EOS",
+        "0.750000"
+      ]
+    ],
+    "reencoded_digest": "eb190189f81b0c10f1927560dd789cb5b131e0db8f2261a4286ed7151e3d21b5",
+    "digest_equality": false,
+    "outbox_check_bypassed_reason": "EventExecutionResult lacks feature_bundle_digest attribute, getattr returns None"
+  },
+  "rollout_experiments": {
+    "prompt_cat": {
+      "prompt": [
+        "القط"
+      ],
+      "emitted_surfaces": [
+        "يشرب",
+        "حليب"
+      ],
+      "stop_status": "GEN_STOP_EOS",
+      "steps_count": 3,
+      "step_details": [
+        {
+          "step_idx": 0,
+          "winner_assembly_id": 4,
+          "winner_generation": 5,
+          "readout_status": "OK",
+          "emitted_surface": "يشرب",
+          "emitted_marker": "NONE",
+          "top_score": 0.5137547310744841,
+          "second_score": 0.4029698663801766,
+          "margin": 0.11078486469430748
+        },
+        {
+          "step_idx": 1,
+          "winner_assembly_id": 8,
+          "winner_generation": 2,
+          "readout_status": "OK",
+          "emitted_surface": "حليب",
+          "emitted_marker": "NONE",
+          "top_score": 0.09072888924207101,
+          "second_score": 0.0,
+          "margin": 0.09072888924207101
+        },
+        {
+          "step_idx": 2,
+          "winner_assembly_id": 2,
+          "winner_generation": 2,
+          "readout_status": "OK",
+          "emitted_surface": "<EOS>",
+          "emitted_marker": "EOS",
+          "top_score": 0.6484484203903691,
+          "second_score": 0.511842450918729,
+          "margin": 0.13660596947164005
+        }
+      ]
+    },
+    "prompt_cat_drink": {
+      "prompt": [
+        "القط",
+        "يشرب"
+      ],
+      "emitted_surfaces": [
+        "حليب"
+      ],
+      "stop_status": "GEN_STOP_EOS"
+    },
+    "prompt_eagle": {
+      "prompt": [
+        "النسر"
+      ],
+      "emitted_surfaces": [
+        "يشرب",
+        "ماء"
+      ],
+      "stop_status": "GEN_STOP_AMBIGUOUS",
+      "step_details": [
+        {
+          "step_idx": 0,
+          "winner_assembly_id": 4,
+          "winner_generation": 5,
+          "readout_status": "OK",
+          "emitted_surface": "يشرب",
+          "emitted_marker": "NONE",
+          "top_score": 0.5082440878277231,
+          "second_score": 0.39862554865433014,
+          "margin": 0.10961853917339298
+        },
+        {
+          "step_idx": 1,
+          "winner_assembly_id": 10,
+          "winner_generation": 2,
+          "readout_status": "OK",
+          "emitted_surface": "ماء",
+          "emitted_marker": "NONE",
+          "top_score": 0.12795715026750926,
+          "second_score": 0.0,
+          "margin": 0.12795715026750926
+        },
+        {
+          "step_idx": 2,
+          "winner_assembly_id": null,
+          "winner_generation": null,
+          "readout_status": "AMBIGUOUS",
+          "emitted_surface": null,
+          "emitted_marker": null,
+          "top_score": 0.20694424313392146,
+          "second_score": 0.20694424313392146,
+          "margin": 0.0
+        }
+      ]
+    },
+    "prompt_eagle_drink": {
+      "prompt": [
+        "النسر",
+        "يشرب"
+      ],
+      "emitted_surfaces": [
+        "ماء"
+      ],
+      "stop_status": "GEN_STOP_AMBIGUOUS"
+    }
+  },
+  "assembly_checkpoints": {
+    "natural_no_eos": {
+      "root_34": [
+        {
+          "assembly_id": 1,
+          "status": "LIVE",
+          "members": [
+            8321,
+            8327,
+            9005,
+            10167,
+            10696
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 7,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 9,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 2,
+          "status": "LIVE",
+          "members": [
+            8416,
+            8530,
+            8575,
+            8586,
+            8695,
+            9222,
+            9411,
+            9627,
+            10258,
+            10299,
+            10858,
+            10899,
+            11921
+          ],
+          "structural_generation": 11,
+          "birth_close_serial": 8,
+          "surface": null,
+          "marker": null,
+          "external_count": 8,
+          "readout_status": "READOUT_AMBIGUOUS"
+        },
+        {
+          "assembly_id": 3,
+          "status": "LIVE",
+          "members": [
+            9669,
+            11119,
+            11195,
+            11784,
+            11807,
+            12123,
+            12241
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 8,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 25,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 4,
+          "status": "LIVE",
+          "members": [
+            9061,
+            10595,
+            11077,
+            11811
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "القط",
+          "marker": "NONE",
+          "external_count": 10,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 5,
+          "status": "LIVE",
+          "members": [
+            9319,
+            9325,
+            10903,
+            11220
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 10,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 6,
+          "status": "LIVE",
+          "members": [
+            8589,
+            9205,
+            9369,
+            9487
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "النسر",
+          "marker": "NONE",
+          "external_count": 9,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 7,
+          "status": "LIVE",
+          "members": [
+            8242,
+            9854,
+            11638,
+            11984
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 10,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 8,
+          "status": "LIVE",
+          "members": [
+            9183,
+            9951,
+            10345,
+            10496,
+            10502,
+            11191,
+            11463,
+            12066
+          ],
+          "structural_generation": 6,
+          "birth_close_serial": 15,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 8,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 9,
+          "status": "LIVE",
+          "members": [
+            8809,
+            9734,
+            9740,
+            10044,
+            10308,
+            10634,
+            11193
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 16,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 9,
+          "readout_status": "OK"
+        }
+      ],
+      "root_56": [
+        {
+          "assembly_id": 1,
+          "status": "LIVE",
+          "members": [
+            8321,
+            8327,
+            9005,
+            10167,
+            10696
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 7,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 31,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 2,
+          "status": "LIVE",
+          "members": [
+            8416,
+            8530,
+            8575,
+            8586,
+            8695,
+            9222,
+            9240,
+            9411,
+            9627,
+            10258,
+            10299,
+            10858,
+            10899,
+            11921
+          ],
+          "structural_generation": 12,
+          "birth_close_serial": 8,
+          "surface": null,
+          "marker": null,
+          "external_count": 10,
+          "readout_status": "READOUT_AMBIGUOUS"
+        },
+        {
+          "assembly_id": 3,
+          "status": "LIVE",
+          "members": [
+            9669,
+            11119,
+            11195,
+            11784,
+            11807,
+            12123,
+            12241
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 8,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 47,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 4,
+          "status": "LIVE",
+          "members": [
+            9061,
+            10595,
+            11077,
+            11811
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "القط",
+          "marker": "NONE",
+          "external_count": 21,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 5,
+          "status": "LIVE",
+          "members": [
+            9319,
+            9325,
+            10903,
+            11220
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 21,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 6,
+          "status": "LIVE",
+          "members": [
+            8589,
+            9205,
+            9369,
+            9487
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "النسر",
+          "marker": "NONE",
+          "external_count": 20,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 7,
+          "status": "LIVE",
+          "members": [
+            8242,
+            9854,
+            11193,
+            11638,
+            11984
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 14,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 2,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 8,
+          "status": "LIVE",
+          "members": [
+            9183,
+            9951,
+            10345,
+            10496,
+            10502,
+            11191,
+            11463,
+            12066
+          ],
+          "structural_generation": 6,
+          "birth_close_serial": 15,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 19,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 9,
+          "status": "LIVE",
+          "members": [
+            8809,
+            9734,
+            9740,
+            10044,
+            10308,
+            10634,
+            11193
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 16,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 20,
+          "readout_status": "OK"
+        }
+      ],
+      "root_80": [
+        {
+          "assembly_id": 1,
+          "status": "LIVE",
+          "members": [
+            8321,
+            8327,
+            9005,
+            10167,
+            10696
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 7,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 55,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 2,
+          "status": "LIVE",
+          "members": [
+            8416,
+            8530,
+            8575,
+            8586,
+            8695,
+            9222,
+            9240,
+            9411,
+            9627,
+            10258,
+            10299,
+            10786,
+            10858,
+            10899,
+            11921
+          ],
+          "structural_generation": 13,
+          "birth_close_serial": 8,
+          "surface": null,
+          "marker": null,
+          "external_count": 11,
+          "readout_status": "READOUT_AMBIGUOUS"
+        },
+        {
+          "assembly_id": 3,
+          "status": "LIVE",
+          "members": [
+            9669,
+            11119,
+            11195,
+            11784,
+            11807,
+            12123,
+            12241
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 8,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 71,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 4,
+          "status": "LIVE",
+          "members": [
+            9061,
+            10595,
+            11077,
+            11811
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "القط",
+          "marker": "NONE",
+          "external_count": 33,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 5,
+          "status": "LIVE",
+          "members": [
+            9319,
+            9325,
+            10903,
+            11220
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 33,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 6,
+          "status": "LIVE",
+          "members": [
+            8589,
+            9205,
+            9369,
+            9487
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "النسر",
+          "marker": "NONE",
+          "external_count": 32,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 7,
+          "status": "LIVE",
+          "members": [
+            8242,
+            9854,
+            11193,
+            11638,
+            11984
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 14,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 14,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 8,
+          "status": "LIVE",
+          "members": [
+            9183,
+            9951,
+            10345,
+            10496,
+            10502,
+            11191,
+            11463,
+            12066
+          ],
+          "structural_generation": 6,
+          "birth_close_serial": 15,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 31,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 9,
+          "status": "LIVE",
+          "members": [
+            8809,
+            9734,
+            9740,
+            10044,
+            10308,
+            10634,
+            11193
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 16,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 32,
+          "readout_status": "OK"
+        }
+      ]
+    },
+    "canonical_with_eos": {
+      "root_34": [
+        {
+          "assembly_id": 1,
+          "status": "LIVE",
+          "members": [
+            8321,
+            8327,
+            9005,
+            10167,
+            10696
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 7,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 9,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 2,
+          "status": "LIVE",
+          "members": [
+            8728,
+            10417,
+            11859,
+            12117
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 7,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 26,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 3,
+          "status": "LIVE",
+          "members": [
+            8416,
+            8530,
+            8575,
+            8586,
+            8695,
+            9222,
+            9411,
+            9627,
+            10258,
+            10299,
+            10858,
+            10899,
+            11921
+          ],
+          "structural_generation": 11,
+          "birth_close_serial": 8,
+          "surface": null,
+          "marker": null,
+          "external_count": 8,
+          "readout_status": "READOUT_AMBIGUOUS"
+        },
+        {
+          "assembly_id": 4,
+          "status": "LIVE",
+          "members": [
+            9669,
+            11119,
+            11195,
+            11784,
+            11807,
+            12123,
+            12241
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 8,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 25,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 5,
+          "status": "LIVE",
+          "members": [
+            8834,
+            9209,
+            10570,
+            10646,
+            10915,
+            11153,
+            11583,
+            12116,
+            12117
+          ],
+          "structural_generation": 7,
+          "birth_close_serial": 8,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 24,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 6,
+          "status": "LIVE",
+          "members": [
+            8834,
+            9209,
+            10570,
+            10646,
+            10915,
+            11153,
+            11583,
+            12116,
+            12117
+          ],
+          "structural_generation": 7,
+          "birth_close_serial": 8,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 24,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 7,
+          "status": "LIVE",
+          "members": [
+            9061,
+            10595,
+            11077,
+            11811
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "القط",
+          "marker": "NONE",
+          "external_count": 10,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 8,
+          "status": "LIVE",
+          "members": [
+            9319,
+            9325,
+            10903,
+            11220
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 10,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 9,
+          "status": "LIVE",
+          "members": [
+            8589,
+            9205,
+            9369,
+            9487
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "النسر",
+          "marker": "NONE",
+          "external_count": 9,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 10,
+          "status": "LIVE",
+          "members": [
+            8242,
+            9854,
+            11638,
+            11984
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 10,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 11,
+          "status": "LIVE",
+          "members": [
+            9183,
+            9951,
+            10345,
+            10496,
+            10502,
+            11191,
+            11463,
+            12066
+          ],
+          "structural_generation": 6,
+          "birth_close_serial": 15,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 8,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 12,
+          "status": "LIVE",
+          "members": [
+            8809,
+            9734,
+            9740,
+            10044,
+            10308,
+            10634,
+            11193
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 16,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 9,
+          "readout_status": "OK"
+        }
+      ],
+      "root_56": [
+        {
+          "assembly_id": 1,
+          "status": "LIVE",
+          "members": [
+            8321,
+            8327,
+            9005,
+            10167,
+            10696
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 7,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 31,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 2,
+          "status": "LIVE",
+          "members": [
+            8728,
+            10417,
+            11859,
+            12117
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 7,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 48,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 3,
+          "status": "LIVE",
+          "members": [
+            8416,
+            8530,
+            8575,
+            8586,
+            8695,
+            9222,
+            9240,
+            9411,
+            9627,
+            10258,
+            10299,
+            10858,
+            10899,
+            11921
+          ],
+          "structural_generation": 12,
+          "birth_close_serial": 8,
+          "surface": null,
+          "marker": null,
+          "external_count": 8,
+          "readout_status": "READOUT_AMBIGUOUS"
+        },
+        {
+          "assembly_id": 4,
+          "status": "LIVE",
+          "members": [
+            9669,
+            11119,
+            11195,
+            11784,
+            11807,
+            12123,
+            12241
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 8,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 47,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 5,
+          "status": "LIVE",
+          "members": [
+            8834,
+            9209,
+            10570,
+            10646,
+            10915,
+            11153,
+            11583,
+            12116,
+            12117
+          ],
+          "structural_generation": 7,
+          "birth_close_serial": 8,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 46,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 6,
+          "status": "LIVE",
+          "members": [
+            8834,
+            9209,
+            10570,
+            10646,
+            10915,
+            11153,
+            11583,
+            12116,
+            12117
+          ],
+          "structural_generation": 7,
+          "birth_close_serial": 8,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 46,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 7,
+          "status": "LIVE",
+          "members": [
+            9061,
+            10595,
+            11077,
+            11811
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "القط",
+          "marker": "NONE",
+          "external_count": 21,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 8,
+          "status": "LIVE",
+          "members": [
+            9319,
+            9325,
+            10903,
+            11220
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 21,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 9,
+          "status": "LIVE",
+          "members": [
+            8589,
+            9205,
+            9369,
+            9487
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "النسر",
+          "marker": "NONE",
+          "external_count": 20,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 10,
+          "status": "LIVE",
+          "members": [
+            8242,
+            9854,
+            11638,
+            11984
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 21,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 11,
+          "status": "LIVE",
+          "members": [
+            9183,
+            9951,
+            10345,
+            10496,
+            10502,
+            11191,
+            11463,
+            12066
+          ],
+          "structural_generation": 6,
+          "birth_close_serial": 15,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 19,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 12,
+          "status": "LIVE",
+          "members": [
+            8809,
+            9734,
+            9740,
+            10044,
+            10308,
+            10634,
+            11193
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 16,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 20,
+          "readout_status": "OK"
+        }
+      ],
+      "root_80": [
+        {
+          "assembly_id": 1,
+          "status": "LIVE",
+          "members": [
+            8321,
+            8327,
+            9005,
+            10167,
+            10696
+          ],
+          "structural_generation": 3,
+          "birth_close_serial": 7,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 55,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 2,
+          "status": "LIVE",
+          "members": [
+            8728,
+            10417,
+            11859,
+            12117
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 7,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 72,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 3,
+          "status": "LIVE",
+          "members": [
+            8416,
+            8530,
+            8575,
+            8586,
+            8695,
+            9222,
+            9240,
+            9411,
+            9627,
+            10258,
+            10299,
+            10786,
+            10858,
+            10899,
+            11921
+          ],
+          "structural_generation": 13,
+          "birth_close_serial": 8,
+          "surface": null,
+          "marker": null,
+          "external_count": 8,
+          "readout_status": "READOUT_AMBIGUOUS"
+        },
+        {
+          "assembly_id": 4,
+          "status": "LIVE",
+          "members": [
+            9669,
+            11119,
+            11195,
+            11784,
+            11807,
+            12123,
+            12241
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 8,
+          "surface": "يشرب",
+          "marker": "NONE",
+          "external_count": 71,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 5,
+          "status": "LIVE",
+          "members": [
+            8834,
+            9209,
+            10570,
+            10646,
+            10915,
+            11153,
+            11583,
+            12116,
+            12117
+          ],
+          "structural_generation": 7,
+          "birth_close_serial": 8,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 70,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 6,
+          "status": "LIVE",
+          "members": [
+            8834,
+            9209,
+            10570,
+            10646,
+            10915,
+            11153,
+            11583,
+            12116,
+            12117
+          ],
+          "structural_generation": 7,
+          "birth_close_serial": 8,
+          "surface": "<EOS>",
+          "marker": "EOS",
+          "external_count": 70,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 7,
+          "status": "LIVE",
+          "members": [
+            9061,
+            10595,
+            11077,
+            11811
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "القط",
+          "marker": "NONE",
+          "external_count": 33,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 8,
+          "status": "LIVE",
+          "members": [
+            9319,
+            9325,
+            10903,
+            11220
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 13,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 33,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 9,
+          "status": "LIVE",
+          "members": [
+            8589,
+            9205,
+            9369,
+            9487
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "النسر",
+          "marker": "NONE",
+          "external_count": 32,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 10,
+          "status": "LIVE",
+          "members": [
+            8242,
+            9854,
+            11638,
+            11984
+          ],
+          "structural_generation": 2,
+          "birth_close_serial": 14,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 33,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 11,
+          "status": "LIVE",
+          "members": [
+            9183,
+            9951,
+            10345,
+            10496,
+            10502,
+            11191,
+            11463,
+            12066
+          ],
+          "structural_generation": 6,
+          "birth_close_serial": 15,
+          "surface": "حليب",
+          "marker": "NONE",
+          "external_count": 31,
+          "readout_status": "OK"
+        },
+        {
+          "assembly_id": 12,
+          "status": "LIVE",
+          "members": [
+            8809,
+            9734,
+            9740,
+            10044,
+            10308,
+            10634,
+            11193
+          ],
+          "structural_generation": 5,
+          "birth_close_serial": 16,
+          "surface": "ماء",
+          "marker": "NONE",
+          "external_count": 32,
+          "readout_status": "OK"
+        }
+      ]
+    }
+  },
+  "audit_findings_status": {
+    "R1-B01": "CONFIRMED (Read-only W mutation in test helper)",
+    "R1-B02": "CONFIRMED (Outbox pre-commit leakage)",
+    "R1-B03": "CONFIRMED (Cross-process persistence NOT_IMPLEMENTED)",
+    "R1-H01": "CONFIRMED (Multi-owner Gate C acceptance confirmed)",
+    "R1-H04": "CONFIRMED (Idempotency key prevents collision)",
+    "R1-H05": "CONFIRMED (Latent slot modifications survive tx.abort_exposure)",
+    "R1-M01": "CONFIRMED_AND_CRITICAL (Duplicate Assemblies 5 & 6 form under canonical EOS, causing GEN_STOP_AMBIGUOUS on eagle branch)",
+    "R1-M02": "CONFIRMED (Context cell z enters lexical assembly, depresses CoreCoverage on rival context)",
+    "R1-M03": "CONFIRMED (Pass-2 lateral gains excluded by P_T > 0, |G| dilution causes NO_MATCH on large assemblies)"
+  },
+  "corrections_summary": {
+    "persistence": "Corrected Arabic summary contradiction; cross-process disk persistence is NOT implemented.",
+    "github_branch_protection": "Corrected assertion that main is protected; GitHub API confirms protected: false.",
+    "readout_false_selection_risk": "Corrected claim of zero general false selection risk; 0.0000 on single negative control does not prove zero risk across arbitrary vocabularies.",
+    "readout_equation_remediation": "No new readout equation approved during audit; formula frozen.",
+    "manifest_provenance": "Generated programmatically by scratch/generate_c01_manifest.py."
+  }
+}

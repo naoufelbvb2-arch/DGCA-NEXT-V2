@@ -30,7 +30,8 @@ from dgca.core.state import (
     MachineState,
     StableBinding,
 )
-from dgca.encoder.envelope import encode_exposure, encode_lexical_token_event
+import dataclasses
+from dgca.encoder.envelope import Marker, encode_exposure, encode_lexical_token_event
 from dgca.experiments.gates import _wire_consolidated_synapse
 from dgca.lifecycle.exposure_tx import ExposureTransactionManager, run_read_only_episode
 from dgca.peripheral.readout_ledger import SurfaceReadoutLedgerV1
@@ -85,43 +86,99 @@ def test_f01_task2_natural_assembly_duplication_analysis() -> None:
     branch_ab = encode_exposure("القط يشرب حليب", append_eos=False)
     branch_db = encode_exposure("النسر يشرب ماء", append_eos=False)
 
+    checkpoints_data: dict[int, dict] = {}
+
     for root_id in range(1, 81):
         is_ab = (root_id % 2 != 0)
         envs = branch_ab if is_ab else branch_db
         tx.begin_exposure(root_id)
         for env in envs:
-            core_ev = encode_lexical_token_event(
-                env.peripheral_surface.raw_surface_nfc_utf8,
-                exposure_id=root_id,
-                event_order=env.core_event.event_order,
-                boundary=env.core_event.boundary,
-            ).core_event
+            core_ev = dataclasses.replace(env.core_event, exposure_id=root_id)
             tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
         tx.end_exposure(root_id)
 
-    # Inspect LIVE assemblies at root 80
-    live_asms = [a for a in state.W.assemblies.values() if a.status == AssemblyStatus.LIVE]
+        if root_id in (34, 56, 80):
+            live_asms = [a for a in state.W.assemblies.values() if a.status == AssemblyStatus.LIVE]
+            member_sets: dict[tuple[int, ...], list[int]] = {}
+            surface_map: dict[str, list[int]] = {}
+
+            for a in live_asms:
+                m_tuple = tuple(sorted(a.member_cell_ids))
+                member_sets.setdefault(m_tuple, []).append(a.assembly_id)
+                res_r = ledger.resolve_readout(a.assembly_id, a.structural_generation, current_live_generation=a.structural_generation)
+                surf = getattr(res_r.envelope, "raw_surface_nfc_utf8", None)
+                if surf:
+                    surface_map.setdefault(surf, []).append(a.assembly_id)
+
+            exact_duplicates = [ids for m, ids in member_sets.items() if len(ids) > 1]
+            checkpoints_data[root_id] = {
+                "live_count": len(live_asms),
+                "exact_duplicates_count": len(exact_duplicates),
+                "surface_map": surface_map,
+            }
+
+    # Verify Checkpoint 34
+    assert checkpoints_data[34]["live_count"] == 9
+    assert checkpoints_data[34]["exact_duplicates_count"] == 0
+    assert len(checkpoints_data[34]["surface_map"].get("يشرب", [])) >= 2
+    assert len(checkpoints_data[34]["surface_map"].get("حليب", [])) >= 2
+    assert len(checkpoints_data[34]["surface_map"].get("ماء", [])) >= 2
+
+    # Verify Checkpoint 56
+    assert checkpoints_data[56]["live_count"] == 9
+    assert checkpoints_data[56]["exact_duplicates_count"] == 0
+    assert len(checkpoints_data[56]["surface_map"].get("يشرب", [])) >= 2
+    assert len(checkpoints_data[56]["surface_map"].get("حليب", [])) >= 2
+    assert len(checkpoints_data[56]["surface_map"].get("ماء", [])) >= 2
+
+    # Verify Checkpoint 80
+    assert checkpoints_data[80]["live_count"] == 9
+    assert checkpoints_data[80]["exact_duplicates_count"] == 0
+    assert len(checkpoints_data[80]["surface_map"].get("يشرب", [])) >= 2
+    assert len(checkpoints_data[80]["surface_map"].get("حليب", [])) >= 2
+    assert len(checkpoints_data[80]["surface_map"].get("ماء", [])) >= 2
+
+
+def test_f01_task2_canonical_eos_structural_duplicate_collision() -> None:
+    """Task 2 & R1-M01: Canonical EOS training naturally generates EXACT_STRUCTURAL_DUPLICATE Assemblies (5 & 6)."""
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=True,
+        enable_assembly_pipeline=True,
+        readout_ledger=ledger,
+    )
+
+    branch_ab = encode_exposure("القط يشرب حليب", append_eos=True)
+    branch_db = encode_exposure("النسر يشرب ماء", append_eos=True)
+
+    for root_id in range(1, 57):
+        is_ab = (root_id % 2 != 0)
+        envs = branch_ab if is_ab else branch_db
+        tx.begin_exposure(root_id)
+        for env in envs:
+            core_ev = dataclasses.replace(env.core_event, exposure_id=root_id)
+            tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
+        tx.end_exposure(root_id)
+
+    # Verify exact duplicate assemblies exist
     member_sets: dict[tuple[int, ...], list[int]] = {}
-    surface_map: dict[str, list[int]] = {}
+    for a in state.W.assemblies.values():
+        if a.status == AssemblyStatus.LIVE:
+            m_tuple = tuple(sorted(a.member_cell_ids))
+            member_sets.setdefault(m_tuple, []).append(a.assembly_id)
 
-    for a in live_asms:
-        m_tuple = tuple(sorted(a.member_cell_ids))
-        member_sets.setdefault(m_tuple, []).append(a.assembly_id)
-        res_r = ledger.resolve_readout(a.assembly_id, a.structural_generation, current_live_generation=a.structural_generation)
-        surf = getattr(res_r.envelope, "raw_surface_nfc_utf8", None)
-        if surf:
-            surface_map.setdefault(surf, []).append(a.assembly_id)
-
-    # 1. Check for EXACT_STRUCTURAL_DUPLICATE
-    exact_duplicates = [ids for m, ids in member_sets.items() if len(ids) > 1]
-    # In natural cold-start learning, exact structural duplicates do NOT occur (count = 0)
-    assert len(exact_duplicates) == 0, "Observed unexpected exact structural duplicates in natural learning"
-
-    # 2. Check for SAME_SURFACE_DIFFERENT_STRUCTURE
-    # Multiple distinct assemblies exist for "يشرب" (Asm 1 & Asm 3), "حليب" (Asm 5 & 8), "ماء" (Asm 7 & 9)
-    assert len(surface_map.get("يشرب", [])) >= 2
-    assert len(surface_map.get("حليب", [])) >= 2
-    assert len(surface_map.get("ماء", [])) >= 2
+    exact_duplicates = {m: ids for m, ids in member_sets.items() if len(ids) > 1}
+    assert len(exact_duplicates) == 1
+    dup_members, dup_ids = next(iter(exact_duplicates.items()))
+    assert set(dup_ids) == {5, 6}
+    assert dup_members == (8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)
+    # Both are attested to EOS
+    res5 = ledger.resolve_readout(5, state.W.assemblies[5].structural_generation, current_live_generation=state.W.assemblies[5].structural_generation)
+    res6 = ledger.resolve_readout(6, state.W.assemblies[6].structural_generation, current_live_generation=state.W.assemblies[6].structural_generation)
+    assert res5.envelope.marker == Marker.EOS
+    assert res6.envelope.marker == Marker.EOS
 
 
 def test_f01_task3_natural_contextual_z_contamination() -> None:
