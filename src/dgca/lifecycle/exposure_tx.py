@@ -20,29 +20,31 @@ from enum import StrEnum
 logger = logging.getLogger(__name__)
 
 
+def _is_valid_outbox_consumer(consumer: object) -> bool:
+    """Validate that consumer implements the peripheral outbox batch interface (Core §9.4, §10.2)."""
+    return consumer is not None and callable(getattr(consumer, "consume_outbox_batch", None))
+
+
 class frozendict(dict):
-    """Immutable mapping preserving standard dict interfaces (Core §10.2)."""
+    """Immutable mapping preserving standard dict interfaces (Core §10.2, Correction S02)."""
 
-    def __setitem__(self, key: object, value: object) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        if getattr(self, "_initialized", False):
+            raise TypeError("frozendict is immutable")
+        super().__init__(*args, **kwargs)
+        self._initialized = True
+
+    def __readonly__(self, *args: object, **kwargs: object) -> None:
         raise TypeError("frozendict is immutable")
 
-    def __delitem__(self, key: object) -> None:
-        raise TypeError("frozendict is immutable")
-
-    def clear(self) -> None:
-        raise TypeError("frozendict is immutable")
-
-    def pop(self, *args: object, **kwargs: object) -> object:
-        raise TypeError("frozendict is immutable")
-
-    def popitem(self) -> tuple[object, object]:
-        raise TypeError("frozendict is immutable")
-
-    def setdefault(self, *args: object, **kwargs: object) -> object:
-        raise TypeError("frozendict is immutable")
-
-    def update(self, *args: object, **kwargs: object) -> None:
-        raise TypeError("frozendict is immutable")
+    __setitem__ = __readonly__
+    __delitem__ = __readonly__
+    __ior__ = __readonly__
+    clear = __readonly__
+    pop = __readonly__
+    popitem = __readonly__
+    setdefault = __readonly__
+    update = __readonly__
 
     def copy(self) -> frozendict:
         return self
@@ -522,10 +524,14 @@ class ExposureTransactionManager:
     ) -> int:
         """Explicitly dispatch pending outbox notifications outside read-only execution.
 
-        Idempotent; clears roots from the pending view on success.
+        Idempotent; clears roots from the pending view strictly upon successful consumption.
         """
         target_ledger = ledger if ledger is not None else self.readout_ledger
-        if target_ledger is None:
+        if not _is_valid_outbox_consumer(target_ledger):
+            logger.warning(
+                "Cannot reconcile outbox: consumer %r does not implement callable consume_outbox_batch",
+                target_ledger,
+            )
             return 0
 
         roots = (
@@ -538,15 +544,17 @@ class ExposureTransactionManager:
             batch = self._publication_view.pending_outbox_by_root.get(rid)
             if not batch:
                 continue
-            if hasattr(target_ledger, "consume_outbox_batch"):
-                delivered += target_ledger.consume_outbox_batch(batch)
 
-            new_pending = dict(self._publication_view.pending_outbox_by_root)
-            new_pending.pop(rid, None)
+            # Invoke consumer method
+            delivered += target_ledger.consume_outbox_batch(batch)  # type: ignore[union-attr]
+
+            # Clear pending queue for this root strictly after successful delivery
+            pending_after = dict(self._publication_view.pending_outbox_by_root)
+            pending_after.pop(rid, None)
             self._publication_view = TransactionPublicationView(
                 W=self._publication_view.W,
                 completed_roots=self._publication_view.completed_roots,
-                pending_outbox_by_root=frozendict(new_pending),
+                pending_outbox_by_root=frozendict(pending_after),
                 completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
                 active_exposure_id=self._publication_view.active_exposure_id,
             )
@@ -807,6 +815,7 @@ class ExposureTransactionManager:
             completed_roots_high_watermark=new_watermark,
             active_exposure_id=None,
         )
+        journal.status = ExposureStatus.ABORTED
         self.open_journal = None
         return ExposureStatus.ABORTED
 
@@ -926,7 +935,6 @@ class ExposureTransactionManager:
                 )
             )
 
-        journal.status = ExposureStatus.COMPLETED
         report = EndExposureReport(
             exposure_id=exposure_id,
             status=ExposureStatus.COMPLETED,
@@ -966,6 +974,7 @@ class ExposureTransactionManager:
         # Step 6: Atomic Publication Point (single pointer swap)
         self._publication_view = new_view
         self.state.W = new_view.W
+        journal.status = ExposureStatus.COMPLETED
         self._protected_open_root_pairs.clear()
         self.open_journal = None
 
@@ -975,25 +984,31 @@ class ExposureTransactionManager:
                 "Injected fault at FP-03: post-commit peripheral dispatch deferred for root %d",
                 exposure_id,
             )
-        elif self.readout_ledger is not None and outbox_notifs:
-            try:
-                if hasattr(self.readout_ledger, "consume_outbox_batch"):
-                    self.readout_ledger.consume_outbox_batch(outbox_notifs)  # type: ignore[attr-defined]
-                # Delivery succeeded; remove from pending queue
-                pending_after = dict(self._publication_view.pending_outbox_by_root)
-                pending_after.pop(exposure_id, None)
-                self._publication_view = TransactionPublicationView(
-                    W=self._publication_view.W,
-                    completed_roots=self._publication_view.completed_roots,
-                    pending_outbox_by_root=frozendict(pending_after),
-                    completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
-                    active_exposure_id=self._publication_view.active_exposure_id,
-                )
-            except Exception as exc:
-                # Root remains COMPLETED. W remains committed. Batch remains in pending view.
+        elif outbox_notifs:
+            if not _is_valid_outbox_consumer(self.readout_ledger):
                 logger.warning(
-                    "Peripheral dispatch deferred for root %d: %s", exposure_id, exc
+                    "Peripheral ledger %r does not implement callable consume_outbox_batch; dispatch deferred for root %d",
+                    self.readout_ledger,
+                    exposure_id,
                 )
+            else:
+                try:
+                    self.readout_ledger.consume_outbox_batch(outbox_notifs)  # type: ignore[union-attr]
+                    # Delivery succeeded; remove from pending queue
+                    pending_after = dict(self._publication_view.pending_outbox_by_root)
+                    pending_after.pop(exposure_id, None)
+                    self._publication_view = TransactionPublicationView(
+                        W=self._publication_view.W,
+                        completed_roots=self._publication_view.completed_roots,
+                        pending_outbox_by_root=frozendict(pending_after),
+                        completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
+                        active_exposure_id=self._publication_view.active_exposure_id,
+                    )
+                except Exception as exc:
+                    # Root remains COMPLETED. W remains committed. Batch remains in pending view.
+                    logger.warning(
+                        "Peripheral dispatch deferred for root %d: %s", exposure_id, exc
+                    )
 
         return report
 

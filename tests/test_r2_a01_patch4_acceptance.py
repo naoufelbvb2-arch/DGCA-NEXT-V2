@@ -473,19 +473,390 @@ def test_p5_06_generator_readout_safe_stops() -> None:
     assert gen_res_b.stop_status == StatusCode.GEN_STOP_READOUT_UNAVAILABLE
     assert gen_res_b.stop_status != StatusCode.GEN_STOP_READOUT_UNKNOWN
 
-    # TEST C: State and Ledger Immutability
-    from tests.test_r2_a01_patch2_acceptance import snapshot_w
+    # TEST C: Complete State and Ledger Immutability (Correction S04)
+    from tests.test_r2_a01_patch2_acceptance import snapshot_ledger, snapshot_w
 
-    hash_w_pre = hash_state_snapshot(snapshot_w(state.W))
-    ledger_rows_pre = {k: len(v) for k, v in attested_ledger._rows_by_asm_gen.items()}
+    snap_w_pre = snapshot_w(state.W)
+    hash_w_pre = hash_state_snapshot(snap_w_pre)
+
+    snap_l_pre = snapshot_ledger(attested_ledger)
+    hash_l_pre = hash_state_snapshot(snap_l_pre)
 
     # Run generation with normal attested ledger
     gen_res_c = generate_episode(state, [prompt_ev], attested_ledger, max_steps=1)
     assert gen_res_c.emitted_surfaces == ("جميل",)
 
-    hash_w_post = hash_state_snapshot(snapshot_w(state.W))
-    ledger_rows_post = {k: len(v) for k, v in attested_ledger._rows_by_asm_gen.items()}
+    snap_w_post = snapshot_w(state.W)
+    hash_w_post = hash_state_snapshot(snap_w_post)
 
-    # Exact byte-for-byte immutability
-    assert hash_w_pre == hash_w_post, "W mutated during read-only generation episode"
-    assert ledger_rows_pre == ledger_rows_post, "Ledger mutated during read-only generation"
+    snap_l_post = snapshot_ledger(attested_ledger)
+    hash_l_post = hash_state_snapshot(snap_l_post)
+
+    # Exact byte-for-byte structural and cryptographic immutability
+    assert snap_w_pre == snap_w_post, "W structural snapshot mutated during read-only generation"
+    assert hash_w_pre == hash_w_post, "W SHA-256 digest drifted during read-only generation"
+    assert snap_l_pre == snap_l_post, "Ledger structural snapshot mutated during read-only generation"
+    assert hash_l_pre == hash_l_post, "Ledger SHA-256 digest drifted during read-only generation"
+
+
+def test_s01_no_silent_outbox_loss_on_unsupported_reconcile_consumer() -> None:
+    """Correction S01: reconcile_outbox() with an unsupported consumer preserves pending batch.
+
+    Mandatory regression:
+    - Real completed root with 3 pending notifications.
+    - tx.reconcile_outbox(exposure_id=root_id, ledger=object()).
+    - Verify: no notification delivered, pending batch remains intact.
+    - Readiness still reports OUTBOX_DELIVERY_PENDING.
+    - Subsequent call with valid ledger successfully reconciles the complete batch.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=None,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    tx.end_exposure(root_id)
+
+    # 1. Verify batch is pending
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+    # 2. Call reconcile_outbox with unsupported consumer (lacking callable consume_outbox_batch)
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=object())
+    assert delivered == 0
+
+    # 3. Batch must remain 100% intact
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+    with pytest.raises(ObservationError) as exc_info:
+        tx.assert_outbox_ready(root_id)
+    assert exc_info.value.code == StatusCode.OUTBOX_DELIVERY_PENDING
+
+    # 4. Subsequent reconciliation with a valid ledger succeeds
+    valid_ledger = SurfaceReadoutLedgerV1()
+    reconciled = tx.reconcile_outbox(exposure_id=root_id, ledger=valid_ledger)
+    assert reconciled == 3
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+    tx.assert_outbox_ready(root_id)  # Does not raise
+    assert len(valid_ledger._rows_by_asm_gen) == 3
+
+
+def test_s01_no_silent_outbox_loss_on_unsupported_initial_dispatch() -> None:
+    """Correction S01: end_exposure() with an unsupported ledger preserves pending batch.
+
+    Mandatory regression:
+    - Real open root with 3 events.
+    - Initial dispatch supplied with unsupported ledger (object()).
+    - W committed, root COMPLETED, but pending batch is preserved in publication view.
+    - Readiness reports OUTBOX_DELIVERY_PENDING.
+    - Subsequent reconcile_outbox() with valid ledger delivers complete batch.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=object(),  # Unsupported consumer type
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    rep = tx.end_exposure(root_id)
+
+    # 1. Neural state committed; root COMPLETED (never rolled back)
+    assert rep.status == ExposureStatus.COMPLETED
+    assert tx.status == ExposureStatus.CLOSED
+    assert state.W.close_serial == 1
+    assert root_id in tx.completed_roots
+
+    # 2. Batch must be preserved in pending queue (not silently dropped)
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+    with pytest.raises(ObservationError) as exc_info:
+        tx.assert_outbox_ready(root_id)
+    assert exc_info.value.code == StatusCode.OUTBOX_DELIVERY_PENDING
+
+    # 3. Subsequent reconcile with valid ledger completes delivery
+    valid_ledger = SurfaceReadoutLedgerV1()
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=valid_ledger)
+    assert delivered == 3
+    assert tx.has_pending_outbox(root_id) is False
+    tx.assert_outbox_ready(root_id)
+
+
+def test_s02_immutable_publication_metadata_adversarial() -> None:
+    """Correction S02: Comprehensive adversarial mutation tests on frozendict publication metadata.
+
+    Verifies that publication metadata cannot be modified via:
+    - Direct item assignment (__setitem__)
+    - In-place union (|= / __ior__)
+    - update()
+    - pop()
+    - clear()
+    - setdefault()
+    - popitem()
+    - Re-calling __init__()
+    - References retained before subsequent publication swaps.
+    """
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    rep1 = tx.end_exposure(root_id)
+
+    published = tx.completed_roots
+    pending = tx.pending_outbox_by_root
+    forged_report = copy.copy(rep1)
+
+    # 1. Direct item assignment
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published[999] = forged_report  # type: ignore[index]
+
+    # 2. In-place union |= (__ior__)
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published |= {999: forged_report}  # type: ignore[misc]
+
+    # 3. update()
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.update({999: forged_report})
+
+    # 4. pop()
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.pop(root_id)
+
+    # 5. clear()
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.clear()
+
+    # 6. setdefault()
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.setdefault(999, forged_report)
+
+    # 7. popitem()
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.popitem()
+
+    # 8. Re-calling __init__()
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.__init__({999: forged_report})
+
+    # Same adversarial tests on pending mapping
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        pending[999] = ()  # type: ignore[index]
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        pending |= {999: ()}  # type: ignore[misc]
+
+    # 9. Reference isolation across subsequent publication swaps
+    retained_v1 = tx.completed_roots
+    assert len(retained_v1) == 1
+    assert root_id in retained_v1
+
+    # Commit Root 2
+    root_id_2 = 2
+    tx.begin_exposure(root_id_2)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id_2,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+    rep2 = tx.end_exposure(root_id_2)
+
+    # Authoritative view now has 2 roots
+    assert len(tx.completed_roots) == 2
+    assert root_id_2 in tx.completed_roots
+
+    # Retained v1 reference is 100% unchanged
+    assert len(retained_v1) == 1
+    assert root_id_2 not in retained_v1
+    assert retained_v1[root_id] is rep1
+
+
+def test_s03_precise_atomic_publication_visibility() -> None:
+    """Correction S03: Authoritative publication boundary and visibility consistency.
+
+    Verifies:
+    - Before publication, completed root is absent from authoritative published view.
+    - Pre-publication failure preserves OPEN journal status and tx.status == OPEN.
+    - Single atomic swap updates (W, completed_roots, pending_outbox_by_root, watermark, active_id=None).
+    - Readers capturing publication_view snapshot cannot observe mixed committed versions.
+    """
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+
+    # 1. Pre-publication checks
+    assert tx.status == ExposureStatus.OPEN
+    assert tx.publication_view.active_exposure_id == root_id
+    assert root_id not in tx.publication_view.completed_roots
+    assert tx.open_journal is not None
+    assert tx.open_journal.status == ExposureStatus.OPEN
+
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    # 2. Before publication, journal status is still OPEN
+    assert tx.open_journal.status == ExposureStatus.OPEN
+
+    # 3. Controlled throwing hook during shadow preparation preserves OPEN journal status
+    def throwing_hook(w_pre, w_shadow, h_slow, journal, diags):
+        assert journal.status == ExposureStatus.OPEN, "Journal must be OPEN during preparation"
+        raise RuntimeError("Controlled failure in shadow preparation hook")
+
+    tx.register_end_exposure_hook(throwing_hook)
+
+    with pytest.raises(RuntimeError, match="Controlled failure in shadow preparation hook"):
+        tx.end_exposure(root_id)
+
+    # Pre-publication failure guarantees:
+    assert tx.status == ExposureStatus.OPEN
+    assert tx.open_journal is not None
+    assert tx.open_journal.status == ExposureStatus.OPEN
+    assert root_id not in tx.publication_view.completed_roots
+    assert tx.publication_view.active_exposure_id == root_id
+    assert state.W.close_serial == 0
+    assert len(ledger._rows_by_asm_gen) == 0
+
+    # 4. Clear throwing hook and complete publication
+    tx._end_exposure_hooks.clear()
+    rep = tx.end_exposure(root_id)
+
+    # Post-publication guarantees:
+    pub = tx.publication_view
+    assert pub.active_exposure_id is None
+    assert root_id in pub.completed_roots
+    assert pub.completed_roots[root_id] is rep
+    assert pub.completed_roots_high_watermark == root_id
+    assert pub.W.close_serial == 1
+    assert tx.open_journal is None
+    assert tx.status == ExposureStatus.CLOSED
+
+
+def test_controlled_throwing_shadow_preparation_hook_fp01() -> None:
+    """Section 6: Controlled throwing shadow preparation hook demonstrates FP-01 isolation.
+
+    Verifies that real operational failure during shadow preparation:
+    - Delivers 0 pre-commit peripheral attestations.
+    - Leaves W uncommitted.
+    - Leaves completed_roots empty.
+    - Preserves admitted sensory commitments.
+    - Leaves journal.status == OPEN.
+    - Leaves root cleanly retryable or abortable.
+    """
+    state = MachineState()
+    ledger = SurfaceReadoutLedgerV1()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    sensory_cells_admitted = set(state.W.committed_cells.keys())
+    assert len(sensory_cells_admitted) > 0
+
+    # Register actual operational throwing hook
+    def throwing_preparation_hook(w_pre, w_shadow, h_slow, journal, diags):
+        raise RuntimeError("Operational preparation error during shadow transaction")
+
+    tx.register_end_exposure_hook(throwing_preparation_hook)
+
+    with pytest.raises(RuntimeError, match="Operational preparation error"):
+        tx.end_exposure(root_id)
+
+    # Invariants:
+    assert tx.status == ExposureStatus.OPEN
+    assert tx.open_journal is not None
+    assert tx.open_journal.status == ExposureStatus.OPEN
+    assert root_id not in tx.completed_roots
+    assert state.W.close_serial == 0
+    assert len(ledger._rows_by_asm_gen) == 0  # 0 peripheral attestations
+    assert set(state.W.committed_cells.keys()) == sensory_cells_admitted  # Sensory retention
+
+    # Clean abort capability
+    abort_status = tx.abort_exposure(root_id)
+    assert abort_status == ExposureStatus.ABORTED
+    assert tx.status == ExposureStatus.CLOSED
+    assert root_id in tx.aborted_roots
+    assert set(state.W.committed_cells.keys()) == sensory_cells_admitted
