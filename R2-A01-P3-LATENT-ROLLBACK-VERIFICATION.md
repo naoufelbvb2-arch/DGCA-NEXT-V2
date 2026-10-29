@@ -59,16 +59,23 @@ When an aborted exposure commits a previously uncommitted sensory cell $c_s$:
 ## 3. Implementation Mechanism
 
 ### 3.1 Extension of `OpenExposureJournal`
-In [`src/dgca/lifecycle/exposure_tx.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/lifecycle/exposure_tx.py#L272-L285):
+In [`src/dgca/lifecycle/exposure_tx.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/lifecycle/exposure_tx.py#L272-L287):
 ```python
-@dataclass(slots=True)
+@dataclass
 class OpenExposureJournal:
+    """In-flight tracking data for an OPEN exposure."""
+
     exposure_id: int
     status: ExposureStatus
     h_slow_begin: HSlowState
     h_slow_event: HSlowState
     latent_table_begin: LatentNeighborhoodTable | None = None
-    ...
+    next_event_order: int = 0
+    next_proposal_ordinal: int = 0
+    last_event_remaining_k_r: int = K_R_PER_EVENT
+    last_step_a: dict[int, float] = field(default_factory=dict)
+    active_in_flight: set[int] = field(default_factory=set)
+    coactive_in_flight: set[int] = field(default_factory=set)
 ```
 
 ### 3.2 Snapshot Capture at `begin_exposure()`
@@ -116,6 +123,7 @@ self._protected_open_root_pairs.clear()
 | **P4-05** | `test_p4_05_multi_root_isolation` | **Multi-Root Isolation (Root 1 COMPLETE $\rightarrow$ Root 2 COMPLETE $\rightarrow$ Root 3 ABORT $\rightarrow$ Root 4 COMPLETE):** Root 1 and 2 topology survives. Root 3 coactive mutations absent. Root 4 learns lawfully from post-Root-2 state. Re-aborting Root 3 leaves Root 4 untouched. | **PASSED** |
 | **P4-06** | `test_p4_06_failure_and_rollback_safety` | **Failure & Rollback Safety:** Covers repeated BEGIN on same OPEN root, zero-event ABORT, ABORT of completed root (raises `ObservationError`), ABORT after slot recycling, and ABORT after rejected event (out-of-order event). | **PASSED** |
 | **P4-07** | `test_p4_07_scaling_and_memory_sanity` | **Memory Sanity:** 50 consecutive BEGIN $\rightarrow$ OPEN $\rightarrow$ ABORT cycles confirm zero accumulating memory leaks or latent topology drift. | **PASSED** |
+| **P4-08** | `test_p4_08_adversarial_empty_set_sensitivity` | **Adversarial Empty-Set Sensitivity (Correction C04):** Proves that inserting or removing empty-set entries in `_pinned_slots` or `_coactive_reverse_index` causes structural snapshot inequality and canonical SHA-256 digest divergence. | **PASSED** |
 
 ---
 

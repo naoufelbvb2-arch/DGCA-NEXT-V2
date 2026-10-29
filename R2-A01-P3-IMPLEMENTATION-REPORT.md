@@ -52,34 +52,48 @@ In Patch 3:
 ## 3. Snapshot and Rollback Architecture
 
 ### 3.1 Dataclass Extension
-In [`src/dgca/lifecycle/exposure_tx.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/lifecycle/exposure_tx.py#L32-L46):
+In [`src/dgca/lifecycle/exposure_tx.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/lifecycle/exposure_tx.py#L272-L287):
 ```python
 @dataclass
 class OpenExposureJournal:
     """In-flight tracking data for an OPEN exposure."""
+
     exposure_id: int
-    h_slow_begin: dict[int, float]
-    seen_event_digests: set[str] = field(default_factory=set)
-    accepted_event_count: int = 0
-    accepted_event_ids: list[int] = field(default_factory=list)
-    opened_at_step: int = 0
-    closed_at_step: int | None = None
+    status: ExposureStatus
+    h_slow_begin: HSlowState
+    h_slow_event: HSlowState
     latent_table_begin: LatentNeighborhoodTable | None = None
+    next_event_order: int = 0
+    next_proposal_ordinal: int = 0
+    last_event_remaining_k_r: int = K_R_PER_EVENT
+    last_step_a: dict[int, float] = field(default_factory=dict)
+    active_in_flight: set[int] = field(default_factory=set)
+    coactive_in_flight: set[int] = field(default_factory=set)
 ```
 
 ### 3.2 Capture on `begin_exposure()`
 When beginning a new exposure, the live latent table is cloned:
 ```python
+# FIFR-B06 LAB POLICY A: capture immutable H_slow_BEGIN before any root-local adaptation
+h_begin = self.state.H_slow.clone()
+# R2-A01 Patch 3: capture immutable LatentNeighborhoodTable at BEGIN
 latent_begin = self.state.W.latent_table.clone()
-journal = OpenExposureJournal(
+self.state.R.reset_cold()
+self._protected_open_root_pairs.clear()
+
+self.open_journal = OpenExposureJournal(
     exposure_id=exposure_id,
-    h_slow_begin=h_slow_begin,
-    opened_at_step=self.global_step,
+    status=ExposureStatus.OPEN,
+    h_slow_begin=h_begin,
+    h_slow_event=h_begin.clone(),
     latent_table_begin=latent_begin,
+    next_event_order=0,
+    next_proposal_ordinal=0,
+    last_event_remaining_k_r=K_R_PER_EVENT,
 )
 ```
 - **Single Capture:** Captured exactly once per new `OPEN` root.
-- **Guard against repeated BEGIN:** Calling `begin_exposure()` on an already OPEN root raises `ObservationError`, preventing accidental overwrite of `latent_table_begin`.
+- **Idempotent Re-entry on Repeated BEGIN:** If `begin_exposure(exposure_id)` is called again for the currently OPEN root (`self.open_journal.exposure_id == exposure_id`), the implementation returns the existing journal immediately without re-cloning or overwriting `latent_table_begin`. If called for a *different* root while the current root is OPEN, it raises `ObservationError(StatusCode.EXPOSURE_ALREADY_OPEN)`.
 - **Reference Isolation:** `LatentNeighborhoodTable.clone()` performs deep dictionary copy of `_slots_by_cell` (and copies of all 24-slot tuples), `_coactive_reverse_index` (and copies of all target sets), `_pinned_slots` (and copies of pin sets), and `_wiring_logs` (and copies of log lists). No mutable structures are shared between live state and snapshot.
 
 ### 3.3 Restoration on `abort_exposure()`
@@ -112,43 +126,56 @@ The acceptance suite in [`tests/test_r2_a01_patch3_acceptance.py`](file:///c:/Us
 | Scenario ID | Test Name | Specific Verifications & Checks | Result |
 | :--- | :--- | :--- | :---: |
 | **P4-01** | `test_p4_01_abort_sensory_preservation` | - Root status returns `ABORTED`.<br>- Committed sensory cells remain in `w.committed_cells` with valid event clocks.<br>- `completed_roots_high_watermark` preserved.<br>- `w.latent_table` matches pre-exposure BEGIN state.<br>- Virtual lookup `get_slots_read_only` returns deterministic fixed neighbors without mutating `_slots_by_cell`. | **PASSED** |
-| **P4-02** | `test_p4_02_abort_coactive_latent_slot_rollback` | - Initialized 50 cells with 50 coactive links.<br>- Executed **120 actual mutations** (assignments + recycling) during OPEN root.<br>- Verified 120 slot changes present before ABORT.<br>- Called `abort_exposure()`.<br>- Verified exact restoration of all 24 slot positions across all 50 cells.<br>- Verified exact equality of full structural snapshots and SHA-256 state hashes. | **PASSED** |
+| **P4-02** | `test_p4_02_abort_coactive_latent_slot_rollback` | - Initialized 50 cells with 50 coactive links.<br>- Executed **120 actual mutations** (assignments + recycling) during OPEN root using legally constrained regional topology (intra 0..5 in same region, inter 12..17 in valid cross-region).<br>- Verified 120 slot changes present before ABORT.<br>- Validated `assert_slot_region_legality`.<br>- Called `abort_exposure()`.<br>- Verified exact restoration of all 24 slot positions across all 50 cells.<br>- Verified exact equality of full structural snapshots and SHA-256 state hashes. | **PASSED** |
 | **P4-03** | `test_p4_03_reverse_index_symmetry` | - Performed genuine coactive assignments modifying `_coactive_reverse_index`, `_pinned_slots`, and `_wiring_logs`.<br>- Aborted exposure.<br>- Verified exact structural restoration of reverse index, pins, and logs.<br>- Verified zero orphan reverse targets and zero stale sources.<br>- Verified exact forward/reverse symmetry: $T \in N(S) \iff S \in \text{rev}(T)$. | **PASSED** |
 | **P4-04** | `test_p4_04_duplicate_abort_idempotency` | - Aborted Root 1 successfully.<br>- Second call to `abort_exposure(1)` returns `ABORTED` immediately.<br>- Began and committed Root 2.<br>- Third call to `abort_exposure(1)` returns `ABORTED` with zero mutation.<br>- Root 2 topology remains completely intact. | **PASSED** |
 | **P4-05** | `test_p4_05_multi_root_isolation` | - Trajectory: Root 1 COMPLETE $\rightarrow$ Root 2 COMPLETE $\rightarrow$ Root 3 ABORT $\rightarrow$ Root 4 COMPLETE.<br>- Root 1 and 2 topology survives intact.<br>- Root 3 coactive assignments completely absent.<br>- Root 4 learns lawfully from post-Root-2 state.<br>- Second ABORT of Root 3 leaves Root 4 topology completely unchanged. | **PASSED** |
-| **P4-06** | `test_p4_06_failure_and_rollback_safety` | - Negative test: Repeated BEGIN on OPEN root raises `ObservationError`.<br>- ABORT with zero events restores BEGIN snapshot cleanly.<br>- Negative test: ABORT of already completed root raises `ObservationError`.<br>- Slot recycling during OPEN root cleanly rolled back.<br>- Out-of-order rejected event during OPEN root rolled back on ABORT. | **PASSED** |
+| **P4-06** | `test_p4_06_failure_and_rollback_safety` | - Negative test: Repeated BEGIN on same OPEN root returns existing journal idempotently.<br>- ABORT with zero events restores BEGIN snapshot cleanly.<br>- Negative test: ABORT of already completed root raises `ObservationError`.<br>- Slot recycling during OPEN root cleanly rolled back.<br>- Out-of-order rejected event during OPEN root rolled back on ABORT. | **PASSED** |
 | **P4-07** | `test_p4_07_scaling_and_memory_sanity` | - 50 consecutive BEGIN $\rightarrow$ OPEN $\rightarrow$ ABORT cycles.<br>- Live cell count remains constant.<br>- Reverse target count remains constant.<br>- Zero memory leak or latent topology drift over repeated cycles. | **PASSED** |
+| **P4-08** | `test_p4_08_adversarial_empty_set_sensitivity` | - Correction C04 adversarial test: inserting or removing empty-set entries in `_pinned_slots` or `_coactive_reverse_index` causes immediate structural snapshot inequality and canonical SHA-256 digest divergence. | **PASSED** |
 
 ---
 
 ## 5. Scaling Benchmark: BENCH-R2-A01-P4
 
 ### 5.1 Methodology
-The benchmark script [`benchmarks/bench_r2_a01_p4_latent_scaling.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/benchmarks/bench_r2_a01_p4_latent_scaling.py) evaluates performance across three authorized cell scales and a high-cycle stress test:
-1. **Small Scale:** 300 cells (50 iterations)
-2. **Medium Scale:** 2,000 cells (30 iterations)
-3. **High Occupancy Scale:** 12,288 cells (10 iterations)
-4. **1,000-Cycle Stress Test:** 500 cells subjected to 1,000 consecutive BEGIN $\rightarrow$ OPEN (with coactive mutations) $\rightarrow$ ABORT cycles.
+The benchmark script [`benchmarks/bench_r2_a01_p4_latent_scaling.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/benchmarks/bench_r2_a01_p4_latent_scaling.py) evaluates performance across three authorized cell scales under both ABORT and COMMIT workloads, plus a 1,000-cycle stress test with intermediate GC checkpoints:
+1. **Small Scale:** 300 cells (50 ABORT iterations, 15 COMMIT iterations)
+2. **Medium Scale:** 2,000 cells (30 ABORT iterations, 10 COMMIT iterations)
+3. **High Occupancy Scale:** 12,288 cells (10 ABORT iterations, 5 COMMIT iterations)
+4. **1,000-Cycle Stress Test:** 500 cells subjected to 1,000 consecutive BEGIN $\rightarrow$ OPEN (with coactive mutations) $\rightarrow$ ABORT cycles with GC checkpoints at cycles 0, 200, 400, 600, 800, 1000.
 
 Measurements use high-resolution performance counters (`time.perf_counter()`), Python memory tracing (`tracemalloc`), and explicit garbage collection (`gc.collect()`) to isolate snapshot/rollback allocations from permanent transaction logs.
 
-### 5.2 Actual Measured Results
+### 5.2 Actual Measured Results: ABORT Workload
 | Scale | Cell Count | Clone Latency (Mean $\pm$ Std) | BEGIN Latency (Mean $\pm$ Std) | ABORT Latency (Mean $\pm$ Std) | Clone Allocation Size | Peak Memory |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Small** | 300 | $0.993 \text{ ms} \pm 0.540 \text{ ms}$ | $0.091 \text{ ms} \pm 0.044 \text{ ms}$ | $0.201 \text{ ms} \pm 0.557 \text{ ms}$ | 184.56 KB | 9.23 MB |
-| **Medium** | 2,000 | $6.914 \text{ ms} \pm 1.938 \text{ ms}$ | $0.932 \text{ ms} \pm 1.507 \text{ ms}$ | $1.386 \text{ ms} \pm 1.926 \text{ ms}$ | 1,263.34 KB | 37.90 MB |
-| **High Occupancy** | 12,288 | $43.951 \text{ ms} \pm 8.087 \text{ ms}$ | $10.829 \text{ ms} \pm 10.040 \text{ ms}$ | $11.084 \text{ ms} \pm 4.396 \text{ ms}$ | 8,160.54 KB | 81.80 MB |
+| **Small** | 300 | $1.056 \text{ ms} \pm 0.638 \text{ ms}$ | $0.171 \text{ ms} \pm 0.065 \text{ ms}$ | $0.335 \text{ ms} \pm 0.751 \text{ ms}$ | 184.56 KB | 9.23 MB |
+| **Medium** | 2,000 | $7.309 \text{ ms} \pm 2.673 \text{ ms}$ | $1.698 \text{ ms} \pm 3.004 \text{ ms}$ | $1.412 \text{ ms} \pm 0.448 \text{ ms}$ | 1,263.34 KB | 37.90 MB |
+| **High Occupancy** | 12,288 | $46.258 \text{ ms} \pm 12.279 \text{ ms}$ | $7.954 \text{ ms} \pm 7.171 \text{ ms}$ | $16.044 \text{ ms} \pm 12.247 \text{ ms}$ | 8,160.54 KB | 81.80 MB |
 
-### 5.3 1,000-Cycle Stress Test Results
-- **Total Duration (1,000 cycles):** 3.148 seconds
-- **Mean Cycle Latency:** 3.148 ms / cycle
-- **P99 Cycle Latency:** 6.058 ms / cycle
-- **Initial Materialized Cells:** 500
-- **Final Materialized Cells:** 500 (**Exact Match, 0 drift**)
-- **Initial Reverse Index Targets:** 500
-- **Final Reverse Index Targets:** 500 (**Exact Match, 0 drift**)
-- **Retained Transaction History Records:** 1,000 aborted roots (Lawful transaction bookkeeping in `self.aborted_roots`)
-- **Peak Traced Memory:** 1,711.76 KB
+### 5.3 Actual Measured Results: COMMIT Workload (Correction C02)
+| Scale | Cell Count | Completed Roots | BEGIN (Mean $\pm$ Std) | EVENT (Mean $\pm$ Std) | END (Mean $\pm$ Std) | Total Cycle | Retained State Growth | Retained Mem Growth |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Small** | 300 | 15 | $1.259 \pm 0.708 \text{ ms}$ | $42.054 \pm 15.565 \text{ ms}$ | $33.465 \pm 20.620 \text{ ms}$ | $76.778 \text{ ms}$ | 574 syn, 3 asm, 76 cells, 17 outbox | 1,485.65 KB |
+| **Medium** | 2,000 | 10 | $7.858 \pm 7.801 \text{ ms}$ | $36.815 \pm 11.855 \text{ ms}$ | $43.943 \pm 15.918 \text{ ms}$ | $88.616 \text{ ms}$ | 476 syn, 3 asm, 76 cells, 2 outbox | 2,104.29 KB |
+| **High Occupancy** | 12,288 | 5 | $39.788 \pm 5.074 \text{ ms}$ | $23.999 \pm 10.037 \text{ ms}$ | $166.883 \pm 9.725 \text{ ms}$ | $230.670 \text{ ms}$ | 175 syn, 0 asm, 64 cells, 0 outbox | 8,458.24 KB |
+
+### 5.4 1,000-Cycle Stress Test & Intermediate GC Checkpoints (Correction C03)
+- **Total Duration (1,000 cycles):** 3.359 seconds (Mean: 3.359 ms, P99: 7.959 ms)
+- **Intermediate Garbage Collection Checkpoints:**
+  | Cycle | Retained Mem (KB) | Live Tables | Live Journals | Aborted Roots | Structural Match |
+  | :---: | :---: | :---: | :---: | :---: | :---: |
+  | **0** | 0.00 KB | 1 | 0 | 0 | **EXACT** |
+  | **200** | 466.48 KB | 1 | 0 | 200 | **EXACT** |
+  | **400** | 1,021.55 KB | 1 | 0 | 400 | **EXACT** |
+  | **600** | 1,167.68 KB | 1 | 0 | 600 | **EXACT** |
+  | **800** | 1,331.29 KB | 1 | 0 | 800 | **EXACT** |
+  | **1000** | 1,477.20 KB | 1 | 0 | 1,000 | **EXACT** |
+- **Initial vs Final Cells:** 500 $\rightarrow$ 500 (**Exact Match, 0 drift**)
+- **Initial vs Final Reverse Targets:** 500 $\rightarrow$ 500 (**Exact Match, 0 drift**)
+- **Retained Transaction History Records:** 1,000 aborted roots (lawful transaction bookkeeping in `self.aborted_roots`)
+- **Peak Traced Memory:** 2,276.99 KB
 - **Leak Verdict:** **ZERO unintended latent topology retention across aborted roots and ZERO accumulating orphan snapshot objects.**
 
 ---
@@ -157,10 +184,10 @@ Measurements use high-resolution performance counters (`time.perf_counter()`), P
 
 ### 6.1 Pytest Execution Summary
 - **Execution Command:** `python -m pytest tests/ -q`
-- **Total Test Cases:** **137 passed (100% pass rate, 0 failures, 0 errors, 0 warnings)**
-- **Execution Time:** 26.97s
+- **Total Test Cases:** **138 passed (100% pass rate, 0 failures, 0 errors, 0 warnings)**
+- **Execution Time:** 27.28s
 - **Baseline Test Count:** 130 tests
-- **New Patch 3 Tests:** 7 tests
+- **New Patch 3 Tests:** 8 tests
 
 ### 6.2 Regression Invariant Verification
 1. **Patch 1 Provenance & Event Identity:** All raw surface NFC normalization, canonical digest reconstruction, and duplicate event idempotency tests pass without modification.

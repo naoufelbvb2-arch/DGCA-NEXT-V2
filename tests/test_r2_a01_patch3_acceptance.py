@@ -21,7 +21,9 @@ from dgca.core.latent_index import (
     COACTIVE_INTRA_SLOTS,
     LatentNeighborhoodTable,
     WiringLogEntry,
+    _inter_region_slot_range,
 )
+from dgca.core.sic_v1 import CellAddress
 from dgca.core.state import MachineState
 from dgca.encoder import encode_exposure
 from dgca.lifecycle.exposure_tx import (
@@ -35,18 +37,20 @@ from tests.test_r2_a01_patch2_acceptance import (
 
 
 def _snapshot_latent_table(table: LatentNeighborhoodTable) -> dict[str, Any]:
-    """Capture 100% of internal state of LatentNeighborhoodTable into an immutable structure."""
+    """Capture 100% of internal state of LatentNeighborhoodTable into an immutable structure.
+
+    Correction C04: Retains all actual dictionary keys, including those whose values are empty sets.
+    """
     return {
         "_slots_by_cell": {
             cid: tuple(slots) for cid, slots in sorted(table._slots_by_cell.items())
         },
         "_pinned_slots": {
-            cid: frozenset(pins) for cid, pins in sorted(table._pinned_slots.items()) if pins
+            k: frozenset(pins) for k, pins in sorted(table._pinned_slots.items())
         },
         "_coactive_reverse_index": {
             tgt: frozenset(srcs)
             for tgt, srcs in sorted(table._coactive_reverse_index.items())
-            if srcs
         },
         "_wiring_logs": {
             cid: tuple(
@@ -56,6 +60,32 @@ def _snapshot_latent_table(table: LatentNeighborhoodTable) -> dict[str, Any]:
             for cid, entries in sorted(table._wiring_logs.items())
         },
     }
+
+
+def assert_slot_region_legality(table: LatentNeighborhoodTable) -> None:
+    """Verify that all populated coactive slots conform to Core §1.3 slot layout and regional legality."""
+    for owner_id, slots in table._slots_by_cell.items():
+        owner_reg = CellAddress.from_global_id(owner_id).region
+        for slot_idx, target_id in enumerate(slots):
+            if target_id is None:
+                continue
+            assert target_id != owner_id, f"Self-link forbidden: cell {owner_id} in slot {slot_idx}"
+            target_reg = CellAddress.from_global_id(target_id).region
+            if slot_idx in COACTIVE_INTRA_SLOTS:
+                assert target_reg == owner_reg, (
+                    f"Slot {slot_idx} is intra-region: owner {owner_id} ({owner_reg}) "
+                    f"and target {target_id} ({target_reg}) must be same region"
+                )
+            elif slot_idx in COACTIVE_INTER_SLOTS:
+                assert target_reg != owner_reg, (
+                    f"Slot {slot_idx} is inter-region: owner {owner_id} ({owner_reg}) "
+                    f"and target {target_id} ({target_reg}) must be different regions"
+                )
+                legal_range = _inter_region_slot_range(owner_reg, target_reg)
+                assert slot_idx in legal_range, (
+                    f"Slot {slot_idx} illegal for cross-region {target_reg} from owner {owner_reg}: "
+                    f"expected slot in {legal_range}"
+                )
 
 
 def test_p4_01_abort_sensory_preservation():
@@ -137,14 +167,17 @@ def test_p4_02_abort_coactive_latent_slot_rollback():
     state = MachineState()
     tx = ExposureTransactionManager(state, auto_coactive_latent=False)
 
-    # Pre-populate 50 materialized cells in the latent table with initial wiring
+    # Pre-populate 50 materialized cells in the latent table with legal initial wiring
+    # Correction C01: Cells 100..149 are in Region.VISION.
     table = state.W.latent_table
     pre_materialized = list(range(100, 150))
     for cid in pre_materialized:
         table.materialize_cell(cid)
-        # Wire slot 0 to (cid + 1)
-        table._set_coactive_slot(cid, 0, (cid + 1) % TOTAL_CELL_COUNT, event_clock=10, reason="PRE_POP")
+        # Wire slot 0 (intra) to distinct partner in Region.VISION
+        partner_intra = 100 + ((cid - 100 + 1) % 50)
+        table._set_coactive_slot(cid, 0, partner_intra, event_clock=10, reason="PRE_POP")
 
+    assert_slot_region_legality(table)
     snap_begin = _snapshot_latent_table(table)
     hash_begin = hash_state_snapshot(snap_begin)
     assert len(table._slots_by_cell) == 50
@@ -154,31 +187,32 @@ def test_p4_02_abort_coactive_latent_slot_rollback():
 
     # Produce at least 100 genuine coactive assignment / recycling mutations
     mutation_count = 0
-    # 1. 50 assignments in intra slot 1
+    # 1. 50 assignments in intra slot 1 (same region: Region.VISION)
     for cid in pre_materialized:
         old_val = table._slots_by_cell[cid][1]
-        new_val = (cid + 2) % TOTAL_CELL_COUNT
+        new_val = 100 + ((cid - 100 + 2) % 50)
         assert old_val != new_val
         table._set_coactive_slot(cid, 1, new_val, event_clock=20, reason="ADMIT_SLOT_1")
         mutation_count += 1
 
-    # 2. 50 assignments in inter slot 12
+    # 2. 50 assignments in inter slot 12 (cross-region: Region.AUDIO in 4096..4145)
     for cid in pre_materialized:
         old_val = table._slots_by_cell[cid][12]
-        new_val = (cid + 1000) % TOTAL_CELL_COUNT
+        new_val = 4096 + ((cid - 100 + 1) % 50)
         assert old_val != new_val
         table._set_coactive_slot(cid, 12, new_val, event_clock=21, reason="ADMIT_SLOT_12")
         mutation_count += 1
 
-    # 3. 20 recycling mutations in intra slot 0
+    # 3. 20 recycling mutations in intra slot 0 (same region: Region.VISION)
     for cid in pre_materialized[:20]:
         old_val = table._slots_by_cell[cid][0]
-        recycled_val = (cid + 500) % TOTAL_CELL_COUNT
+        recycled_val = 100 + ((cid - 100 + 3) % 50)
         assert old_val != recycled_val
         table._set_coactive_slot(cid, 0, recycled_val, event_clock=22, reason="RECYCLE_SLOT_0")
         mutation_count += 1
 
     assert mutation_count >= 120, f"Expected >= 100 mutations, got {mutation_count}"
+    assert_slot_region_legality(table)
 
     # Verify table has diverged from BEGIN
     snap_mutated = _snapshot_latent_table(table)
@@ -199,6 +233,7 @@ def test_p4_02_abort_coactive_latent_slot_rollback():
 
     assert snap_restored == snap_begin
     assert hash_restored == hash_begin
+    assert_slot_region_legality(state.W.latent_table)
 
 
 def test_p4_03_reverse_index_symmetry():
@@ -506,4 +541,50 @@ def test_p4_07_scaling_and_memory_sanity():
     assert len(state.W.latent_table._slots_by_cell) == initial_cells
     assert len(state.W.latent_table._coactive_reverse_index) == initial_rev
     assert _snapshot_latent_table(state.W.latent_table) == snap_initial
+
+
+def test_p4_08_adversarial_empty_set_sensitivity():
+    """Correction C04: Adversarial test confirming exact sensitivity to empty-set dictionary entries.
+
+    Verifies that inserting or removing an empty-set entry in _pinned_slots or
+    _coactive_reverse_index changes:
+    1. Structural snapshot equality.
+    2. Canonical SHA-256 state digest.
+    """
+    table = LatentNeighborhoodTable()
+    table.materialize_cell(10)
+
+    snap_base = _snapshot_latent_table(table)
+    hash_base = hash_state_snapshot(snap_base)
+
+    # 1. Test empty set insertion in _pinned_slots
+    table._pinned_slots[(10, 0)] = set()
+    snap_pinned_empty = _snapshot_latent_table(table)
+    hash_pinned_empty = hash_state_snapshot(snap_pinned_empty)
+
+    assert snap_pinned_empty != snap_base, "Snapshot failed to detect empty set in _pinned_slots"
+    assert hash_pinned_empty != hash_base, "SHA-256 digest failed to detect empty set in _pinned_slots"
+    assert (10, 0) in snap_pinned_empty["_pinned_slots"]
+    assert snap_pinned_empty["_pinned_slots"][(10, 0)] == frozenset()
+
+    # Remove entry and verify restoration
+    del table._pinned_slots[(10, 0)]
+    assert _snapshot_latent_table(table) == snap_base
+    assert hash_state_snapshot(_snapshot_latent_table(table)) == hash_base
+
+    # 2. Test empty set insertion in _coactive_reverse_index
+    table._coactive_reverse_index[99] = set()
+    snap_rev_empty = _snapshot_latent_table(table)
+    hash_rev_empty = hash_state_snapshot(snap_rev_empty)
+
+    assert snap_rev_empty != snap_base, "Snapshot failed to detect empty set in _coactive_reverse_index"
+    assert hash_rev_empty != hash_base, "SHA-256 digest failed to detect empty set in _coactive_reverse_index"
+    assert 99 in snap_rev_empty["_coactive_reverse_index"]
+    assert snap_rev_empty["_coactive_reverse_index"][99] == frozenset()
+
+    # Remove entry and verify restoration
+    del table._coactive_reverse_index[99]
+    assert _snapshot_latent_table(table) == snap_base
+    assert hash_state_snapshot(_snapshot_latent_table(table)) == hash_base
+
 
