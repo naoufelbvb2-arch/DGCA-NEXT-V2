@@ -2,7 +2,9 @@
 
 Covers:
 - Field Coverage Audit: Complete, verifiable 100% attribute coverage across WState, LatentNeighborhoodTable, HSlowState, RState, and SurfaceReadoutLedgerV1
-- Deterministic canonical serializer and cryptographically verified SHA-256 state hashes
+- Nested Dataclass Coverage Audit: Dynamic verification via dataclasses.fields() across Synapse, ContextCandidateDescriptor, StableBinding, OwnerProfile, CompactWitnessProfile, ContrastEpisodeRecord, Assembly, ParentContextRef, WiringLogEntry, LedgerCandidateRow
+- Canonical Enum Serialization & Primitive Type Separation: Guarantees enum identity is serialized before generic int/str, preventing type collisions (IntEnum vs int, StrEnum vs str, bool vs int, int vs float)
+- Adversarial Synapse Mutation Sensitivity Test: Modifies previously omitted Synapse fields (last_evidence_root, candidate_deadline, internally_supported, created_event_id, created_exposure_id, last_external_event_id) and proves structural inequality and SHA-256 digest divergence
 - P1-01: Complete RETRIEVE Immutability Gate (Full WState, HSlowState, RState structural and SHA-256 equality)
 - P1-02: Stale Binding Read-Only Isolation (Status stays ACTIVE in caller W, gate closes, diagnostic returned)
 - P1-03: Homeostasis Scratch Isolation (H_slow cloned in scratch, float equality across repeated runs, SHA-256 equality)
@@ -36,6 +38,7 @@ from dgca.core.generator import generate_episode
 from dgca.core.latent_index import (
     TOTAL_CELL_COUNT,
     LatentNeighborhoodTable,
+    WiringLogEntry,
     compute_fixed_local_neighbors,
     compute_fixed_topographic_neighbors,
 )
@@ -55,7 +58,6 @@ from dgca.core.state import (
     StableBinding,
     WState,
 )
-from dgca.lla.owner_registry import OwnerProfile, CompactWitnessProfile
 from dgca.encoder.envelope import (
     CoreEventPayloadV1,
     EventOrigin,
@@ -64,13 +66,14 @@ from dgca.encoder.envelope import (
     encode_exposure,
     encode_lexical_token_event,
 )
-from dgca.lla.contrast_ledger import ContrastEpisodeRecord
 from dgca.lifecycle.exposure_tx import (
     ExposureStatus,
     ExposureTransactionManager,
     compute_pred_score,
     run_read_only_episode,
 )
+from dgca.lla.contrast_ledger import ContrastEpisodeRecord
+from dgca.lla.owner_registry import CompactWitnessProfile, OwnerProfile
 from dgca.peripheral.readout_ledger import (
     LedgerCandidateRow,
     SurfaceReadoutLedgerV1,
@@ -86,12 +89,12 @@ def canonical_state_digest(val: Any) -> bytes:
 
     Specification:
     - None: b'N;'
-    - bool: b'B1;' or b'B0;'
+    - bool: b'B1;' or b'B0;' (Checked before int, as bool is a subclass of int in Python)
+    - enum.Enum: b'E:<class_name>:<enum_value>;' (Checked before int/str, so IntEnum/StrEnum retain enum identity)
     - int: b'I:<decimal>;'
     - float: b'F:<hex_float>;' (exact bitwise IEEE 754 precision, platform-independent)
     - str: b'S:<len>:<utf8_bytes>;'
     - bytes: b'X:<len>:<raw_bytes>;'
-    - enum.Enum: b'E:<class_name>:<enum_value>;'
     - tuple / list: b'T:<len>[<element_digests>];'
     - set / frozenset: b'U:<len>{<sorted_element_digests>};' (elements sorted by their own canonical digest)
     - dict: b'D:<len>{<sorted_key_val_pairs>};' (pairs sorted by key's canonical digest)
@@ -100,6 +103,10 @@ def canonical_state_digest(val: Any) -> bytes:
         return b"N;"
     elif isinstance(val, bool):
         return b"B1;" if val else b"B0;"
+    elif isinstance(val, enum.Enum):
+        cls_name = val.__class__.__name__.encode("ascii")
+        val_str = str(val.value).encode("utf-8")
+        return b"E:" + cls_name + b":" + val_str + b";"
     elif isinstance(val, int):
         return b"I:" + str(val).encode("ascii") + b";"
     elif isinstance(val, float):
@@ -109,8 +116,6 @@ def canonical_state_digest(val: Any) -> bytes:
         return b"S:" + str(len(b)).encode("ascii") + b":" + b + b";"
     elif isinstance(val, bytes):
         return b"X:" + str(len(val)).encode("ascii") + b":" + val + b";"
-    elif isinstance(val, enum.Enum):
-        return b"E:" + val.__class__.__name__.encode("ascii") + b":" + str(val.value).encode("utf-8") + b";"
     elif isinstance(val, (tuple, list)):
         return b"T:" + str(len(val)).encode("ascii") + b"[" + b"".join(canonical_state_digest(x) for x in val) + b"];"
     elif isinstance(val, (set, frozenset)):
@@ -130,184 +135,226 @@ def hash_state_snapshot(snap: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Deep Snapshot Helpers for Invariant Verification (Complete 100% Coverage)
+# Deep Nested Snapshot Helpers for Invariant Verification (100% Dataclass Coverage)
 # ---------------------------------------------------------------------------
 
-def _snapshot_candidate(cand: ContextCandidateDescriptor) -> tuple[Any, ...]:
-    return (
-        cand.z_cell_id,
-        cand.anchor_id,
-        cand.owner_seq,
-        cand.p_sources,
-        cand.c_sources,
-        cand.y_targets,
-        cand.l_z_q6,
-        cand.u_z_q6,
-        cand.tau_ctx_q6,
-        frozenset(cand.anchor_source_set),
-        cand.phase,
-        cand.probe_matches,
-        cand.consolidation_matches,
-        cand.age_events,
-        cand.admitted_root_id,
-        cand.depth,
-        cand.p_source_kinds,
-        tuple(
-            sorted(
-                (
-                    cid,
-                    (
-                        ref.parent_z_cell_id,
-                        ref.parent_anchor_id,
-                        ref.parent_owner_seq,
-                        ref.parent_binding_generation,
-                        ref.depth,
-                    ),
-                )
-                for cid, ref in cand.parent_refs.items()
-            )
+def _snapshot_synapse(s: Synapse) -> dict[str, Any]:
+    """Capture all 13 declared fields of Synapse with dynamic dataclass audit (Correction V04)."""
+    snap = {
+        "key": s.key,
+        "S": s.S,
+        "E_ext": s.E_ext,
+        "E_int": s.E_int,
+        "external_count": s.external_count,
+        "state": s.state,
+        "created_event_id": s.created_event_id,
+        "created_exposure_id": s.created_exposure_id,
+        "last_external_event_id": s.last_external_event_id,
+        "last_evidence_root": s.last_evidence_root,
+        "candidate_deadline": s.candidate_deadline,
+        "internally_supported": s.internally_supported,
+        "confirmed_roots": tuple(sorted(s.confirmed_roots)),
+    }
+    missing = {f.name for f in dataclasses.fields(Synapse)} - set(snap.keys())
+    assert not missing, f"_snapshot_synapse missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_assembly(asm: Assembly) -> dict[str, Any]:
+    """Capture all declared fields of Assembly."""
+    snap = {
+        "assembly_id": asm.assembly_id,
+        "region": asm.region,
+        "member_cell_ids": tuple(sorted(asm.member_cell_ids)),
+        "structural_generation": asm.structural_generation,
+        "birth_close_serial": asm.birth_close_serial,
+        "last_mutation_close_serial": asm.last_mutation_close_serial,
+        "last_merge_split_close_serial": asm.last_merge_split_close_serial,
+        "status": asm.status,
+    }
+    missing = {f.name for f in dataclasses.fields(Assembly)} - set(snap.keys())
+    assert not missing, f"_snapshot_assembly missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_parent_context_ref(ref: ParentContextRef) -> dict[str, Any]:
+    """Capture all declared fields of ParentContextRef."""
+    snap = {
+        "parent_z_cell_id": ref.parent_z_cell_id,
+        "parent_anchor_id": ref.parent_anchor_id,
+        "parent_owner_seq": ref.parent_owner_seq,
+        "parent_binding_generation": ref.parent_binding_generation,
+        "depth": ref.depth,
+    }
+    missing = {f.name for f in dataclasses.fields(ParentContextRef)} - set(snap.keys())
+    assert not missing, f"_snapshot_parent_context_ref missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_candidate(cand: ContextCandidateDescriptor) -> dict[str, Any]:
+    """Capture all declared fields of ContextCandidateDescriptor."""
+    snap = {
+        "z_cell_id": cand.z_cell_id,
+        "anchor_id": cand.anchor_id,
+        "owner_seq": cand.owner_seq,
+        "p_sources": cand.p_sources,
+        "c_sources": cand.c_sources,
+        "y_targets": cand.y_targets,
+        "l_z_q6": cand.l_z_q6,
+        "u_z_q6": cand.u_z_q6,
+        "tau_ctx_q6": cand.tau_ctx_q6,
+        "anchor_source_set": frozenset(cand.anchor_source_set),
+        "phase": cand.phase,
+        "probe_matches": cand.probe_matches,
+        "consolidation_matches": cand.consolidation_matches,
+        "age_events": cand.age_events,
+        "admitted_root_id": cand.admitted_root_id,
+        "depth": cand.depth,
+        "p_source_kinds": cand.p_source_kinds,
+        "parent_refs": {cid: _snapshot_parent_context_ref(ref) for cid, ref in sorted(cand.parent_refs.items())},
+        "status": cand.status,
+    }
+    missing = {f.name for f in dataclasses.fields(ContextCandidateDescriptor)} - set(snap.keys())
+    assert not missing, f"_snapshot_candidate missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_binding(b: StableBinding) -> dict[str, Any]:
+    """Capture all declared fields of StableBinding."""
+    snap = {
+        "schema_version": b.schema_version,
+        "z_cell_id": b.z_cell_id,
+        "anchor_id": b.anchor_id,
+        "owner_seq": b.owner_seq,
+        "binding_generation": b.binding_generation,
+        "p_keys": b.p_keys,
+        "l_z_q6": b.l_z_q6,
+        "u_z_q6": b.u_z_q6,
+        "tau_ctx_q6": b.tau_ctx_q6,
+        "c_keys": b.c_keys,
+        "y_keys": b.y_keys,
+        "anchor_source_set": frozenset(b.anchor_source_set),
+        "status": b.status,
+        "depth": b.depth,
+        "p_source_kinds": b.p_source_kinds,
+        "parent_refs": {cid: _snapshot_parent_context_ref(ref) for cid, ref in sorted(b.parent_refs.items())},
+    }
+    missing = {f.name for f in dataclasses.fields(StableBinding)} - set(snap.keys())
+    assert not missing, f"_snapshot_binding missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_compact_witness_profile(wp: CompactWitnessProfile) -> dict[str, Any]:
+    """Capture all declared fields of CompactWitnessProfile."""
+    snap = {
+        "top8_p_supports_u": dict(wp.top8_p_supports_u),
+        "top8_c_supports_u": dict(wp.top8_c_supports_u),
+        "top8_y_supports_u": dict(wp.top8_y_supports_u),
+        "full_p_digest": bytes(wp.full_p_digest),
+        "full_c_digest": bytes(wp.full_c_digest),
+        "full_y_digest": bytes(wp.full_y_digest),
+        "p_source_kinds": dict(wp.p_source_kinds),
+        "p_parent_refs": {cid: _snapshot_parent_context_ref(ref) for cid, ref in sorted(wp.p_parent_refs.items())},
+        "audited_root_id": wp.audited_root_id,
+        "p_bundle_digest": bytes(wp.p_bundle_digest),
+        "c_bundle_digest": bytes(wp.c_bundle_digest),
+        "y_bundle_digest": bytes(wp.y_bundle_digest),
+    }
+    missing = {f.name for f in dataclasses.fields(CompactWitnessProfile)} - set(snap.keys())
+    assert not missing, f"_snapshot_compact_witness_profile missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_owner_profile(prof: OwnerProfile) -> dict[str, Any]:
+    """Capture all declared fields of OwnerProfile."""
+    snap = {
+        "schema_version": prof.schema_version,
+        "anchor_id": prof.anchor_id,
+        "owner_seq": prof.owner_seq,
+        "z_cell_id": prof.z_cell_id,
+        "state": prof.state,
+        "p_sources": prof.p_sources,
+        "c_sources": prof.c_sources,
+        "y_targets": prof.y_targets,
+        "l_z_q6": prof.l_z_q6,
+        "u_z_q6": prof.u_z_q6,
+        "tau_ctx_q6": prof.tau_ctx_q6,
+        "anchor_source_set": frozenset(prof.anchor_source_set),
+        "witness_profiles": tuple(_snapshot_compact_witness_profile(wp) for wp in prof.witness_profiles),
+        "binding_generation": prof.binding_generation,
+        "depth": prof.depth,
+        "p_source_kinds": prof.p_source_kinds,
+        "parent_refs": {cid: _snapshot_parent_context_ref(ref) for cid, ref in sorted(prof.parent_refs.items())},
+        "profile_digest": bytes(prof.profile_digest),
+    }
+    missing = {f.name for f in dataclasses.fields(OwnerProfile)} - set(snap.keys())
+    assert not missing, f"_snapshot_owner_profile missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_contrast_episode(ep: ContrastEpisodeRecord) -> dict[str, Any]:
+    """Capture all declared fields of ContrastEpisodeRecord."""
+    snap = {
+        "anchor_id": ep.anchor_id,
+        "exposure_id": ep.exposure_id,
+        "event_order_b": ep.event_order_b,
+        "completed_event_clock": ep.completed_event_clock,
+        "p_supports_u": dict(ep.p_supports_u),
+        "c_supports_u": dict(ep.c_supports_u),
+        "y_supports_u": dict(ep.y_supports_u),
+        "p_source_kinds": dict(ep.p_source_kinds),
+        "p_parent_refs": {cid: _snapshot_parent_context_ref(ref) for cid, ref in sorted(ep.p_parent_refs.items())},
+        "p_digest": bytes(ep.p_digest),
+        "c_digest": bytes(ep.c_digest),
+        "y_digest": bytes(ep.y_digest),
+        "p_bundle_digest": bytes(ep.p_bundle_digest),
+        "c_bundle_digest": bytes(ep.c_bundle_digest),
+        "y_bundle_digest": bytes(ep.y_bundle_digest),
+        "p_direct_x_u": dict(ep.p_direct_x_u),
+        "c_direct_x_u": dict(ep.c_direct_x_u),
+        "has_collision": ep.has_collision,
+    }
+    missing = {f.name for f in dataclasses.fields(ContrastEpisodeRecord)} - set(snap.keys())
+    assert not missing, f"_snapshot_contrast_episode missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_wiring_log_entry(entry: WiringLogEntry) -> dict[str, Any]:
+    """Capture all declared fields of WiringLogEntry."""
+    snap = {
+        "event_clock": entry.event_clock,
+        "owner_cell_id": entry.owner_cell_id,
+        "slot_index": entry.slot_index,
+        "old_target_id": entry.old_target_id,
+        "new_target_id": entry.new_target_id,
+        "reason": entry.reason,
+    }
+    missing = {f.name for f in dataclasses.fields(WiringLogEntry)} - set(snap.keys())
+    assert not missing, f"_snapshot_wiring_log_entry missing dataclass fields: {missing}"
+    return snap
+
+
+def _snapshot_ledger_candidate_row(row: LedgerCandidateRow) -> dict[str, Any]:
+    """Capture all declared fields of LedgerCandidateRow."""
+    snap = {
+        "assembly_id": row.assembly_id,
+        "structural_generation": row.structural_generation,
+        "surface_utf8_nfc": row.surface_utf8_nfc,
+        "marker": row.marker,
+        "surface_sha256": bytes(row.surface_sha256),
+        "feature_bundle_digest": bytes(row.feature_bundle_digest),
+        "envelope": (
+            row.envelope.raw_surface_nfc_utf8,
+            bytes(row.envelope.surface_sha256),
+            bytes(row.envelope.feature_bundle_digest),
+            tuple(row.envelope.canonical_features_copy),
+            row.envelope.marker,
         ),
-        cand.status,
-    )
-
-
-def _snapshot_binding(b: StableBinding) -> tuple[Any, ...]:
-    return (
-        b.schema_version,
-        b.z_cell_id,
-        b.anchor_id,
-        b.owner_seq,
-        b.binding_generation,
-        b.p_keys,
-        b.l_z_q6,
-        b.u_z_q6,
-        b.tau_ctx_q6,
-        b.c_keys,
-        b.y_keys,
-        frozenset(b.anchor_source_set),
-        b.status,
-        b.depth,
-        b.p_source_kinds,
-        tuple(
-            sorted(
-                (
-                    cid,
-                    (
-                        ref.parent_z_cell_id,
-                        ref.parent_anchor_id,
-                        ref.parent_owner_seq,
-                        ref.parent_binding_generation,
-                        ref.depth,
-                    ),
-                )
-                for cid, ref in b.parent_refs.items()
-            )
-        ),
-    )
-
-
-def _snapshot_owner_profile(prof: OwnerProfile) -> tuple[Any, ...]:
-    return (
-        prof.schema_version,
-        prof.anchor_id,
-        prof.owner_seq,
-        prof.z_cell_id,
-        prof.state,
-        prof.p_sources,
-        prof.c_sources,
-        prof.y_targets,
-        prof.l_z_q6,
-        prof.u_z_q6,
-        prof.tau_ctx_q6,
-        frozenset(prof.anchor_source_set),
-        tuple(
-            (
-                tuple(sorted(wp.top8_p_supports_u.items())),
-                tuple(sorted(wp.top8_c_supports_u.items())),
-                tuple(sorted(wp.top8_y_supports_u.items())),
-                bytes(wp.full_p_digest),
-                bytes(wp.full_c_digest),
-                bytes(wp.full_y_digest),
-                tuple(sorted(wp.p_source_kinds.items())),
-                tuple(
-                    sorted(
-                        (
-                            cid,
-                            (
-                                ref.parent_z_cell_id,
-                                ref.parent_anchor_id,
-                                ref.parent_owner_seq,
-                                ref.parent_binding_generation,
-                                ref.depth,
-                            ),
-                        )
-                        for cid, ref in wp.p_parent_refs.items()
-                    )
-                ),
-                wp.audited_root_id,
-                bytes(wp.p_bundle_digest),
-                bytes(wp.c_bundle_digest),
-                bytes(wp.y_bundle_digest),
-            )
-            for wp in prof.witness_profiles
-        ),
-        prof.binding_generation,
-        prof.depth,
-        prof.p_source_kinds,
-        tuple(
-            sorted(
-                (
-                    cid,
-                    (
-                        ref.parent_z_cell_id,
-                        ref.parent_anchor_id,
-                        ref.parent_owner_seq,
-                        ref.parent_binding_generation,
-                        ref.depth,
-                    ),
-                )
-                for cid, ref in prof.parent_refs.items()
-            )
-        ),
-        bytes(prof.profile_digest),
-    )
-
-
-def _snapshot_contrast_episode(ep: ContrastEpisodeRecord) -> tuple[Any, ...]:
-    return (
-        ep.anchor_id,
-        ep.exposure_id,
-        ep.event_order_b,
-        ep.completed_event_clock,
-        tuple(sorted(ep.p_supports_u.items())),
-        tuple(sorted(ep.c_supports_u.items())),
-        tuple(sorted(ep.y_supports_u.items())),
-        tuple(sorted(ep.p_source_kinds.items())),
-        tuple(
-            sorted(
-                (
-                    cid,
-                    (
-                        ref.parent_z_cell_id,
-                        ref.parent_anchor_id,
-                        ref.parent_owner_seq,
-                        ref.parent_binding_generation,
-                        ref.depth,
-                    ),
-                )
-                for cid, ref in ep.p_parent_refs.items()
-            )
-        ),
-        bytes(ep.p_digest),
-        bytes(ep.c_digest),
-        bytes(ep.y_digest),
-        bytes(ep.p_bundle_digest),
-        bytes(ep.c_bundle_digest),
-        bytes(ep.y_bundle_digest),
-        tuple(sorted(ep.p_direct_x_u.items())),
-        tuple(sorted(ep.c_direct_x_u.items())),
-        ep.has_collision,
-    )
+        "confirmed_roots": frozenset(row.confirmed_roots),
+    }
+    missing = {f.name for f in dataclasses.fields(LedgerCandidateRow)} - set(snap.keys())
+    assert not missing, f"_snapshot_ledger_candidate_row missing dataclass fields: {missing}"
+    return snap
 
 
 def snapshot_w(w: WState) -> dict[str, Any]:
@@ -317,10 +364,7 @@ def snapshot_w(w: WState) -> dict[str, Any]:
         "_pinned_slots": {cid: frozenset(slots) for cid, slots in sorted(w.latent_table._pinned_slots.items())},
         "_coactive_reverse_index": {cid: frozenset(sources) for cid, sources in sorted(w.latent_table._coactive_reverse_index.items())},
         "_wiring_logs": {
-            cid: tuple(
-                (e.event_clock, e.owner_cell_id, e.slot_index, e.old_target_id, e.new_target_id, e.reason)
-                for e in entries
-            )
+            cid: tuple(_snapshot_wiring_log_entry(e) for e in entries)
             for cid, entries in sorted(w.latent_table._wiring_logs.items())
         },
     }
@@ -334,31 +378,14 @@ def snapshot_w(w: WState) -> dict[str, Any]:
         "last_referenced_event": dict(w.last_referenced_event),
         "latent_table": latent_snap,
         "synapses": {
-            k: (
-                s.key,
-                s.state,
-                s.S,
-                s.E_ext,
-                s.E_int,
-                s.external_count,
-                tuple(sorted(s.confirmed_roots)),
-            )
+            k: _snapshot_synapse(s)
             for k, s in sorted(w.synapses.items())
         },
         "outgoing_by_source": {src: frozenset(keys) for src, keys in sorted(w.outgoing_by_source.items())},
         "incoming_by_target": {tgt: frozenset(keys) for tgt, keys in sorted(w.incoming_by_target.items())},
         "reserved_keys_by_candidate": {cid: frozenset(keys) for cid, keys in sorted(w.reserved_keys_by_candidate.items())},
         "assemblies": {
-            aid: (
-                asm.assembly_id,
-                asm.region,
-                tuple(sorted(asm.member_cell_ids)),
-                asm.structural_generation,
-                asm.birth_close_serial,
-                asm.last_mutation_close_serial,
-                asm.last_merge_split_close_serial,
-                asm.status,
-            )
+            aid: _snapshot_assembly(asm)
             for aid, asm in sorted(w.assemblies.items())
         },
         "next_assembly_id": w.next_assembly_id,
@@ -439,33 +466,17 @@ def snapshot_r(r: RState) -> dict[str, Any]:
 
 def snapshot_ledger(ledger: SurfaceReadoutLedgerV1) -> dict[str, Any]:
     """Capture a complete snapshot of SurfaceReadoutLedgerV1 without holding mutable aliases."""
-    rows_snap: dict[tuple[int, int], dict[tuple[str, Marker, bytes], Any]] = {}
-    for (aid, gen), candidate_map in sorted(ledger._rows_by_asm_gen.items()):
-        rows_snap[(aid, gen)] = {
-            t_key: (
-                row.assembly_id,
-                row.structural_generation,
-                row.surface_utf8_nfc,
-                row.marker,
-                bytes(row.surface_sha256),
-                bytes(row.feature_bundle_digest),
-                (
-                    row.envelope.raw_surface_nfc_utf8,
-                    bytes(row.envelope.surface_sha256),
-                    bytes(row.envelope.feature_bundle_digest),
-                    tuple(row.envelope.canonical_features_copy),
-                    row.envelope.marker,
-                ),
-                frozenset(row.confirmed_roots),
-            )
+    rows_snap = {
+        (aid, gen): {
+            t_key: _snapshot_ledger_candidate_row(row)
             for t_key, row in sorted(candidate_map.items())
         }
-
+        for (aid, gen), candidate_map in sorted(ledger._rows_by_asm_gen.items())
+    }
     bundles_snap = {
         surf_key: frozenset(digests)
         for surf_key, digests in sorted(ledger._bundles_by_surface.items())
     }
-
     snap = {
         "available": ledger.available,
         "_rows_by_asm_gen": rows_snap,
@@ -531,6 +542,12 @@ def _build_rich_test_state() -> tuple[MachineState, CoreEventPayloadV1, CoreEven
             E_ext=4.0,
             E_int=0.0,
             external_count=3,
+            created_event_id=1,
+            created_exposure_id=1,
+            last_external_event_id=2,
+            last_evidence_root=1,
+            candidate_deadline=100,
+            internally_supported=False,
             confirmed_roots=(1, 2, 3),
         )
         state.W.add_or_replace_synapse(syn)
@@ -580,7 +597,7 @@ def _build_rich_test_state() -> tuple[MachineState, CoreEventPayloadV1, CoreEven
 
 
 # ===========================================================================
-# 0. Field Coverage Audit Test (Correction V01)
+# 0. Field Coverage Audit Tests (Correction V01 & Section 3)
 # ===========================================================================
 
 def test_field_coverage_audit():
@@ -614,6 +631,222 @@ def test_field_coverage_audit():
     snap_l = snapshot_ledger(ledger)
     missing_l = set(vars(ledger).keys()) - set(snap_l.keys())
     assert not missing_l, f"Audit failed: SurfaceReadoutLedgerV1 has uncaptured fields: {missing_l}"
+
+
+def test_nested_dataclass_coverage_audit():
+    """Verify that nested snapshot helpers cover 100% of declared fields in all mutable dataclasses (Section 3).
+
+    Specifically audits:
+    - Synapse (all 13 fields)
+    - ContextCandidateDescriptor (all 19 fields)
+    - StableBinding (all 16 fields)
+    - OwnerProfile (all 18 fields)
+    - CompactWitnessProfile (all 12 fields)
+    - ContrastEpisodeRecord (all 18 fields)
+    - Assembly (all 8 fields)
+    - ParentContextRef (all 5 fields)
+    - WiringLogEntry (all 6 fields)
+    - LedgerCandidateRow (all 8 fields)
+    """
+    state, _, _, z_cell = _build_rich_test_state()
+    syn = next(iter(state.W.synapses.values()))
+    binding = state.W.stable_bindings[z_cell]
+    asm = state.W.assemblies[1]
+
+    # 1. Synapse
+    syn_snap = _snapshot_synapse(syn)
+    assert set(syn_snap.keys()) == {f.name for f in dataclasses.fields(Synapse)}
+
+    # 2. Assembly
+    asm_snap = _snapshot_assembly(asm)
+    assert set(asm_snap.keys()) == {f.name for f in dataclasses.fields(Assembly)}
+
+    # 3. StableBinding
+    bind_snap = _snapshot_binding(binding)
+    assert set(bind_snap.keys()) == {f.name for f in dataclasses.fields(StableBinding)}
+
+    # 4. ParentContextRef
+    pref = ParentContextRef(
+        parent_z_cell_id=5, parent_anchor_id=10, parent_owner_seq=1, parent_binding_generation=1, depth=2
+    )
+    pref_snap = _snapshot_parent_context_ref(pref)
+    assert set(pref_snap.keys()) == {f.name for f in dataclasses.fields(ParentContextRef)}
+
+    # 5. ContextCandidateDescriptor
+    cand = ContextCandidateDescriptor(
+        z_cell_id=10, anchor_id=20, owner_seq=1, p_sources=(1, 2), c_sources=(3, 4), y_targets=(5, 6),
+        l_z_q6=500_000, u_z_q6=100_000, tau_ctx_q6=150_000, anchor_source_set=frozenset([1, 2]),
+    )
+    cand_snap = _snapshot_candidate(cand)
+    assert set(cand_snap.keys()) == {f.name for f in dataclasses.fields(ContextCandidateDescriptor)}
+
+    # 6. CompactWitnessProfile
+    wp = CompactWitnessProfile(
+        top8_p_supports_u={1: 100}, top8_c_supports_u={2: 200}, top8_y_supports_u={3: 300},
+        full_p_digest=b"p", full_c_digest=b"c", full_y_digest=b"y",
+    )
+    wp_snap = _snapshot_compact_witness_profile(wp)
+    assert set(wp_snap.keys()) == {f.name for f in dataclasses.fields(CompactWitnessProfile)}
+
+    # 7. OwnerProfile
+    prof = OwnerProfile(
+        schema_version=1, anchor_id=20, owner_seq=1, z_cell_id=10, state=OwnerState.ACTIVE,
+        p_sources=(1, 2), c_sources=(3, 4), y_targets=(5, 6), l_z_q6=500_000, u_z_q6=100_000,
+        tau_ctx_q6=150_000, anchor_source_set=frozenset([1, 2]), witness_profiles=(wp, wp),
+    )
+    prof_snap = _snapshot_owner_profile(prof)
+    assert set(prof_snap.keys()) == {f.name for f in dataclasses.fields(OwnerProfile)}
+
+    # 8. ContrastEpisodeRecord
+    ep = ContrastEpisodeRecord(
+        anchor_id=20, exposure_id=1, event_order_b=1, completed_event_clock=100,
+        p_supports_u={1: 100}, c_supports_u={2: 200}, y_supports_u={3: 300},
+    )
+    ep_snap = _snapshot_contrast_episode(ep)
+    assert set(ep_snap.keys()) == {f.name for f in dataclasses.fields(ContrastEpisodeRecord)}
+
+    # 9. WiringLogEntry
+    wlog = WiringLogEntry(
+        event_clock=10, owner_cell_id=1, slot_index=2, old_target_id=None, new_target_id=3, reason="TEST"
+    )
+    wlog_snap = _snapshot_wiring_log_entry(wlog)
+    assert set(wlog_snap.keys()) == {f.name for f in dataclasses.fields(WiringLogEntry)}
+
+    # 10. LedgerCandidateRow
+    env = PeripheralSurfaceEnvelopeV1(
+        raw_surface_nfc_utf8="test", surface_sha256=b"s", feature_bundle_digest=b"d",
+        canonical_features_copy=(("f", "1.0"),), marker=Marker.NONE,
+    )
+    row = LedgerCandidateRow(
+        assembly_id=1, structural_generation=1, surface_utf8_nfc="test", marker=Marker.NONE,
+        surface_sha256=b"s", feature_bundle_digest=b"d", envelope=env,
+    )
+    row_snap = _snapshot_ledger_candidate_row(row)
+    assert set(row_snap.keys()) == {f.name for f in dataclasses.fields(LedgerCandidateRow)}
+
+
+def test_canonical_enum_and_primitive_type_separation():
+    """Verify that canonical_state_digest differentiates enum types from generic int and str (Section 4).
+
+    Asserts that:
+    - IntEnum (SynapseScope.LOCAL) does NOT collapse into generic int (0)
+    - StrEnum (ExecutionMode.LEARN) does NOT collapse into generic str ("LEARN")
+    - bool (True/False) does NOT collapse into int (1/0)
+    - int (1) does NOT collapse into float (1.0)
+    - str ("0") does NOT collapse into bytes (b"0")
+    """
+    cases = [
+        (False, b"B0;"),
+        (True, b"B1;"),
+        (0, b"I:0;"),
+        (1, b"I:1;"),
+        (0.0, b"F:0x0.0p+0;"),
+        (1.0, b"F:0x1.0000000000000p+0;"),
+        (SynapseScope.LOCAL, b"E:SynapseScope:0;"),
+        (SynapseScope.ASSOCIATIVE, b"E:SynapseScope:2;"),
+        ("0", b"S:1:0;"),
+        (b"0", b"X:1:0;"),
+        (ExecutionMode.LEARN, b"E:ExecutionMode:LEARN;"),
+        ("LEARN", b"S:5:LEARN;"),
+    ]
+
+    digests = []
+    for val, expected in cases:
+        d = canonical_state_digest(val)
+        assert d == expected, f"Mismatch for {val}: expected {expected}, got {d}"
+        digests.append(d)
+
+    # Assert all 12 cases produce strictly distinct byte strings
+    assert len(digests) == len(set(digests)), "Collision detected between distinct Python types in canonical digest!"
+
+
+def test_synapse_mutation_sensitivity_adversarial():
+    """Adversarial verification proving that snapshot and SHA-256 state hashing detect mutations (Correction V04).
+
+    Mutates previously omitted Synapse fields:
+    - last_evidence_root
+    - candidate_deadline
+    - internally_supported
+    - created_event_id
+    - created_exposure_id
+    - last_external_event_id
+    Asserts that in every case:
+    1. Structural snapshot comparison detects the mutation (snapshot_mut != snapshot_base)
+    2. SHA-256 state digest changes (hash_mut != hash_base)
+    3. Restoring the original state restores exact snapshot and SHA-256 equality
+    """
+    state, _, _, _ = _build_rich_test_state()
+    syn_key = next(iter(state.W.synapses.keys()))
+    syn = state.W.synapses[syn_key]
+
+    snap_base = snapshot_w(state.W)
+    hash_base = hash_state_snapshot(snap_base)
+
+    # 1. Mutate last_evidence_root
+    orig_root = syn.last_evidence_root
+    syn.last_evidence_root = orig_root + 99
+    snap_mut1 = snapshot_w(state.W)
+    hash_mut1 = hash_state_snapshot(snap_mut1)
+    assert snap_mut1 != snap_base, "Snapshot failed to detect last_evidence_root mutation!"
+    assert hash_mut1 != hash_base, "SHA-256 failed to detect last_evidence_root mutation!"
+    syn.last_evidence_root = orig_root
+    assert snapshot_w(state.W) == snap_base
+    assert hash_state_snapshot(snapshot_w(state.W)) == hash_base
+
+    # 2. Mutate candidate_deadline
+    orig_deadline = syn.candidate_deadline
+    syn.candidate_deadline = orig_deadline + 500
+    snap_mut2 = snapshot_w(state.W)
+    hash_mut2 = hash_state_snapshot(snap_mut2)
+    assert snap_mut2 != snap_base, "Snapshot failed to detect candidate_deadline mutation!"
+    assert hash_mut2 != hash_base, "SHA-256 failed to detect candidate_deadline mutation!"
+    syn.candidate_deadline = orig_deadline
+    assert snapshot_w(state.W) == snap_base
+    assert hash_state_snapshot(snapshot_w(state.W)) == hash_base
+
+    # 3. Mutate internally_supported
+    orig_supp = syn.internally_supported
+    syn.internally_supported = not orig_supp
+    snap_mut3 = snapshot_w(state.W)
+    hash_mut3 = hash_state_snapshot(snap_mut3)
+    assert snap_mut3 != snap_base, "Snapshot failed to detect internally_supported mutation!"
+    assert hash_mut3 != hash_base, "SHA-256 failed to detect internally_supported mutation!"
+    syn.internally_supported = orig_supp
+    assert snapshot_w(state.W) == snap_base
+    assert hash_state_snapshot(snapshot_w(state.W)) == hash_base
+
+    # 4. Mutate created_event_id
+    orig_ev = syn.created_event_id
+    syn.created_event_id = orig_ev + 17
+    snap_mut4 = snapshot_w(state.W)
+    hash_mut4 = hash_state_snapshot(snap_mut4)
+    assert snap_mut4 != snap_base, "Snapshot failed to detect created_event_id mutation!"
+    assert hash_mut4 != hash_base, "SHA-256 failed to detect created_event_id mutation!"
+    syn.created_event_id = orig_ev
+    assert snapshot_w(state.W) == snap_base
+    assert hash_state_snapshot(snapshot_w(state.W)) == hash_base
+
+    # 5. Mutate created_exposure_id
+    orig_exp = syn.created_exposure_id
+    syn.created_exposure_id = orig_exp + 33
+    snap_mut5 = snapshot_w(state.W)
+    hash_mut5 = hash_state_snapshot(snap_mut5)
+    assert snap_mut5 != snap_base, "Snapshot failed to detect created_exposure_id mutation!"
+    assert hash_mut5 != hash_base, "SHA-256 failed to detect created_exposure_id mutation!"
+    syn.created_exposure_id = orig_exp
+    assert snapshot_w(state.W) == snap_base
+    assert hash_state_snapshot(snapshot_w(state.W)) == hash_base
+
+    # 6. Mutate last_external_event_id
+    orig_last_ev = syn.last_external_event_id
+    syn.last_external_event_id = orig_last_ev + 11
+    snap_mut6 = snapshot_w(state.W)
+    hash_mut6 = hash_state_snapshot(snap_mut6)
+    assert snap_mut6 != snap_base, "Snapshot failed to detect last_external_event_id mutation!"
+    assert hash_mut6 != hash_base, "SHA-256 failed to detect last_external_event_id mutation!"
+    syn.last_external_event_id = orig_last_ev
+    assert snapshot_w(state.W) == snap_base
+    assert hash_state_snapshot(snapshot_w(state.W)) == hash_base
 
 
 # ===========================================================================
