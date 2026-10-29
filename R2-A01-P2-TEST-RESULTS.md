@@ -2,10 +2,12 @@
 
 ## Comprehensive Verification Matrix: Read-Only Immutability & Transactional STALE
 
-- **Engineering Role:** Principal Scientific Software Verification Engineer  
+- **Engineering Role:** Principal Software Documentation Auditor & Scientific Verification Engineer  
 - **Test Session Date:** 2026-10-28  
 - **Branch:** `fix/r2-a01-p2-read-only-immutability`  
-- **Target SHA:** [`3bd29703fb77c704c7a5e35b97293991724b7a0b`](https://github.com/naoufelbvb2-arch/DGCA-NEXT-V2/commit/3bd29703fb77c704c7a5e35b97293991724b7a0b)  
+- **Reviewed Branch HEAD:** [`da087cc55c05a5a572edd513412136f245546080`](https://github.com/naoufelbvb2-arch/DGCA-NEXT-V2/commit/da087cc55c05a5a572edd513412136f245546080)  
+- **Verification Implementation SHA:** [`3bd29703fb77c704c7a5e35b97293991724b7a0b`](https://github.com/naoufelbvb2-arch/DGCA-NEXT-V2/commit/3bd29703fb77c704c7a5e35b97293991724b7a0b)  
+- **Frozen Patch 1 Baseline SHA:** [`a307c42b664328910cfdc9fe4788cc303895f189`](https://github.com/naoufelbvb2-arch/DGCA-NEXT-V2/commit/a307c42b664328910cfdc9fe4788cc303895f189)  
 - **Test Command:** `python -m pytest tests/ -q`  
 - **Result:** **130 passed (100% pass rate, 0 failures, 0 errors)**  
 
@@ -13,13 +15,15 @@
 
 ## 1. Epistemological and Verification Classification
 
-The test evidence in this report is strictly delineated across five epistemic levels:
+The test evidence in this report is strictly categorized across seven empirical and structural verification dimensions:
 
-1. **Source-Code Inspection:** Static verification that mutation statements are guarded by `mode == ExecutionMode.LEARN` or `mutate=True` (deferred to Step 5.1 of `end_exposure`).
-2. **Automated Pytest Evidence:** 130 automated regression and acceptance tests passing across Python 3.14.4 on Windows.
-3. **Deterministic Snapshot Comparison:** Deep dictionary-and-tuple structural comparison covering 100% of persistent state attributes across `WState`, `LatentNeighborhoodTable`, `HSlowState`, `RState`, `SurfaceReadoutLedgerV1`, and all 10 nested mutable dataclasses.
-4. **Cryptographic SHA-256 Digest Verification:** Executable computation and assertion of SHA-256 digests generated via `canonical_state_digest()`, featuring strict enum priority over generic primitives.
-5. **Empirical Verification Under Tested Conditions:** Validation on both a synthetic fixture network AND a genuine 56-alternating-root cold-start curriculum with canonical EOS and an attested peripheral ledger containing 15 assembly/generation groups and 398 outbox keys.
+1. **Source-Code Inspection:** Static verification that mutation statements are guarded by `mode == ExecutionMode.LEARN` or `mutate=True` (deferred to Step 5.1 of `end_exposure` on `w_shadow`).
+2. **Automated Regression Tests:** 130 automated regression and acceptance tests passing across Python 3.14.4 on Windows.
+3. **Full Structural State Snapshots:** Deep dictionary-and-tuple structural comparison covering 100% of persistent state attributes across `WState`, `LatentNeighborhoodTable`, `HSlowState`, `RState`, `SurfaceReadoutLedgerV1`, and all 10 nested mutable dataclasses.
+4. **Deterministic SHA-256 Comparisons:** Executable computation and assertion of SHA-256 digests generated via `canonical_state_digest()`, featuring strict enum priority over generic primitives.
+5. **Adversarial Mutation-Detection Tests:** Executable mutation tests confirming that altering any declared field triggers immediate snapshot and SHA-256 digest divergence.
+6. **Genuine 56-Root Cold-Start Curriculum:** Validation on an authentic 56-alternating-root cold-start curriculum with canonical EOS and an attested peripheral ledger containing 15 assembly/generation groups and 398 outbox keys.
+7. **Empirical Invariance Over Tested Execution Paths:** Proving exact, bit-identical state preservation across all evaluated retrieval and generation trajectories without claiming universal formal mathematical exhaustiveness for unobserved paths.
 
 ---
 
@@ -28,7 +32,7 @@ The test evidence in this report is strictly delineated across five epistemic le
 | Scenario ID | Test Name | Purpose / Invariant Tested | Result |
 | :--- | :--- | :--- | :--- |
 | **AUD-01** | `test_field_coverage_audit` | **Top-Level Field Coverage Audit:** Verifies 100% attribute coverage across `WState` (21 fields), `LatentNeighborhoodTable` (4 fields), `HSlowState` (4 fields), `RState` (19 fields), and `SurfaceReadoutLedgerV1` (4 fields). Asserts failure if any attribute in `vars()` is omitted. | **PASSED** |
-| **AUD-02** | `test_nested_dataclass_coverage_audit` | **Nested Dataclass Coverage Audit (Correction V04 & Section 3):** Dynamically inspects `dataclasses.fields()` across 10 nested records (`Synapse` [13 fields], `ContextCandidateDescriptor` [8], `StableBinding` [6], `OwnerProfile` [7], `CompactWitnessProfile` [5], `ContrastEpisodeRecord` [7], `Assembly` [6], `ParentContextRef` [2], `WiringLogEntry` [4], `LedgerCandidateRow` [6]). Asserts failure if any declared field is omitted from snapshot coverage. | **PASSED** |
+| **AUD-02** | `test_nested_dataclass_coverage_audit` | **Nested Dataclass Coverage Audit (Correction V04 & Section 3):** Dynamically inspects `dataclasses.fields()` across all 10 nested production records: `Synapse` (`dgca.core.anatomy`, 13 fields), `ContextCandidateDescriptor` (`dgca.core.state`, 19 fields), `StableBinding` (`dgca.core.state`, 16 fields), `OwnerProfile` (`dgca.lla.owner_registry`, 18 fields), `CompactWitnessProfile` (`dgca.lla.owner_registry`, 12 fields), `ContrastEpisodeRecord` (`dgca.lla.contrast_ledger`, 18 fields), `Assembly` (`dgca.core.state`, 8 fields), `ParentContextRef` (`dgca.core.state`, 5 fields), `WiringLogEntry` (`dgca.core.latent_index`, 6 fields), `LedgerCandidateRow` (`dgca.peripheral.readout_ledger`, 8 fields). Asserts failure if any declared field is omitted from snapshot coverage. | **PASSED** |
 | **TYP-01** | `test_canonical_enum_and_primitive_type_separation` | **Canonical Digest Type Separation (Section 4):** Serializes `enum.Enum` BEFORE `int` and `str` in `canonical_state_digest()`. Asserts zero silent collapse across 12 distinct Python types (`None`, `bool`, `IntEnum`, `StrEnum`, `int`, `float`, `str`, `bytes`, `tuple`, `set`, `dict`). | **PASSED** |
 | **ADV-01** | `test_synapse_mutation_sensitivity_adversarial` | **Synapse Mutation Sensitivity Adversarial Test (Correction V04):** Adversarially mutates all 6 previously omitted Synapse fields (`last_evidence_root`, `candidate_deadline`, `internally_supported`, `created_event_id`, `created_exposure_id`, `last_external_event_id`). Asserts that snapshot structural comparison AND SHA-256 state digest detect every single mutation. | **PASSED** |
 | **P1-01** | `test_p1_01_complete_retrieve_immutability_gate` | **Complete State Snapshot & Cryptographic Digest (P1-01):** Deep snapshot equality AND bitwise SHA-256 digest equality ($W_{\text{after}} = W_{\text{before}}$, $H^{\text{slow}}_{\text{after}} = H^{\text{slow}}_{\text{before}}$, $R^{\text{caller}}_{\text{after}} = R^{\text{caller}}_{\text{before}}$) after active multi-event read-only episode. Verifies `last_referenced_event` and `_slots_by_cell` key sets are untouched. | **PASSED** |
@@ -119,4 +123,4 @@ The integration test `test_non_empty_ledger_genuine_56_root_curriculum_immutabil
 
 ## 5. Certification & Freeze Readiness
 
-All 130 tests pass across unit, integration, empirical milestones, forensics, and acceptance suites. Complete state snapshot coverage (all top-level and 10 nested dataclasses), deterministic SHA-256 cryptographic hashing with strict enum discrimination, adversarial mutation sensitivity, non-empty ledger immutability, and transactional STALE settlement are fully verified.
+All 130 tests pass across unit, integration, empirical milestones, forensics, and acceptance suites. Complete state snapshot coverage (all top-level attributes and all 10 nested dataclasses), deterministic SHA-256 cryptographic hashing with strict enum discrimination, adversarial mutation sensitivity, non-empty ledger immutability, and transactional STALE settlement are fully verified.
