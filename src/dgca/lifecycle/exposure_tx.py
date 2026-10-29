@@ -11,10 +11,55 @@ Normative references:
 from __future__ import annotations
 
 import hashlib
+import logging
 import unicodedata
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
+
+logger = logging.getLogger(__name__)
+
+
+class frozendict(dict):
+    """Immutable mapping preserving standard dict interfaces (Core §10.2)."""
+
+    def __setitem__(self, key: object, value: object) -> None:
+        raise TypeError("frozendict is immutable")
+
+    def __delitem__(self, key: object) -> None:
+        raise TypeError("frozendict is immutable")
+
+    def clear(self) -> None:
+        raise TypeError("frozendict is immutable")
+
+    def pop(self, *args: object, **kwargs: object) -> object:
+        raise TypeError("frozendict is immutable")
+
+    def popitem(self) -> tuple[object, object]:
+        raise TypeError("frozendict is immutable")
+
+    def setdefault(self, *args: object, **kwargs: object) -> object:
+        raise TypeError("frozendict is immutable")
+
+    def update(self, *args: object, **kwargs: object) -> None:
+        raise TypeError("frozendict is immutable")
+
+    def copy(self) -> frozendict:
+        return self
+
+
+@dataclass(frozen=True, slots=True)
+class TransactionPublicationView:
+    """Immutable, atomically-published transaction view (Core §10.2, R2-A01 Patch 4).
+
+    A single pointer swap makes the entire state transition visible simultaneously.
+    """
+
+    W: WState
+    completed_roots: frozendict[int, EndExposureReport]
+    pending_outbox_by_root: frozendict[int, tuple[object, ...]]
+    completed_roots_high_watermark: int
+    active_exposure_id: int | None
 
 from dgca.common.errors import DGCAError, ObservationError, StatusCode
 from dgca.common.hashing import Region
@@ -413,16 +458,99 @@ class ExposureTransactionManager:
         self.allow_headless_events: bool = allow_headless_events
 
         self.open_journal: OpenExposureJournal | None = None
-        self.completed_roots: dict[int, EndExposureReport] = {}
+        self._publication_view = TransactionPublicationView(
+            W=state.W,
+            completed_roots=frozendict(),
+            pending_outbox_by_root=frozendict(),
+            completed_roots_high_watermark=state.W.completed_roots_high_watermark,
+            active_exposure_id=None,
+        )
         self.aborted_roots: dict[int, HSlowState] = {}
         self._protected_open_root_pairs: set[tuple[int, int]] = set()
         self._end_exposure_hooks: list[EndExposureHook] = []
+        self._fault_injection_point: str | None = None
+
+    @property
+    def publication_view(self) -> TransactionPublicationView:
+        return self._publication_view
+
+    @property
+    def completed_roots(self) -> frozendict[int, EndExposureReport]:
+        return self._publication_view.completed_roots
+
+    @property
+    def pending_outbox_by_root(self) -> frozendict[int, tuple[object, ...]]:
+        return self._publication_view.pending_outbox_by_root
 
     @property
     def status(self) -> ExposureStatus:
         if self.open_journal is not None:
             return ExposureStatus.OPEN
         return ExposureStatus.CLOSED
+
+    def has_pending_outbox(self, exposure_id: int | None = None) -> bool:
+        """Check whether pending outbox notifications exist."""
+        if exposure_id is None:
+            return len(self._publication_view.pending_outbox_by_root) > 0
+        return exposure_id in self._publication_view.pending_outbox_by_root
+
+    def pending_outbox_count(self, exposure_id: int | None = None) -> int:
+        """Return the count of pending outbox notifications."""
+        if exposure_id is None:
+            return sum(
+                len(batch) for batch in self._publication_view.pending_outbox_by_root.values()
+            )
+        batch = self._publication_view.pending_outbox_by_root.get(exposure_id)
+        return len(batch) if batch else 0
+
+    def assert_outbox_ready(self, exposure_id: int | None = None) -> None:
+        """Raise ObservationError if pending outbox notifications remain unconsumed."""
+        if self.has_pending_outbox(exposure_id):
+            if exposure_id is not None:
+                count = self.pending_outbox_count(exposure_id)
+                msg = f"Pending outbox notifications ({count}) remain unconsumed for root {exposure_id}"
+            else:
+                total = self.pending_outbox_count()
+                roots = sorted(self._publication_view.pending_outbox_by_root.keys())
+                msg = f"Pending outbox notifications ({total}) remain unconsumed across roots {roots}"
+            raise ObservationError(msg, code=StatusCode.OUTBOX_DELIVERY_PENDING)
+
+    def reconcile_outbox(
+        self,
+        exposure_id: int | None = None,
+        ledger: object | None = None,
+    ) -> int:
+        """Explicitly dispatch pending outbox notifications outside read-only execution.
+
+        Idempotent; clears roots from the pending view on success.
+        """
+        target_ledger = ledger if ledger is not None else self.readout_ledger
+        if target_ledger is None:
+            return 0
+
+        roots = (
+            [exposure_id]
+            if exposure_id is not None
+            else sorted(self._publication_view.pending_outbox_by_root.keys())
+        )
+        delivered = 0
+        for rid in roots:
+            batch = self._publication_view.pending_outbox_by_root.get(rid)
+            if not batch:
+                continue
+            if hasattr(target_ledger, "consume_outbox_batch"):
+                delivered += target_ledger.consume_outbox_batch(batch)
+
+            new_pending = dict(self._publication_view.pending_outbox_by_root)
+            new_pending.pop(rid, None)
+            self._publication_view = TransactionPublicationView(
+                W=self._publication_view.W,
+                completed_roots=self._publication_view.completed_roots,
+                pending_outbox_by_root=frozendict(new_pending),
+                completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
+                active_exposure_id=self._publication_view.active_exposure_id,
+            )
+        return delivered
 
     def register_end_exposure_hook(self, hook: EndExposureHook) -> None:
         """Register a post-evidence shadow transaction hook (used by Phase 4/5/6 operators)."""
@@ -448,11 +576,12 @@ class ExposureTransactionManager:
 
         if (
             exposure_id <= self.state.W.completed_roots_high_watermark
+            or exposure_id <= self._publication_view.completed_roots_high_watermark
             or exposure_id in self.completed_roots
             or exposure_id in self.aborted_roots
         ):
             raise ObservationError(
-                f"Root ID {exposure_id} is not strictly increasing (watermark={self.state.W.completed_roots_high_watermark})"
+                f"Root ID {exposure_id} is not strictly increasing (watermark={self._publication_view.completed_roots_high_watermark})"
             )
 
         # FIFR-B06 LAB POLICY A: capture immutable H_slow_BEGIN before any root-local adaptation
@@ -471,6 +600,13 @@ class ExposureTransactionManager:
             next_event_order=0,
             next_proposal_ordinal=0,
             last_event_remaining_k_r=K_R_PER_EVENT,
+        )
+        self._publication_view = TransactionPublicationView(
+            W=self._publication_view.W,
+            completed_roots=self._publication_view.completed_roots,
+            pending_outbox_by_root=self._publication_view.pending_outbox_by_root,
+            completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
+            active_exposure_id=exposure_id,
         )
         return self.open_journal
 
@@ -658,8 +794,18 @@ class ExposureTransactionManager:
         self._protected_open_root_pairs.clear()
 
         self.aborted_roots[exposure_id] = journal.h_slow_begin.clone()
-        self.state.W.completed_roots_high_watermark = max(
-            self.state.W.completed_roots_high_watermark, exposure_id
+        new_watermark = max(
+            self.state.W.completed_roots_high_watermark,
+            self._publication_view.completed_roots_high_watermark,
+            exposure_id,
+        )
+        self.state.W.completed_roots_high_watermark = new_watermark
+        self._publication_view = TransactionPublicationView(
+            W=self._publication_view.W,
+            completed_roots=self._publication_view.completed_roots,
+            pending_outbox_by_root=self._publication_view.pending_outbox_by_root,
+            completed_roots_high_watermark=new_watermark,
+            active_exposure_id=None,
         )
         self.open_journal = None
         return ExposureStatus.ABORTED
@@ -678,6 +824,10 @@ class ExposureTransactionManager:
             raise ObservationError(f"Root {exposure_id} is not currently OPEN")
         if not self.open_journal.event_results:
             raise ObservationError(f"Cannot END_EXPOSURE({exposure_id}) with zero processed events")
+
+        # FP-01 Fault Injection Gate
+        if self._fault_injection_point == "FP_01":
+            raise RuntimeError("Injected fault at FP-01: candidate/assembly preparation failure")
 
         journal = self.open_journal
         w_pre_close = self.state.W.clone()
@@ -698,7 +848,9 @@ class ExposureTransactionManager:
         w_shadow.completed_external_events_count += len(journal.event_results)
         w_shadow.close_serial += 1
         w_shadow.completed_roots_high_watermark = max(
-            w_shadow.completed_roots_high_watermark, exposure_id
+            w_shadow.completed_roots_high_watermark,
+            self._publication_view.completed_roots_high_watermark,
+            exposure_id,
         )
 
         # Prune expired unpinned candidate synapses
@@ -754,26 +906,26 @@ class ExposureTransactionManager:
         for hook in self._end_exposure_hooks:
             hook(w_pre_close, w_shadow, self.state.H_slow, journal, diagnostics)
 
+        # FP-02 Fault Injection Gate
+        if self._fault_injection_point == "FP_02":
+            raise RuntimeError("Injected fault at FP-02: outbox batch construction failure")
+
         # Build idempotent peripheral outbox notifications for pre-existing LIVE assemblies (no backdating)
         outbox_notifs: tuple[object, ...] = ()
         if journal.peripheral_envelopes_by_order:
             from dgca.peripheral.outbox import build_end_exposure_outbox_notifications
 
-            outbox_notifs = build_end_exposure_outbox_notifications(
-                exposure_id,
-                w_shadow,
-                self.state.H_slow,
-                journal.event_results,
-                journal.peripheral_envelopes_by_order,
-                preexisting_live_assemblies=tuple(w_pre_close.assemblies.values()),
+            outbox_notifs = tuple(
+                build_end_exposure_outbox_notifications(
+                    exposure_id,
+                    w_shadow,
+                    self.state.H_slow,
+                    journal.event_results,
+                    journal.peripheral_envelopes_by_order,
+                    preexisting_live_assemblies=tuple(w_pre_close.assemblies.values()),
+                )
             )
-            if self.readout_ledger is not None and hasattr(
-                self.readout_ledger, "consume_outbox_batch"
-            ):
-                self.readout_ledger.consume_outbox_batch(outbox_notifs)  # type: ignore[attr-defined]
 
-        # Step 6: Atomic commit of w_shadow
-        self.state.W = w_shadow
         journal.status = ExposureStatus.COMPLETED
         report = EndExposureReport(
             exposure_id=exposure_id,
@@ -788,9 +940,61 @@ class ExposureTransactionManager:
             assembly_report=asm_report,
             outbox_notifications=outbox_notifs,
         )
-        self.completed_roots[exposure_id] = report
+
+        new_completed = dict(self._publication_view.completed_roots)
+        new_completed[exposure_id] = report
+
+        new_pending = dict(self._publication_view.pending_outbox_by_root)
+        if outbox_notifs:
+            new_pending[exposure_id] = outbox_notifs
+
+        new_high_watermark = max(
+            self._publication_view.completed_roots_high_watermark,
+            w_shadow.completed_roots_high_watermark,
+            exposure_id,
+        )
+        w_shadow.completed_roots_high_watermark = new_high_watermark
+
+        new_view = TransactionPublicationView(
+            W=w_shadow,
+            completed_roots=frozendict(new_completed),
+            pending_outbox_by_root=frozendict(new_pending),
+            completed_roots_high_watermark=new_high_watermark,
+            active_exposure_id=None,
+        )
+
+        # Step 6: Atomic Publication Point (single pointer swap)
+        self._publication_view = new_view
+        self.state.W = new_view.W
         self._protected_open_root_pairs.clear()
         self.open_journal = None
+
+        # Step 7: Post-Commit Peripheral Dispatch Phase
+        if self._fault_injection_point == "FP_03":
+            logger.warning(
+                "Injected fault at FP-03: post-commit peripheral dispatch deferred for root %d",
+                exposure_id,
+            )
+        elif self.readout_ledger is not None and outbox_notifs:
+            try:
+                if hasattr(self.readout_ledger, "consume_outbox_batch"):
+                    self.readout_ledger.consume_outbox_batch(outbox_notifs)  # type: ignore[attr-defined]
+                # Delivery succeeded; remove from pending queue
+                pending_after = dict(self._publication_view.pending_outbox_by_root)
+                pending_after.pop(exposure_id, None)
+                self._publication_view = TransactionPublicationView(
+                    W=self._publication_view.W,
+                    completed_roots=self._publication_view.completed_roots,
+                    pending_outbox_by_root=frozendict(pending_after),
+                    completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
+                    active_exposure_id=self._publication_view.active_exposure_id,
+                )
+            except Exception as exc:
+                # Root remains COMPLETED. W remains committed. Batch remains in pending view.
+                logger.warning(
+                    "Peripheral dispatch deferred for root %d: %s", exposure_id, exc
+                )
+
         return report
 
 
