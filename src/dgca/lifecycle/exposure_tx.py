@@ -25,6 +25,7 @@ from dgca.core.dynamics import (
     compute_next_step_temporal_drive,
     execute_two_pass_event,
 )
+from dgca.core.latent_index import LatentNeighborhoodTable
 from dgca.core.sic_v1 import SICProjectionResult, project_core_event_v1
 from dgca.core.state import ExecutionMode, HSlowState, MachineState, WState
 from dgca.encoder.decomposer import (
@@ -277,6 +278,7 @@ class OpenExposureJournal:
     status: ExposureStatus
     h_slow_begin: HSlowState
     h_slow_event: HSlowState
+    latent_table_begin: LatentNeighborhoodTable | None = None
     next_event_order: int = 0
     next_proposal_ordinal: int = 0
     last_event_remaining_k_r: int = K_R_PER_EVENT
@@ -455,6 +457,8 @@ class ExposureTransactionManager:
 
         # FIFR-B06 LAB POLICY A: capture immutable H_slow_BEGIN before any root-local adaptation
         h_begin = self.state.H_slow.clone()
+        # R2-A01 Patch 3: capture immutable LatentNeighborhoodTable at BEGIN
+        latent_begin = self.state.W.latent_table.clone()
         self.state.R.reset_cold()
         self._protected_open_root_pairs.clear()
 
@@ -463,6 +467,7 @@ class ExposureTransactionManager:
             status=ExposureStatus.OPEN,
             h_slow_begin=h_begin,
             h_slow_event=h_begin.clone(),
+            latent_table_begin=latent_begin,
             next_event_order=0,
             next_proposal_ordinal=0,
             last_event_remaining_k_r=K_R_PER_EVENT,
@@ -646,6 +651,9 @@ class ExposureTransactionManager:
         journal = self.open_journal
         # FIFR-B06 LAB POLICY A: restore exact H_slow_BEGIN
         self.state.H_slow = journal.h_slow_begin.clone()
+        # R2-A01 Patch 3: restore exact LatentNeighborhoodTable at BEGIN
+        if journal.latent_table_begin is not None:
+            self.state.W.latent_table = journal.latent_table_begin.clone()
         self.state.R.reset_cold()
         self._protected_open_root_pairs.clear()
 
