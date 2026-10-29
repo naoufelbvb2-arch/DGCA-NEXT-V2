@@ -675,7 +675,8 @@ def execute_two_pass_event(
         if cur_a > 0.0 or old_hist:
             new_hist = (old_hist + (cur_a,))[-H_CONTEXT:]
             r.A_hist[cid] = new_hist
-            w.last_referenced_event[cid] = w.global_event_clock
+            if mode == ExecutionMode.LEARN:
+                w.last_referenced_event[cid] = w.global_event_clock
 
     r.E1_frontier = e1_frontier
     r.L_frontier = l_frontier

@@ -168,23 +168,45 @@ class LatentNeighborhoodTable:
             self._slots_by_cell[cell_id] = slots
         return slots
 
+    def materialize_cell(self, cell_id: int) -> list[int | None]:
+        """Explicitly materialize the 24-slot array for cell_id in _slots_by_cell (LEARN commitment only)."""
+        return self._ensure_cell_materialized(cell_id)
+
+    def get_slots_read_only(self, cell_id: int) -> tuple[int | None, ...]:
+        """Return the 24-slot tuple for cell_id without mutating _slots_by_cell (R2-A01 Patch 2)."""
+        if not (0 <= cell_id < TOTAL_CELL_COUNT):
+            raise DGCAError(StatusCode.INVALID_OBSERVATION, f"Cell ID out of range: {cell_id}")
+        existing = self._slots_by_cell.get(cell_id)
+        if existing is not None:
+            return tuple(existing)
+        # Synthesize virtual slots on the fly without inserting into self._slots_by_cell
+        res: list[int | None] = [None] * 24
+        local_6 = compute_fixed_local_neighbors(cell_id)
+        topo_6 = compute_fixed_topographic_neighbors(cell_id)
+        for idx, target in enumerate(local_6):
+            res[6 + idx] = target
+        for idx, target in enumerate(topo_6):
+            res[18 + idx] = target
+        return tuple(res)
+
     def get_slots(self, cell_id: int) -> tuple[int | None, ...]:
-        """Return the 24-slot tuple for cell_id."""
-        return tuple(self._ensure_cell_materialized(cell_id))
+        """Return the 24-slot tuple for cell_id without mutating _slots_by_cell."""
+        return self.get_slots_read_only(cell_id)
 
     def get_wiring_log(self, cell_id: int) -> tuple[WiringLogEntry, ...]:
         """Return the wiring audit log for cell_id."""
         return tuple(self._wiring_logs.get(cell_id, ()))
 
     def forward_neighbors(self, cell_id: int) -> set[int]:
-        """Return the set of all non-None target cell IDs in N(cell_id)."""
-        slots = self._ensure_cell_materialized(cell_id)
+        """Return the set of all non-None target cell IDs in N(cell_id) without mutating _slots_by_cell."""
+        slots = self.get_slots_read_only(cell_id)
         return {tgt for tgt in slots if tgt is not None}
 
     def reverse_neighbors(self, target_cell_id: int) -> set[int]:
         """Return all source cell IDs i such that target_cell_id in N(i).
 
         Combines the transactional coactive reverse index with deterministic fixed local/topographic inverses.
+        Does not mutate _slots_by_cell for candidate sources.
         """
         if not (0 <= target_cell_id < TOTAL_CELL_COUNT):
             raise DGCAError(StatusCode.INVALID_OBSERVATION, f"Cell ID out of range: {target_cell_id}")
@@ -218,13 +240,13 @@ class LatentNeighborhoodTable:
         return sources
 
     def is_eligible(self, source_id: int, target_id: int) -> bool:
-        """Evaluate D_ij = 1[j in N(i) or i in N(j)] (Core §1.3)."""
+        """Evaluate D_ij = 1[j in N(i) or i in N(j)] (Core §1.3) without mutating _slots_by_cell."""
         if source_id == target_id:
             return False
-        slots_i = self._ensure_cell_materialized(source_id)
+        slots_i = self.get_slots_read_only(source_id)
         if target_id in slots_i:
             return True
-        slots_j = self._ensure_cell_materialized(target_id)
+        slots_j = self.get_slots_read_only(target_id)
         return source_id in slots_j
 
     def is_slot_pinned(self, owner_cell_id: int, slot_index: int) -> bool:

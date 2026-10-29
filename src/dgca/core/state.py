@@ -452,7 +452,7 @@ class WState:
             return False
         self.committed_cells[cell_id] = event_clock
         self.last_referenced_event[cell_id] = event_clock
-        self.latent_table.get_slots(cell_id)
+        self.latent_table.materialize_cell(cell_id)
         return True
 
     def add_or_replace_synapse(self, synapse: Synapse) -> None:
@@ -698,7 +698,7 @@ class MachineState:
             last_referenced_event=self.W.last_referenced_event.get(cell_id),
             r_bar=self.H_slow.get_r_bar(cell_id),
             g=self.H_slow.get_g(cell_id),
-            latent_neighborhood=self.W.latent_table.get_slots(cell_id),
+            latent_neighborhood=self.W.latent_table.get_slots_read_only(cell_id),
             B_i=self.W.outgoing_budget_b_i,
             B_i_cross=self.W.cross_outgoing_budget_b_i_x,
         )

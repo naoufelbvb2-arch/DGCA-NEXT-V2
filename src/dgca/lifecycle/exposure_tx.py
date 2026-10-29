@@ -731,6 +731,17 @@ class ExposureTransactionManager:
                 journal.event_results,
             )
 
+        # Step 5.1 (Core §7.6, §11 & R2-A01 Patch 2): Transactional settlement of stale bindings on w_shadow
+        from dgca.core.context_gate import validate_and_refresh_stable_binding
+        from dgca.core.state import BindingStatus
+        for z_id, binding in sorted(w_shadow.stable_bindings.items()):
+            if binding.status == BindingStatus.ACTIVE:
+                ok, stale_code = validate_and_refresh_stable_binding(
+                    binding, w_shadow, mutate=True
+                )
+                if not ok:
+                    diagnostics.append(stale_code)
+
         # Execute registered post-evidence shadow hooks (e.g. Phase 6 peripheral outbox)
         for hook in self._end_exposure_hooks:
             hook(w_pre_close, w_shadow, self.state.H_slow, journal, diagnostics)
@@ -803,7 +814,7 @@ def run_read_only_episode(
     scratch_state = MachineState(
         w=state.W,  # read-only reference; never mutated when mode == RETRIEVE
         r=state.R.clone(),
-        h_slow=state.H_slow,
+        h_slow=state.H_slow.clone(),
     )
     scratch_state.R.reset_cold()
 

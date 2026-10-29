@@ -132,34 +132,39 @@ def validate_parent_hierarchy(
     return True, StatusCode.OK
 
 
-def validate_and_refresh_stable_binding(binding: StableBinding, w: WState) -> tuple[bool, StatusCode]:
+def validate_and_refresh_stable_binding(
+    binding: StableBinding,
+    w: WState,
+    *,
+    mutate: bool = False,
+) -> tuple[bool, StatusCode]:
     """Verify all mandatory physical keys and thresholds of a StableBinding (Core §5.1, §7.6, §11).
 
-    If any mandatory key is non-live/illegal, marks binding.status = STALE transactionally.
+    If mutate=True and any mandatory key is non-live/illegal, marks binding.status = STALE (R2-A01 Patch 2).
     """
     if binding.status != BindingStatus.ACTIVE:
         return False, StatusCode.STALE_CONTEXT_BINDING
+
+    def _fail(code: StatusCode) -> tuple[bool, StatusCode]:
+        if mutate:
+            binding.status = BindingStatus.STALE
+        return False, code
+
     if not is_valid_calibration_triple(binding.l_z_q6, binding.u_z_q6, binding.tau_ctx_q6):
-        binding.status = BindingStatus.STALE
-        return False, StatusCode.INVALID_CONTEXT_THRESHOLD
+        return _fail(StatusCode.INVALID_CONTEXT_THRESHOLD)
     if binding.z_cell_id not in w.committed_cells:
-        binding.status = BindingStatus.STALE
-        return False, StatusCode.STALE_CONTEXT_BINDING
+        return _fail(StatusCode.STALE_CONTEXT_BINDING)
     if len(binding.anchor_source_set) > ANCHOR_SOURCE_MAX:
-        binding.status = BindingStatus.STALE
-        return False, StatusCode.ANCHOR_CONTEXT_TOO_WIDE
+        return _fail(StatusCode.ANCHOR_CONTEXT_TOO_WIDE)
 
     # Both P keys must be legal consolidated ASSOCIATIVE links
     if len(binding.p_keys) != 2:
-        binding.status = BindingStatus.STALE
-        return False, StatusCode.STALE_CONTEXT_BINDING
+        return _fail(StatusCode.STALE_CONTEXT_BINDING)
     for pk in binding.p_keys:
         if pk[1] != binding.z_cell_id or pk[2] != SynapseScope.ASSOCIATIVE:
-            binding.status = BindingStatus.STALE
-            return False, StatusCode.STALE_CONTEXT_BINDING
+            return _fail(StatusCode.STALE_CONTEXT_BINDING)
         if not is_legal_consolidated_synapse(pk, w):
-            binding.status = BindingStatus.STALE
-            return False, StatusCode.STALE_CONTEXT_BINDING
+            return _fail(StatusCode.STALE_CONTEXT_BINDING)
 
     # At least 1 retained C key must be a legal consolidated LOCAL link
     valid_c = [
@@ -170,8 +175,7 @@ def validate_and_refresh_stable_binding(binding: StableBinding, w: WState) -> tu
         and is_legal_consolidated_synapse(ck, w)
     ]
     if not valid_c:
-        binding.status = BindingStatus.STALE
-        return False, StatusCode.STALE_CONTEXT_BINDING
+        return _fail(StatusCode.STALE_CONTEXT_BINDING)
 
     # At least 1 retained Y key must be a legal consolidated ASSOCIATIVE link
     valid_y = [
@@ -182,8 +186,7 @@ def validate_and_refresh_stable_binding(binding: StableBinding, w: WState) -> tu
         and is_legal_consolidated_synapse(yk, w)
     ]
     if not valid_y:
-        binding.status = BindingStatus.STALE
-        return False, StatusCode.STALE_CONTEXT_BINDING
+        return _fail(StatusCode.STALE_CONTEXT_BINDING)
 
     # Validate parent hierarchy if depth > 1
     if binding.depth > 1:
@@ -196,8 +199,7 @@ def validate_and_refresh_stable_binding(binding: StableBinding, w: WState) -> tu
             {binding.z_cell_id},
         )
         if not ok:
-            binding.status = BindingStatus.STALE
-            return False, code
+            return _fail(code)
 
     return True, StatusCode.OK
 
