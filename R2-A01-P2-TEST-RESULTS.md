@@ -5,7 +5,7 @@
 - **Engineering Role:** Principal Scientific Software Verification Engineer  
 - **Test Session Date:** 2026-10-28  
 - **Branch:** `fix/r2-a01-p2-read-only-immutability`  
-- **Target SHA:** Working Tree on `fix/r2-a01-p2-read-only-immutability`  
+- **Target SHA:** [`3bd29703fb77c704c7a5e35b97293991724b7a0b`](https://github.com/naoufelbvb2-arch/DGCA-NEXT-V2/commit/3bd29703fb77c704c7a5e35b97293991724b7a0b)  
 - **Test Command:** `python -m pytest tests/ -q`  
 - **Result:** **130 passed (100% pass rate, 0 failures, 0 errors)**  
 
