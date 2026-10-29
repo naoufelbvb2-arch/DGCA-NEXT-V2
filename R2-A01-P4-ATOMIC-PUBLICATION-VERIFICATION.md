@@ -28,24 +28,22 @@ self.state.W = w_shadow
 This inverted sequence created a catastrophic failure window:
 1. If an unhandled exception or crash occurred during `consume_outbox_batch()`, the peripheral ledger accepted partial attestations for an exposure whose Core neural state $W$ was never committed.
 2. The uncommitted exposure could subsequently be aborted via `abort_exposure()`, leaving orphaned, invalid attestations in the peripheral ledger for aborted or non-existent neural assemblies.
-3. Multi-statement assignments (`self.state.W = w_shadow`, `self.completed_roots[exposure_id] = report`, `self.open_journal = None`) allowed concurrent or intermediate observers to witness partially-committed states (e.g., updated $W$ while status was still `OPEN`, or completed root without outbox registration).
+3. Sequential field assignments (`self.state.W = w_shadow`, `self.completed_roots[exposure_id] = report`, `self.open_journal = None`) previously allowed readers inspecting individual attributes across lifecycle boundaries to witness partially-committed states (e.g., updated $W$ while `open_journal` was still present).
 
 ### 1.2 Mathematical Formulation of In-Process Publication Atomicity
-Under Patch 4, all transactionally-managed state components are unified into an immutable snapshot:
+Under Patch 4, all transactionally-managed state components are unified into an authoritative publication view:
 $$\mathcal{V} = \langle W, \mathcal{R}_{\text{completed}}, \mathcal{Q}_{\text{pending}}, H_{\text{watermark}}, \text{active\_id} \rangle$$
 
 The publication transition from exposure state $S_{\text{pre-end}}$ to committed state $S_{\text{committed}}$ is executed via a single reference assignment (pointer swap):
 
 $$\boxed{\mathcal{V}_{\text{published}} \leftarrow \mathcal{V}_{\text{new}}}$$
 
-At that single instant:
-1. Neural weights, assemblies, and synapses in $W$ become active simultaneously.
-2. The root transitions from `OPEN` to `COMPLETED` in the completed registry.
-3. Any constructed outbox notifications are atomically registered in $\mathcal{Q}_{\text{pending}}$.
-4. The high watermark is monotonically advanced.
-5. `active_exposure_id` is set to `None`.
-
-No intermediate or partially-committed state can ever be observed by external readers.
+#### Publication Visibility & Execution Contract (C02-S03):
+1. **Unified Authoritative Readers (`tx.publication_view`):** Capturing a single reference to `tx.publication_view` provides an internally consistent, indivisible snapshot $\mathcal{V}$ across all five components simultaneously: committed neural state $W$, completed root registry $\mathcal{R}_{\text{completed}}$, pending outbox batches $\mathcal{Q}_{\text{pending}}$, watermark $H_{\text{watermark}}$, and active exposure indicator.
+2. **Direct Attribute Readers (`tx.state.W`, `tx.status`, `tx.open_journal`):** Direct readers inspecting separate attributes do NOT enjoy cross-attribute atomicity, as these attributes are updated sequentially in subsequent bytecode statements (`self._publication_view = new_view`, `self.state.W = new_view.W`, `journal.status = COMPLETED`, `self.open_journal = None`).
+3. **Serialized Execution Requirement:** The DGCA runtime assumes cooperative, serialized caller execution. Multiple OS threads must not execute lifecycle transitions or access state concurrently without external synchronization. Python's GIL alone does not provide multi-statement transactional atomicity across distinct object attributes.
+4. **Immutable Metadata vs. Mutable Neural State:** Publication metadata ($\mathcal{R}_{\text{completed}}$, $\mathcal{Q}_{\text{pending}}$) is wrapped in genuinely immutable `frozendict` instances backed by `MappingProxyType`. In contrast, $WState$ is an in-memory mutable graph object whose immutability during read-only rollout is verified through cryptographic hashing and snapshot checks (Patch 2).
+5. **In-OPEN Sensory Admissions:** Sensory cells admitted during `process_event` commit immediately into `state.W.committed_cells` (Core §9.1) and survive shadow preparation aborts (Patch 3), whereas latent topology mutations are strictly rolled back upon abort.
 
 ### 1.3 Strict Sequencing Order
 The authoritative execution order is now mathematically enforced:
@@ -69,14 +67,15 @@ The authoritative execution order is now mathematically enforced:
   2. Build outbox notifications against w_shadow
      (FP-02 failure: root remains OPEN, W untouched, ledger untouched)
   3. Construct immutable TransactionPublicationView
-  4. ATOMIC POINTER SWAP (Single reference assignment)
-     self._publication_view = new_view
-     self.state.W = new_view.W
-     self.open_journal = None
+  4. ATOMIC POINTER SWAP & SEQUENTIAL STATE TRANSITION
+     self._publication_view = new_view  <-- Unified publication view atomically published
+     self.state.W = new_view.W          <-- Direct neural state pointer updated
+     journal.status = ExposureStatus.COMPLETED
+     self.open_journal = None           <-- Lifecycle status closed
   5. Post-Commit Peripheral Dispatch
      try: consume_outbox_batch()
-     - SUCCESS: Clear pending batch for root in publication view
-     - FAILURE (FP-03): Retain batch in pending view; log warning
+     - SUCCESS & ACKNOWLEDGED: Clear pending batch for root in publication view
+     - FAILURE (FP-03) / NO-OP / EXCEPTION: Retain batch in pending view; log warning
   6. Return EndExposureReport
 ```
 

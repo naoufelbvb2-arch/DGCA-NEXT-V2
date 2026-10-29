@@ -26,6 +26,7 @@ from dgca.lifecycle.exposure_tx import (
     TransactionPublicationView,
     frozendict,
 )
+from dgca.peripheral.outbox import OutboxNotificationV1
 from dgca.peripheral.readout_ledger import SurfaceReadoutLedgerV1
 from tests.test_r2_a01_patch2_acceptance import hash_state_snapshot
 
@@ -688,13 +689,29 @@ def test_s02_immutable_publication_metadata_adversarial() -> None:
     with pytest.raises(TypeError, match="frozendict is immutable"):
         published.__init__({999: forged_report})
 
+    # 9. Base-class dict mutation bypasses (C02-S01)
+    with pytest.raises(TypeError):
+        dict.update(published, {999: forged_report})
+    with pytest.raises(TypeError):
+        dict.__setitem__(published, 998, forged_report)
+    with pytest.raises(TypeError):
+        dict.clear(published)
+
+    # 10. Mutation of constructor source dict isolation
+    source_dict = {100: forged_report}
+    test_fd = frozendict(source_dict)
+    source_dict[100] = None  # type: ignore[assignment]
+    source_dict[101] = forged_report
+    assert test_fd[100] is forged_report
+    assert 101 not in test_fd
+
     # Same adversarial tests on pending mapping
     with pytest.raises(TypeError, match="frozendict is immutable"):
         pending[999] = ()  # type: ignore[index]
     with pytest.raises(TypeError, match="frozendict is immutable"):
         pending |= {999: ()}  # type: ignore[misc]
 
-    # 9. Reference isolation across subsequent publication swaps
+    # 11. Reference isolation across subsequent publication swaps
     retained_v1 = tx.completed_roots
     assert len(retained_v1) == 1
     assert root_id in retained_v1
@@ -860,3 +877,328 @@ def test_controlled_throwing_shadow_preparation_hook_fp01() -> None:
     assert tx.status == ExposureStatus.CLOSED
     assert root_id in tx.aborted_roots
     assert set(state.W.committed_cells.keys()) == sensory_cells_admitted
+
+
+class NoOpLedger:
+    """Callable outbox consumer that returns 0 without consuming or acknowledging (C02-S02)."""
+
+    def consume_outbox_batch(self, batch: object) -> int:
+        return 0
+
+
+class PartialFailingLedger(SurfaceReadoutLedgerV1):
+    """Consumer that consumes up to `fail_after` notifications before raising an exception (C02-S02)."""
+
+    def __init__(self, fail_after: int = 1) -> None:
+        super().__init__()
+        self.fail_after = fail_after
+
+    def consume_outbox_batch(self, batch: Sequence[OutboxNotificationV1]) -> int:
+        added = 0
+        for i, notif in enumerate(batch):
+            if i >= self.fail_after:
+                raise RuntimeError("Simulated transient transport failure during batch")
+            if self.consume_outbox_notification(notif):
+                added += 1
+        return added
+
+
+def test_c02_s02_a_valid_consumer_first_delivery() -> None:
+    """C02-S02 Test A: Valid consumer, first delivery.
+
+    All notifications acknowledged. Pending batch cleared.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=None,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    tx.end_exposure(root_id)
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+    valid_ledger = SurfaceReadoutLedgerV1()
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=valid_ledger)
+    assert delivered == 3
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+    tx.assert_outbox_ready(root_id)
+
+    # All candidate rows confirmed
+    for asm_id in (1, 2, 3):
+        rows = valid_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert root_id in rows[0].confirmed_roots
+
+
+def test_c02_s02_b_valid_consumer_duplicate_delivery() -> None:
+    """C02-S02 Test B: Valid consumer, duplicate delivery.
+
+    Already-processed idempotency keys count as acknowledged. No duplicate confirmations.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    valid_ledger = SurfaceReadoutLedgerV1()
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=valid_ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    tx.end_exposure(root_id)
+    # Delivered during initial post-commit
+    assert tx.has_pending_outbox(root_id) is False
+
+    # Simulate re-queuing duplicate batch in pending view (e.g. replay scenario)
+    batch = tuple(
+        OutboxNotificationV1(
+            root_id=root_id,
+            event_order=item.core_event.event_order,
+            assembly_id=i + 1,
+            structural_generation=1,
+            surface_sha256=item.peripheral_surface.surface_sha256,
+            feature_bundle_digest=item.peripheral_surface.feature_bundle_digest,
+            marker=item.peripheral_surface.marker,
+            envelope=item.peripheral_surface,
+        )
+        for i, item in enumerate(envs)
+    )
+    tx._publication_view = TransactionPublicationView(
+        W=tx._publication_view.W,
+        completed_roots=tx._publication_view.completed_roots,
+        pending_outbox_by_root=frozendict({root_id: batch}),
+        completed_roots_high_watermark=tx._publication_view.completed_roots_high_watermark,
+        active_exposure_id=None,
+    )
+    assert tx.has_pending_outbox(root_id) is True
+
+    # Duplicate delivery: method returns 0 new additions, but all notifications are acknowledged
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=valid_ledger)
+    assert delivered == 0
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+
+    # Confirm no duplicate root additions in candidate rows
+    for asm_id in (1, 2, 3):
+        rows = valid_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert rows[0].confirmed_roots == {root_id}
+
+
+def test_c02_s02_c_callable_noop_consumer() -> None:
+    """C02-S02 Test C: Callable no-op consumer.
+
+    Method returns without consuming. Pending batch preserved.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=None,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    tx.end_exposure(root_id)
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+    # Reconcile with callable no-op consumer
+    noop_ledger = NoOpLedger()
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=noop_ledger)
+    assert delivered == 0
+    # Pending batch must be preserved!
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+    with pytest.raises(ObservationError) as exc_info:
+        tx.assert_outbox_ready(root_id)
+    assert exc_info.value.code == StatusCode.OUTBOX_DELIVERY_PENDING
+
+
+def test_c02_s02_d_unsupported_consumer() -> None:
+    """C02-S02 Test D: Unsupported consumer.
+
+    Consumer lacks consume_outbox_batch. Pending batch preserved.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=None,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    tx.end_exposure(root_id)
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+    # Reconcile with object()
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=object())
+    assert delivered == 0
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+
+def test_c02_s02_e_partial_delivery_and_exception() -> None:
+    """C02-S02 Test E: Partial delivery and exception.
+
+    Pending batch preserved. Later reconciliation succeeds without duplication.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=None,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    tx.end_exposure(root_id)
+    assert tx.has_pending_outbox(root_id) is True
+
+    # 1. Partial delivery throws after consuming 1 notification
+    failing_ledger = PartialFailingLedger(fail_after=1)
+    with pytest.raises(RuntimeError, match="Simulated transient transport failure"):
+        tx.reconcile_outbox(exposure_id=root_id, ledger=failing_ledger)
+
+    # Batch is retained
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+    assert len(failing_ledger._processed_outbox_keys) == 1
+
+    # 2. Re-drive reconciliation with fault cleared
+    failing_ledger.fail_after = 99
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=failing_ledger)
+    assert delivered == 2  # Only the remaining 2 notifications newly added
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+    assert len(failing_ledger._processed_outbox_keys) == 3
+
+    # Invariants: no duplicate root observations
+    for asm_id in (1, 2, 3):
+        rows = failing_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert rows[0].confirmed_roots == {root_id}
+
+
+def test_c02_s02_f_initial_post_commit_noop_delivery() -> None:
+    """C02-S02 Test F: Initial post-commit no-op delivery.
+
+    Neural W remains committed. Root remains COMPLETED. Pending batch remains recoverable.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    noop_ledger = NoOpLedger()
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=noop_ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    rep = tx.end_exposure(root_id)
+
+    # 1. Core neural state W is committed
+    assert rep.status == ExposureStatus.COMPLETED
+    assert state.W.close_serial == 1
+    assert tx.status == ExposureStatus.CLOSED
+    assert root_id in tx.completed_roots
+
+    # 2. Pending batch preserved despite no-op ledger returning successfully
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+    with pytest.raises(ObservationError) as exc_info:
+        tx.assert_outbox_ready(root_id)
+    assert exc_info.value.code == StatusCode.OUTBOX_DELIVERY_PENDING
+
+    # 3. Recoverable via explicit reconciliation with valid ledger
+    valid_ledger = SurfaceReadoutLedgerV1()
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=valid_ledger)
+    assert delivered == 3
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+    tx.assert_outbox_ready(root_id)

@@ -10,14 +10,20 @@ Normative references:
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import logging
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
+
+KT = TypeVar("KT")
+VT = TypeVar("VT")
 
 
 def _is_valid_outbox_consumer(consumer: object) -> bool:
@@ -25,16 +31,100 @@ def _is_valid_outbox_consumer(consumer: object) -> bool:
     return consumer is not None and callable(getattr(consumer, "consume_outbox_batch", None))
 
 
-class frozendict(dict):
-    """Immutable mapping preserving standard dict interfaces (Core §10.2, Correction S02)."""
+def _is_batch_acknowledged(consumer: object, batch: Sequence[object]) -> bool:
+    """Verify that consumer has acknowledged and accounted for every notification in the batch (Core §9.4, C02-S02).
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        if getattr(self, "_initialized", False):
+    Requirements:
+    1. Every notification in the batch must be accounted for.
+    2. A genuinely new delivery must be recognized.
+    3. An already-consumed duplicate must be recognized as successfully accounted for.
+    4. A callable no-op consumer returning without recording must not be recognized as acknowledged.
+    """
+    if consumer is None:
+        return False
+
+    # 1. Preferred canonical ledger interface: is_batch_acknowledged(batch)
+    if callable(getattr(consumer, "is_batch_acknowledged", None)):
+        try:
+            return bool(consumer.is_batch_acknowledged(batch))  # type: ignore[union-attr]
+        except Exception:
+            return False
+
+    # 2. Per-notification acknowledgment method: is_notification_acknowledged(notif)
+    if callable(getattr(consumer, "is_notification_acknowledged", None)):
+        try:
+            return all(bool(consumer.is_notification_acknowledged(notif)) for notif in batch)  # type: ignore[union-attr]
+        except Exception:
+            return False
+
+    # 3. Direct idempotency key tracking attribute inspection (_processed_outbox_keys)
+    processed_keys = getattr(consumer, "_processed_outbox_keys", None)
+    if isinstance(processed_keys, (set, frozenset, dict)):
+        try:
+            for notif in batch:
+                idem_key = getattr(notif, "idempotency_key", None)
+                if idem_key is None or idem_key not in processed_keys:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    # Any consumer without an acknowledgment interface or verification proof cannot be verified as consumed
+    return False
+
+
+class frozendict(Mapping[KT, VT]):
+    """Genuinely immutable mapping preserving standard Mapping interfaces (Core §10.2, C02-S01).
+
+    Backed by MappingProxyType over a private defensive copy. Does NOT inherit from dict,
+    eliminating all dict base-class mutation bypasses (e.g., dict.update, dict.__setitem__, dict.clear).
+    """
+
+    __slots__ = ("_proxy", "_hash")
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        if hasattr(self, "_proxy"):
             raise TypeError("frozendict is immutable")
-        super().__init__(*args, **kwargs)
-        self._initialized = True
+        base = dict(*args, **kwargs)
+        super().__setattr__("_proxy", MappingProxyType(base))
+        super().__setattr__("_hash", None)
 
-    def __readonly__(self, *args: object, **kwargs: object) -> None:
+    def __getitem__(self, key: KT) -> VT:
+        return self._proxy[key]
+
+    def __iter__(self) -> Iterator[KT]:
+        return iter(self._proxy)
+
+    def __len__(self) -> int:
+        return len(self._proxy)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._proxy
+
+    def __repr__(self) -> str:
+        return f"frozendict({dict(self._proxy)!r})"
+
+    def copy(self) -> frozendict[KT, VT]:
+        return self
+
+    def __copy__(self) -> frozendict[KT, VT]:
+        return self
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> frozendict[KT, VT]:
+        return frozendict({k: copy.deepcopy(v, memo) for k, v in self._proxy.items()})
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return (frozendict, (dict(self._proxy),))
+
+    def __hash__(self) -> int:
+        if self._hash is None:
+            try:
+                self._hash = hash(tuple(sorted(self._proxy.items())))
+            except TypeError:
+                raise TypeError("frozendict with unhashable values cannot be hashed") from None
+        return self._hash
+
+    def __readonly__(self, *args: Any, **kwargs: Any) -> None:
         raise TypeError("frozendict is immutable")
 
     __setitem__ = __readonly__
@@ -46,15 +136,23 @@ class frozendict(dict):
     setdefault = __readonly__
     update = __readonly__
 
-    def copy(self) -> frozendict:
-        return self
-
 
 @dataclass(frozen=True, slots=True)
 class TransactionPublicationView:
-    """Immutable, atomically-published transaction view (Core §10.2, R2-A01 Patch 4).
+    """Immutable, atomically-published transaction view (Core §10.2, R2-A01 Patch 4, C02-S03).
 
-    A single pointer swap makes the entire state transition visible simultaneously.
+    Visibility Contract:
+    1. Single Indivisible Reference: Capturing a reference to publication_view provides an internally
+       consistent snapshot of (W, completed_roots, pending_outbox_by_root, watermark, active_id).
+    2. Serialized Lifecycle Assumption: The DGCA runtime assumes serialized caller execution.
+       Direct readers accessing individual properties (tx.state.W, tx.open_journal, tx.status)
+       are reading separate attributes updated sequentially and do not enjoy cross-attribute
+       atomicity unless reading through the unified publication_view.
+    3. Structural Separation: Publication metadata (completed_roots, pending_outbox_by_root)
+       is wrapped in immutable frozendict instances, while neural W is a mutable WState
+       object whose invariants are preserved via read-only snapshot verification.
+    4. In-OPEN Sensory Preservations: Sensory cells admitted during OPEN events commit
+       immediately into W.committed_cells and survive shadow preparation aborts (Patch 3).
     """
 
     W: WState
@@ -546,9 +644,20 @@ class ExposureTransactionManager:
                 continue
 
             # Invoke consumer method
-            delivered += target_ledger.consume_outbox_batch(batch)  # type: ignore[union-attr]
+            batch_delivered = target_ledger.consume_outbox_batch(batch)  # type: ignore[union-attr]
 
-            # Clear pending queue for this root strictly after successful delivery
+            # Verify actual consumption acknowledgment (C02-S02)
+            if not _is_batch_acknowledged(target_ledger, batch):
+                logger.warning(
+                    "Reconcile outbox consumer %r did not acknowledge batch for root %d; batch retained",
+                    target_ledger,
+                    rid,
+                )
+                continue
+
+            delivered += batch_delivered
+
+            # Clear pending queue for this root strictly after verified acknowledgment
             pending_after = dict(self._publication_view.pending_outbox_by_root)
             pending_after.pop(rid, None)
             self._publication_view = TransactionPublicationView(
@@ -994,16 +1103,23 @@ class ExposureTransactionManager:
             else:
                 try:
                     self.readout_ledger.consume_outbox_batch(outbox_notifs)  # type: ignore[union-attr]
-                    # Delivery succeeded; remove from pending queue
-                    pending_after = dict(self._publication_view.pending_outbox_by_root)
-                    pending_after.pop(exposure_id, None)
-                    self._publication_view = TransactionPublicationView(
-                        W=self._publication_view.W,
-                        completed_roots=self._publication_view.completed_roots,
-                        pending_outbox_by_root=frozendict(pending_after),
-                        completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
-                        active_exposure_id=self._publication_view.active_exposure_id,
-                    )
+                    if _is_batch_acknowledged(self.readout_ledger, outbox_notifs):
+                        # Delivery succeeded and acknowledged; remove from pending queue
+                        pending_after = dict(self._publication_view.pending_outbox_by_root)
+                        pending_after.pop(exposure_id, None)
+                        self._publication_view = TransactionPublicationView(
+                            W=self._publication_view.W,
+                            completed_roots=self._publication_view.completed_roots,
+                            pending_outbox_by_root=frozendict(pending_after),
+                            completed_roots_high_watermark=self._publication_view.completed_roots_high_watermark,
+                            active_exposure_id=self._publication_view.active_exposure_id,
+                        )
+                    else:
+                        logger.warning(
+                            "Peripheral ledger %r did not acknowledge batch for root %d; dispatch retained in pending queue",
+                            self.readout_ledger,
+                            exposure_id,
+                        )
                 except Exception as exc:
                     # Root remains COMPLETED. W remains committed. Batch remains in pending view.
                     logger.warning(

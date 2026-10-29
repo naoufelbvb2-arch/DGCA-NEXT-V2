@@ -162,7 +162,7 @@ The following mutation attempts were tested against `published = tx.completed_ro
 ### 3.3 Correction S03 — Precise Publication Visibility Contract
 
 #### Visibility & Ownership Architecture
-The runtime concurrency model of DGCA v2 is cooperative and single-threaded under the Python Global Interpreter Lock (GIL).
+The runtime execution model assumes cooperative, serialized caller execution. Multiple OS threads must not invoke lifecycle operations or inspect state concurrently without external synchronization; Python's GIL alone does not provide multi-statement transactional atomicity across distinct object attributes.
 
 | Reader Type | Interface | Guarantee |
 | :--- | :--- | :--- |

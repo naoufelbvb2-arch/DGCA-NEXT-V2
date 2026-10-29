@@ -148,9 +148,13 @@ new_view = TransactionPublicationView(
     active_exposure_id=None,
 )
 
-# 2. ATOMIC PUBLICATION POINT (Single pointer swap)
+# 2. ATOMIC PUBLICATION POINT & VISIBILITY BOUNDARY (Core §10.2, C02-S03)
+# Unified readers reading tx.publication_view receive an indivisible snapshot across all components.
+# Direct readers accessing individual properties (tx.state.W, tx.open_journal) see sequential attribute updates.
+# Execution assumes cooperative, serialized caller execution without unsynchronized multithreading.
 self._publication_view = new_view
 self.state.W = new_view.W
+journal.status = ExposureStatus.COMPLETED
 self._protected_open_root_pairs.clear()
 self.open_journal = None
 

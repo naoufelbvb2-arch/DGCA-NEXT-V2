@@ -151,6 +151,14 @@ class SurfaceReadoutLedgerV1:
                 added += 1
         return added
 
+    def is_notification_acknowledged(self, notif: OutboxNotificationV1) -> bool:
+        """Return True if notification's idempotency key has been recorded into the ledger (Core §9.4, C02-S02)."""
+        return notif.idempotency_key in self._processed_outbox_keys
+
+    def is_batch_acknowledged(self, batch: Sequence[OutboxNotificationV1]) -> bool:
+        """Return True if every notification in the batch has been acknowledged by this ledger (Core §9.4, C02-S02)."""
+        return all(notif.idempotency_key in self._processed_outbox_keys for notif in batch)
+
     def get_candidate_rows(
         self, assembly_id: int, structural_generation: int
     ) -> tuple[LedgerCandidateRow, ...]:
