@@ -384,7 +384,7 @@ class TestPatch1FocusedEdgeCases:
         conflicting_core = dataclasses.replace(core0, modality=Region.VISION)
         with pytest.raises(ObservationError) as exc_info:
             tx.process_event(conflicting_core, peripheral_envelope=env0)
-        assert exc_info.value.code == StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT
+        assert exc_info.value.code in (StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT, StatusCode.INVALID_OBSERVATION)
 
     def test_non_default_salience_acceptance_and_rejection(self) -> None:
         """Verify non-default salience (e.g. 0.500000) derives matching digest and verifies properly."""
@@ -563,3 +563,239 @@ class TestPatch1FocusedEdgeCases:
                 preexisting_live_assemblies=[asm],
             )
         assert exc_info.value.code == StatusCode.PROVENANCE_DIGEST_MISMATCH
+
+
+# ---------------------------------------------------------------------------
+# Section R2-A01-P1-C01: Corrections C01, C02, and C03
+# ---------------------------------------------------------------------------
+
+class TestR2A01Patch1CorrectionsC01C02C03:
+    """Targeted boundary corrections specified in R2-A01-P1-C01."""
+
+    # --- Correction C01: Language Modality Validation ---
+
+    def test_c01_valid_language_modality_accepted(self) -> None:
+        """C01-1: Valid LANGUAGE event carrying language envelope is accepted."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core0, env0 = _make_lexical_pair("القط", root_id=1, event_order=0, modality=Region.LANGUAGE)
+        res = tx.process_event(core0, peripheral_envelope=env0)
+        assert res.event_order == 0
+        assert tx.open_journal.next_event_order == 1
+
+    def test_c01_fresh_vision_paired_with_language_envelope_rejected(self) -> None:
+        """C01-2: Fresh VISION event paired with a language envelope is rejected with INVALID_OBSERVATION."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core_vis, env_lang = _make_lexical_pair("القط", root_id=1, event_order=0, modality=Region.VISION)
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(core_vis, peripheral_envelope=env_lang)
+        assert exc_info.value.code == StatusCode.INVALID_OBSERVATION
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c01_fresh_audio_paired_with_language_envelope_rejected(self) -> None:
+        """C01-3: Fresh AUDIO event paired with a language envelope is rejected with INVALID_OBSERVATION."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core_aud, env_lang = _make_lexical_pair("القط", root_id=1, event_order=0, modality=Region.AUDIO)
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(core_aud, peripheral_envelope=env_lang)
+        assert exc_info.value.code == StatusCode.INVALID_OBSERVATION
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c01_retry_changing_language_to_vision_rejected(self) -> None:
+        """C01-4: Retry changing LANGUAGE to VISION is rejected."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core_lang, env_lang = _make_lexical_pair("القط", root_id=1, event_order=0, modality=Region.LANGUAGE)
+        tx.process_event(core_lang, peripheral_envelope=env_lang)
+        assert tx.open_journal.next_event_order == 1
+
+        # Retry with altered modality
+        core_vis = dataclasses.replace(core_lang, modality=Region.VISION)
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(core_vis, peripheral_envelope=env_lang)
+        assert exc_info.value.code in (StatusCode.INVALID_OBSERVATION, StatusCode.EVENT_RETRY_PAYLOAD_CONFLICT)
+        assert tx.open_journal.next_event_order == 1
+
+    def test_c01_all_rejected_cases_leave_state_unchanged(self) -> None:
+        """C01-5: All rejected modality cases leave W, R, H_slow, journal and peripheral ledger unchanged."""
+        from dgca.peripheral.readout_ledger import SurfaceReadoutLedgerV1
+        state = MachineState()
+        ledger = SurfaceReadoutLedgerV1()
+        tx = ExposureTransactionManager(state, readout_ledger=ledger)
+        tx.begin_exposure(1)
+
+        # Baseline snapshot before attempted rejection
+        w_clock_before = state.W.global_event_clock
+        w_committed_before = set(state.W.committed_cells)
+        w_synapses_before = len(state.W.synapses)
+        r_step_before = state.R.step_index
+        r_a_before = dict(state.R.A)
+        h_slow_g_before = dict(tx.open_journal.h_slow_event.g)
+        journal_results_len_before = len(tx.open_journal.event_results)
+        journal_next_order_before = tx.open_journal.next_event_order
+        ledger_rows_before = len(ledger._rows_by_asm_gen)
+        ledger_keys_before = len(ledger._processed_outbox_keys)
+
+        core_vis, env_lang = _make_lexical_pair("القط", root_id=1, event_order=0, modality=Region.VISION)
+        with pytest.raises(ObservationError):
+            tx.process_event(core_vis, peripheral_envelope=env_lang)
+
+        core_aud, env_lang = _make_lexical_pair("القط", root_id=1, event_order=0, modality=Region.AUDIO)
+        with pytest.raises(ObservationError):
+            tx.process_event(core_aud, peripheral_envelope=env_lang)
+
+        # Assert 100% state preservation across W, R, H_slow, journal, and ledger
+        assert state.W.global_event_clock == w_clock_before
+        assert set(state.W.committed_cells) == w_committed_before
+        assert len(state.W.synapses) == w_synapses_before
+        assert state.R.step_index == r_step_before
+        assert dict(state.R.A) == r_a_before
+        assert dict(tx.open_journal.h_slow_event.g) == h_slow_g_before
+        assert len(tx.open_journal.event_results) == journal_results_len_before
+        assert tx.open_journal.next_event_order == journal_next_order_before
+        assert len(ledger._rows_by_asm_gen) == ledger_rows_before
+        assert len(ledger._processed_outbox_keys) == ledger_keys_before
+
+    # --- Correction C02: Headless EOS Structural Boundary ---
+
+    def test_c02_headless_canonical_eos_at_order_zero_rejected(self) -> None:
+        """C02: Canonical EOS event 0 with allow_headless_events=True, envelope=None is rejected with EMPTY_LEXICAL_EXPOSURE."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state, allow_headless_events=True)
+        tx.begin_exposure(1)
+
+        core_eos, _ = _make_canonical_eos_pair(root_id=1, event_order=0)
+
+        w_clock_before = state.W.global_event_clock
+        journal_len_before = len(tx.open_journal.event_results)
+
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(core_eos, peripheral_envelope=None)
+        assert exc_info.value.code == StatusCode.EMPTY_LEXICAL_EXPOSURE
+
+        # Zero state mutations
+        assert state.W.global_event_clock == w_clock_before
+        assert len(tx.open_journal.event_results) == journal_len_before
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c02_headless_legal_canonical_eos_at_valid_later_order_accepted(self) -> None:
+        """C02: Headless canonical EOS event at event_order > 0 is accepted without peripheral attestations."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state, allow_headless_events=True)
+        tx.begin_exposure(1)
+
+        core0, _ = _make_lexical_pair("القط", root_id=1, event_order=0)
+        tx.process_event(core0, peripheral_envelope=None)
+
+        core_eos, _ = _make_canonical_eos_pair(root_id=1, event_order=1)
+        res = tx.process_event(core_eos, peripheral_envelope=None)
+        assert res.event_order == 1
+        assert tx.open_journal.next_event_order == 2
+        # Headless events must produce zero peripheral attestations
+        assert len(tx.open_journal.peripheral_envelopes_by_order) == 0
+
+    # --- Correction C03: Event Order Validation ---
+
+    def test_c03_negative_event_order_rejected(self) -> None:
+        """C03-1: event_order=-1 is rejected deterministically with INVALID_OBSERVATION without state mutation."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core0, env0 = _make_lexical_pair("القط", root_id=1, event_order=0)
+        malformed_core = dataclasses.replace(core0, event_order=-1)
+
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(malformed_core, peripheral_envelope=env0)
+        assert exc_info.value.code == StatusCode.INVALID_OBSERVATION
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c03_boolean_event_order_rejected(self) -> None:
+        """C03-2: event_order=True is rejected as invalid non-integer with INVALID_OBSERVATION."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core0, env0 = _make_lexical_pair("القط", root_id=1, event_order=0)
+        # Note: In Python, True is an instance of int; must be explicitly rejected
+        malformed_core = dataclasses.replace(core0, event_order=True)  # type: ignore[arg-type]
+
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(malformed_core, peripheral_envelope=env0)
+        assert exc_info.value.code == StatusCode.INVALID_OBSERVATION
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c03_float_event_order_rejected(self) -> None:
+        """C03-3: event_order=1.5 is rejected as invalid non-integer with INVALID_OBSERVATION."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core0, env0 = _make_lexical_pair("القط", root_id=1, event_order=0)
+        malformed_core = dataclasses.replace(core0, event_order=1.5)  # type: ignore[arg-type]
+
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(malformed_core, peripheral_envelope=env0)
+        assert exc_info.value.code == StatusCode.INVALID_OBSERVATION
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c03_out_of_order_positive_event_rejected(self) -> None:
+        """C03-4: Out-of-order positive event (e.g. event_order=2 when next=0) is rejected."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core2, env2 = _make_lexical_pair("القط", root_id=1, event_order=2)
+        with pytest.raises(ObservationError) as exc_info:
+            tx.process_event(core2, peripheral_envelope=env2)
+        assert exc_info.value.code == StatusCode.INVALID_OBSERVATION
+        assert tx.open_journal.next_event_order == 0
+
+    def test_c03_correct_contiguous_order_accepted(self) -> None:
+        """C03-5: Events with correct contiguous order (0 then 1) are accepted."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core0, env0 = _make_lexical_pair("القط", root_id=1, event_order=0)
+        core1, env1 = _make_lexical_pair("يشرب", root_id=1, event_order=1, boundary=False)
+
+        res0 = tx.process_event(core0, peripheral_envelope=env0)
+        assert res0.event_order == 0
+        assert tx.open_journal.next_event_order == 1
+
+        res1 = tx.process_event(core1, peripheral_envelope=env1)
+        assert res1.event_order == 1
+        assert tx.open_journal.next_event_order == 2
+
+    def test_c03_exact_retry_of_valid_previous_event_accepted(self) -> None:
+        """C03-6: Exact retry of an accepted previous event returns cached result without mutation."""
+        state = MachineState()
+        tx = ExposureTransactionManager(state)
+        tx.begin_exposure(1)
+
+        core0, env0 = _make_lexical_pair("القط", root_id=1, event_order=0)
+        core1, env1 = _make_lexical_pair("يشرب", root_id=1, event_order=1, boundary=False)
+
+        res0_orig = tx.process_event(core0, peripheral_envelope=env0)
+        res1_orig = tx.process_event(core1, peripheral_envelope=env1)
+
+        # Retry event 0
+        res0_retry = tx.process_event(core0, peripheral_envelope=env0)
+        assert res0_retry is res0_orig
+        assert tx.open_journal.next_event_order == 2
+
+        # Retry event 1
+        res1_retry = tx.process_event(core1, peripheral_envelope=env1)
+        assert res1_retry is res1_orig
+        assert tx.open_journal.next_event_order == 2

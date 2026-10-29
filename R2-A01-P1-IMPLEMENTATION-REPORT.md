@@ -30,14 +30,14 @@ In strict compliance with authorization constraints:
 ## 2. Implemented Code Changes
 
 ### 2.1 Error Hierarchy Extensions (`src/dgca/common/errors.py`)
-Added authoritative status codes for surface provenance and event identity validation:
-- `PROVENANCE_DIGEST_MISMATCH = 1010` — Raised when feature bundle digests do not match across envelope, core payload, or reconstructed surface features.
-- `PROVENANCE_MARKER_MISMATCH = 1011` — Raised when envelope marker does not match payload boundary/type semantics or contains illegal control characters.
-- `PROVENANCE_FEATURE_COPY_MISMATCH = 1012` — Raised when feature copies in envelope or core payload diverge from canonical features derived from raw surface.
-- `PROVENANCE_ENVELOPE_MISSING = 1013` — Raised when a language event lacks an envelope under strict provenance (`allow_headless_events=False`).
-- `INVALID_SURFACE_HASH = 1014` — Raised when `surface_sha256` does not match the actual SHA-256 of the UTF-8 raw surface bytes.
-- `EVENT_RETRY_PAYLOAD_CONFLICT = 1015` — Raised when an event is retried with an altered core payload.
-- `EVENT_RETRY_PROVENANCE_ALTERATION = 1016` — Raised when an event retry attempts to alter the peripheral provenance channel (e.g., retrying headless vs envelope-backed).
+Added authoritative status codes (as `StrEnum` members with string values matching their names) for surface provenance and event identity validation:
+- `PROVENANCE_DIGEST_MISMATCH = "PROVENANCE_DIGEST_MISMATCH"` — Raised when feature bundle digests do not match across envelope, core payload, or reconstructed surface features.
+- `PROVENANCE_MARKER_MISMATCH = "PROVENANCE_MARKER_MISMATCH"` — Raised when envelope marker does not match payload boundary/type semantics or contains illegal control characters.
+- `PROVENANCE_FEATURE_COPY_MISMATCH = "PROVENANCE_FEATURE_COPY_MISMATCH"` — Raised when feature copies in envelope or core payload diverge from canonical features derived from raw surface.
+- `PROVENANCE_ENVELOPE_MISSING = "PROVENANCE_ENVELOPE_MISSING"` — Raised when a language event lacks an envelope under strict provenance (`allow_headless_events=False`).
+- `INVALID_SURFACE_HASH = "INVALID_SURFACE_HASH"` — Raised when `surface_sha256` does not match the actual SHA-256 of the UTF-8 raw surface bytes.
+- `EVENT_RETRY_PAYLOAD_CONFLICT = "EVENT_RETRY_PAYLOAD_CONFLICT"` — Raised when an event is retried with an altered core payload.
+- `EVENT_RETRY_PROVENANCE_ALTERATION = "EVENT_RETRY_PROVENANCE_ALTERATION"` — Raised when an event retry attempts to alter the peripheral provenance channel (e.g., retrying headless vs envelope-backed).
 
 ### 2.2 Neural Event Dynamics (`src/dgca/core/dynamics.py`)
 - Extended `EventExecutionResult` with `feature_bundle_digest: bytes = b""`.
@@ -92,9 +92,9 @@ Added authoritative status codes for surface provenance and event identity valid
 | Test Suite | Tests Run | Passed | Failed | Duration | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | Baseline Core & Phase 2–7 Suite | 76 | 76 | 0 | 17.5s | PASS |
-| Forensic Regression Suite (`test_f01_cold_start_and_persistence.py`) | 4 | 4 | 0 | 39.1s | PASS |
-| Patch 1 Acceptance Suite (`test_r2_a01_patch1_acceptance.py`) | 23 | 23 | 0 | 1.3s | PASS |
-| **Total Full Test Suite** | **103** | **103** | **0** | **56.6s** | **100% PASS** |
+| Forensic Regression Suite (`test_f01_cold_start_and_persistence.py`) | 4 | 4 | 0 | 12.2s | PASS |
+| Patch 1 Acceptance Suite (`test_r2_a01_patch1_acceptance.py`) | 36 | 36 | 0 | 0.4s | PASS |
+| **Total Full Test Suite** | **116** | **116** | **0** | **30.1s** | **100% PASS** |
 
 ---
 
@@ -113,4 +113,4 @@ Added authoritative status codes for surface provenance and event identity valid
 
 ## 5. Review Gate Status
 
-**Status:** `R2-A01-P1 IMPLEMENTED — AWAITING INDEPENDENT REVIEW`
+**Status:** `R2-A01-P1-C01 CORRECTED — AWAITING FINAL ACCEPTANCE`

@@ -125,7 +125,24 @@ def validate_event_envelope_provenance(
     allow_headless_events: bool = False,
 ) -> None:
     """Validate mechanical provenance between raw surface envelope and Core neural event (R2-A01 Patch 1)."""
-    # 1. Headless check
+    # 1. Structural neural event precheck (independent of peripheral envelope - Correction C02)
+    is_canonical_eos_features = (
+        core_event.features == EOS_CANONICAL_FEATURES
+        or any(feat[0].startswith("\x1fEOS") for feat in core_event.features)
+    )
+    if is_canonical_eos_features:
+        if core_event.event_order == 0:
+            raise ObservationError(
+                "Canonical EOS event cannot be event_order 0 alone (empty exposure)",
+                code=StatusCode.EMPTY_LEXICAL_EXPOSURE,
+            )
+        if core_event.boundary:
+            raise ObservationError(
+                "Canonical EOS event cannot have boundary=True",
+                code=StatusCode.PROVENANCE_MARKER_MISMATCH,
+            )
+
+    # 2. Headless check
     if envelope is None:
         if not allow_headless_events:
             raise ObservationError(
@@ -134,7 +151,14 @@ def validate_event_envelope_provenance(
             )
         return
 
-    # 2. Raw surface string type, UTF-8 validity, NFC normalization, and SHA-256 integrity
+    # 3. Modality validation for language peripheral envelope (Correction C01)
+    if core_event.modality != Region.LANGUAGE:
+        raise ObservationError(
+            f"Language peripheral envelope requires Region.LANGUAGE, got {core_event.modality}",
+            code=StatusCode.INVALID_OBSERVATION,
+        )
+
+    # 4. Raw surface string type, UTF-8 validity, NFC normalization, and SHA-256 integrity
     if not isinstance(envelope.raw_surface_nfc_utf8, str):
         raise ObservationError(
             f"Envelope raw_surface_nfc_utf8 must be str, got {type(envelope.raw_surface_nfc_utf8).__name__}",
@@ -462,6 +486,24 @@ class ExposureTransactionManager:
         if self.open_journal is None:
             raise ObservationError("Cannot process EVENT when no exposure is OPEN")
         journal = self.open_journal
+
+        # Validate event order (Correction C03)
+        order = core_event.event_order
+        if isinstance(order, bool) or not isinstance(order, int):
+            raise ObservationError(
+                f"event_order must be a genuine int, got {type(order).__name__} ({order!r})",
+                code=StatusCode.INVALID_OBSERVATION,
+            )
+        if order < 0:
+            raise ObservationError(
+                f"event_order must be non-negative, got {order}",
+                code=StatusCode.INVALID_OBSERVATION,
+            )
+        if order > journal.next_event_order:
+            raise ObservationError(
+                f"Out-of-order event_order {order}; expected {journal.next_event_order}",
+                code=StatusCode.INVALID_OBSERVATION,
+            )
 
         if core_event.exposure_id is not None and core_event.exposure_id != journal.exposure_id:
             raise ObservationError(

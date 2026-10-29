@@ -94,13 +94,14 @@ def test_f01_task5_strengthened_cold_start_learning_from_zero() -> None:
 
 
 def test_f01_task6_reencoded_eos_discrepancy_and_outbox_bypass() -> None:
-    """Task 1 / Task 6 Discrepancy: Re-encoding raw '<EOS>' alters features/digest; outbox check bypassed.
+    """Task 1 / Task 6 Discrepancy Verification & Patch 1 Elimination.
 
     Investigates Section 1:
-    - Original canonical EOS features vs re-encoded lexical features.
-    - Original digest vs re-encoded digest (equality == False).
-    - Outbox bypass due to EventExecutionResult lacking feature_bundle_digest.
-    - Resolution produces Marker.EOS envelope despite lexical cell recruitment.
+    - Original canonical EOS features vs re-encoded lexical features (features & digest diverge).
+    - Historical vulnerability: re-encoded lexical token previously bypassed outbox checks.
+    - Patch 1 resolution: passing re-encoded lexical token with Marker.EOS envelope is now
+      strictly trapped and rejected during process_event with PROVENANCE_FEATURE_COPY_MISMATCH.
+    - EventExecutionResult now carries feature_bundle_digest, preventing unverified bypass.
     """
     branch_ab = encode_exposure("القط يشرب حليب", append_eos=True)
     eos_env = branch_ab[-1]
