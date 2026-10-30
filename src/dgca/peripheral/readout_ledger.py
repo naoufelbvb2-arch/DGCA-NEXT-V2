@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 
 from dgca.common.errors import StatusCode
 from dgca.encoder.envelope import Marker, PeripheralSurfaceEnvelopeV1
-from dgca.peripheral.outbox import OutboxNotificationV1
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from dgca.peripheral.outbox import OutboxNotificationV1
 
 # Normative attestation threshold across distinct completed external roots (Core §9.4, LG-T09)
 MIN_ATTESTED_EXTERNAL_ROOTS: int = 2
@@ -99,17 +101,19 @@ class SurfaceReadoutLedgerV1:
     def consume_outbox_notification(self, notif: OutboxNotificationV1) -> bool:
         """Idempotently consume an END_EXPOSURE outbox notification (Core §9.4, LG-T16).
 
+        Guarantees the invariant:
+            Acknowledged(n) => EvidenceRecorded(n)
+
         Returns True if the notification contributed a new root observation to the candidate row,
         or False if it was a duplicate notification / duplicate root for the same candidate row.
         """
         idem_key = notif.idempotency_key
-        if idem_key in self._processed_outbox_keys:
+
+        # If already fully acknowledged with complete evidence, return False idempotently
+        if self.is_notification_acknowledged(notif):
             return False
-        self._processed_outbox_keys.add(idem_key)
 
         asm_key = (notif.assembly_id, notif.structural_generation)
-        row_map = self._rows_by_asm_gen.setdefault(asm_key, {})
-
         t_key = (
             notif.envelope.surface_utf8_nfc,
             notif.marker,
@@ -121,27 +125,70 @@ class SurfaceReadoutLedgerV1:
             notif.envelope.surface_utf8_nfc,
             notif.marker,
         )
-        self._bundles_by_surface.setdefault(surf_key, set()).add(notif.feature_bundle_digest)
 
-        row = row_map.get(t_key)
-        if row is None:
-            row = LedgerCandidateRow(
-                assembly_id=notif.assembly_id,
-                structural_generation=notif.structural_generation,
-                surface_utf8_nfc=notif.envelope.surface_utf8_nfc,
-                marker=notif.marker,
-                surface_sha256=notif.surface_sha256,
-                feature_bundle_digest=notif.feature_bundle_digest,
-                envelope=notif.envelope,
-                confirmed_roots={notif.root_id},
-            )
-            row_map[t_key] = row
-            return True
+        # Snapshot pre-state for atomic rollback on failure
+        row_map = self._rows_by_asm_gen.get(asm_key)
+        existed_row_map = row_map is not None
+        existing_row = row_map.get(t_key) if existed_row_map else None
 
-        if notif.root_id in row.confirmed_roots:
-            return False
-        row.confirmed_roots.add(notif.root_id)
-        return True
+        bundles = self._bundles_by_surface.get(surf_key)
+        existed_bundles = bundles is not None
+        had_bundle_digest = existed_bundles and (notif.feature_bundle_digest in bundles)
+        had_confirmed_root = existing_row is not None and (notif.root_id in existing_row.confirmed_roots)
+
+        try:
+            # 1. Update surface bundles mapping
+            if not existed_bundles:
+                bundles = set()
+                self._bundles_by_surface[surf_key] = bundles
+            bundles.add(notif.feature_bundle_digest)
+
+            # 2. Update candidate row and confirmed root
+            if not existed_row_map:
+                row_map = {}
+                self._rows_by_asm_gen[asm_key] = row_map
+
+            added_new_observation = False
+            if existing_row is None:
+                new_row = LedgerCandidateRow(
+                    assembly_id=notif.assembly_id,
+                    structural_generation=notif.structural_generation,
+                    surface_utf8_nfc=notif.envelope.surface_utf8_nfc,
+                    marker=notif.marker,
+                    surface_sha256=notif.surface_sha256,
+                    feature_bundle_digest=notif.feature_bundle_digest,
+                    envelope=notif.envelope,
+                    confirmed_roots={notif.root_id},
+                )
+                row_map[t_key] = new_row
+                added_new_observation = True
+            elif not had_confirmed_root:
+                existing_row.confirmed_roots.add(notif.root_id)
+                added_new_observation = True
+            else:
+                added_new_observation = False
+
+            # 3. Finalize acknowledgment: ONLY after all evidence is fully recorded
+            self._processed_outbox_keys.add(idem_key)
+            return added_new_observation
+
+        except Exception:
+            # Atomic rollback of all partial mutations
+            self._processed_outbox_keys.discard(idem_key)
+
+            if not existed_bundles:
+                self._bundles_by_surface.pop(surf_key, None)
+            elif not had_bundle_digest and bundles is not None:
+                bundles.discard(notif.feature_bundle_digest)
+
+            if not existed_row_map:
+                self._rows_by_asm_gen.pop(asm_key, None)
+            elif existing_row is None and row_map is not None:
+                row_map.pop(t_key, None)
+            elif existing_row is not None and not had_confirmed_root:
+                existing_row.confirmed_roots.discard(notif.root_id)
+
+            raise
 
     def consume_outbox_batch(self, notifications: Sequence[OutboxNotificationV1]) -> int:
         """Consume a batch of outbox notifications and return the count of newly recorded root observations."""
@@ -152,12 +199,39 @@ class SurfaceReadoutLedgerV1:
         return added
 
     def is_notification_acknowledged(self, notif: OutboxNotificationV1) -> bool:
-        """Return True if notification's idempotency key has been recorded into the ledger (Core §9.4, C02-S02)."""
-        return notif.idempotency_key in self._processed_outbox_keys
+        """Return True if notification's evidence and idempotency key are completely recorded (Core §9.4, C03-S01, C03-S03)."""
+        if notif.idempotency_key not in self._processed_outbox_keys:
+            return False
+
+        asm_key = (notif.assembly_id, notif.structural_generation)
+        row_map = self._rows_by_asm_gen.get(asm_key)
+        if not row_map:
+            return False
+
+        t_key = (
+            notif.envelope.surface_utf8_nfc,
+            notif.marker,
+            notif.feature_bundle_digest,
+        )
+        row = row_map.get(t_key)
+        if row is None or notif.root_id not in row.confirmed_roots:
+            return False
+
+        surf_key = (
+            notif.assembly_id,
+            notif.structural_generation,
+            notif.envelope.surface_utf8_nfc,
+            notif.marker,
+        )
+        bundles = self._bundles_by_surface.get(surf_key)
+        if not bundles or notif.feature_bundle_digest not in bundles:
+            return False
+
+        return True
 
     def is_batch_acknowledged(self, batch: Sequence[OutboxNotificationV1]) -> bool:
-        """Return True if every notification in the batch has been acknowledged by this ledger (Core §9.4, C02-S02)."""
-        return all(notif.idempotency_key in self._processed_outbox_keys for notif in batch)
+        """Return True if every notification in the batch has verified evidence and acknowledgment (Core §9.4, C03-S01)."""
+        return all(self.is_notification_acknowledged(notif) for notif in batch)
 
     def get_candidate_rows(
         self, assembly_id: int, structural_generation: int

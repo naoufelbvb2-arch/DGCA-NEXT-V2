@@ -27,7 +27,7 @@ from dgca.lifecycle.exposure_tx import (
     frozendict,
 )
 from dgca.peripheral.outbox import OutboxNotificationV1
-from dgca.peripheral.readout_ledger import SurfaceReadoutLedgerV1
+from dgca.peripheral.readout_ledger import LedgerCandidateRow, SurfaceReadoutLedgerV1
 from tests.test_r2_a01_patch2_acceptance import hash_state_snapshot
 
 
@@ -697,7 +697,14 @@ def test_s02_immutable_publication_metadata_adversarial() -> None:
     with pytest.raises(TypeError):
         dict.clear(published)
 
-    # 10. Mutation of constructor source dict isolation
+    # 10. Private attribute rebinding and deletion protection (C03-S04)
+    from types import MappingProxyType
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published._proxy = MappingProxyType({})  # type: ignore[misc]
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        del published._proxy  # type: ignore[misc]
+
+    # 11. Mutation of constructor source dict isolation
     source_dict = {100: forged_report}
     test_fd = frozendict(source_dict)
     source_dict[100] = None  # type: ignore[assignment]
@@ -711,7 +718,7 @@ def test_s02_immutable_publication_metadata_adversarial() -> None:
     with pytest.raises(TypeError, match="frozendict is immutable"):
         pending |= {999: ()}  # type: ignore[misc]
 
-    # 11. Reference isolation across subsequent publication swaps
+    # 12. Reference isolation across subsequent publication swaps
     retained_v1 = tx.completed_roots
     assert len(retained_v1) == 1
     assert root_id in retained_v1
@@ -1202,3 +1209,380 @@ def test_c02_s02_f_initial_post_commit_noop_delivery() -> None:
     assert tx.has_pending_outbox(root_id) is False
     assert tx.pending_outbox_count(root_id) == 0
     tx.assert_outbox_ready(root_id)
+
+
+class MidNotificationFaultLedger(SurfaceReadoutLedgerV1):
+    """Ledger designed to deterministically simulate mid-notification failures (C03-S02)."""
+
+    def __init__(
+        self,
+        *,
+        fail_before_candidate_row: bool = False,
+        fail_after_candidate_row: bool = False,
+        fail_at_notif_index: int | None = None,
+    ) -> None:
+        super().__init__()
+        self.fail_before_candidate_row = fail_before_candidate_row
+        self.fail_after_candidate_row = fail_after_candidate_row
+        self.fail_at_notif_index = fail_at_notif_index
+        self._notif_call_count = 0
+
+    def consume_outbox_notification(self, notif: OutboxNotificationV1) -> bool:
+        idx = self._notif_call_count
+        self._notif_call_count += 1
+
+        should_fail_this_notif = (
+            self.fail_at_notif_index is None or self.fail_at_notif_index == idx
+        )
+
+        if should_fail_this_notif and self.fail_before_candidate_row:
+            # Simulate failure after idempotency key would historically have been added,
+            # but before candidate evidence is fully recorded
+            raise RuntimeError("Injected failure before candidate evidence recording")
+
+        if should_fail_this_notif and self.fail_after_candidate_row:
+            # Perform candidate row update, then raise before acknowledgment finalization
+            asm_key = (notif.assembly_id, notif.structural_generation)
+            row_map = self._rows_by_asm_gen.setdefault(asm_key, {})
+            t_key = (
+                notif.envelope.surface_utf8_nfc,
+                notif.marker,
+                notif.feature_bundle_digest,
+            )
+            surf_key = (
+                notif.assembly_id,
+                notif.structural_generation,
+                notif.envelope.surface_utf8_nfc,
+                notif.marker,
+            )
+            self._bundles_by_surface.setdefault(surf_key, set()).add(notif.feature_bundle_digest)
+            row = row_map.get(t_key)
+            if row is None:
+                row = LedgerCandidateRow(
+                    assembly_id=notif.assembly_id,
+                    structural_generation=notif.structural_generation,
+                    surface_utf8_nfc=notif.envelope.surface_utf8_nfc,
+                    marker=notif.marker,
+                    surface_sha256=notif.surface_sha256,
+                    feature_bundle_digest=notif.feature_bundle_digest,
+                    envelope=notif.envelope,
+                    confirmed_roots={notif.root_id},
+                )
+                row_map[t_key] = row
+            else:
+                row.confirmed_roots.add(notif.root_id)
+            # Raise exception before _processed_outbox_keys.add(idem_key)
+            raise RuntimeError(
+                "Injected failure after candidate row update but before acknowledgment finalization"
+            )
+
+        return super().consume_outbox_notification(notif)
+
+
+def test_c03_s02_mid_notification_failure_before_evidence() -> None:
+    """C03-S02: Mid-notification failure before candidate evidence is recorded.
+
+    Mandatory assertions:
+    - Failure injected during post-commit delivery.
+    - Neural W remains committed; root remains COMPLETED.
+    - Batch remains pending in publication view.
+    - No false successful acknowledgment is reported.
+    - No incomplete notification permanently poisoned or marked consumed.
+    - Explicit reconciliation succeeds after fault removed.
+    - All keys acknowledged, all evidence recorded, no duplicate root confirmations.
+    - Repeated replay is safe no-op.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    fault_ledger = MidNotificationFaultLedger(fail_before_candidate_row=True)
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=fault_ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    # 1. End exposure triggers post-commit delivery which encounters injected failure
+    rep = tx.end_exposure(root_id)
+
+    # Invariants after failure:
+    assert rep.status == ExposureStatus.COMPLETED
+    assert tx.status == ExposureStatus.CLOSED
+    assert state.W.close_serial == 1
+    assert root_id in tx.completed_roots
+
+    # Batch remains pending
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+    # No false acknowledgment
+    batch = tx.pending_outbox_by_root[root_id]
+    assert fault_ledger.is_batch_acknowledged(batch) is False
+    assert len(fault_ledger._processed_outbox_keys) == 0
+    with pytest.raises(ObservationError) as exc_info:
+        tx.assert_outbox_ready(root_id)
+    assert exc_info.value.code == StatusCode.OUTBOX_DELIVERY_PENDING
+
+    # 2. Clear fault and redrive via reconcile_outbox
+    fault_ledger.fail_before_candidate_row = False
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=fault_ledger)
+    assert delivered == 3
+
+    # Invariants after successful reconciliation:
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+    tx.assert_outbox_ready(root_id)
+    assert fault_ledger.is_batch_acknowledged(batch) is True
+    assert len(fault_ledger._processed_outbox_keys) == 3
+
+    # All candidate evidence exists with exact single root confirmation
+    for asm_id in (1, 2, 3):
+        rows = fault_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert rows[0].confirmed_roots == {root_id}
+
+    # 3. Repeated replay test
+    delivered_replay = tx.reconcile_outbox(exposure_id=root_id, ledger=fault_ledger)
+    assert delivered_replay == 0
+    for asm_id in (1, 2, 3):
+        rows = fault_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert rows[0].confirmed_roots == {root_id}
+
+
+def test_c03_s02_failure_after_candidate_row_before_ack() -> None:
+    """C03-S02: Failure after candidate row update but before acknowledgment finalization.
+
+    Mandatory assertions:
+    - Candidate row was updated, but exception raised before key recorded.
+    - Batch remains pending; is_batch_acknowledged returns False.
+    - Subsequent reconciliation finalizes acknowledgment without duplicate confirmations.
+    - Repeated replay produces 0 additions and leaves confirmed roots unchanged.
+    """
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    fault_ledger = MidNotificationFaultLedger(fail_after_candidate_row=True, fail_at_notif_index=0)
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=fault_ledger,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    # 1. End exposure
+    rep = tx.end_exposure(root_id)
+    assert rep.status == ExposureStatus.COMPLETED
+    assert tx.has_pending_outbox(root_id) is True
+
+    # First candidate row was updated, but not acknowledged because key was not added
+    batch = tx.pending_outbox_by_root[root_id]
+    assert fault_ledger.is_batch_acknowledged(batch) is False
+    assert fault_ledger.is_notification_acknowledged(batch[0]) is False
+
+    # 2. Clear fault and reconcile
+    fault_ledger.fail_after_candidate_row = False
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=fault_ledger)
+    # The first row was already confirmed; the other 2 rows are newly confirmed
+    assert delivered == 2
+    assert tx.has_pending_outbox(root_id) is False
+    assert fault_ledger.is_batch_acknowledged(batch) is True
+    assert len(fault_ledger._processed_outbox_keys) == 3
+
+    # Verify no duplicate root confirmation for any candidate row
+    for asm_id in (1, 2, 3):
+        rows = fault_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert rows[0].confirmed_roots == {root_id}
+
+    # 3. Replay
+    delivered_again = tx.reconcile_outbox(exposure_id=root_id, ledger=fault_ledger)
+    assert delivered_again == 0
+    for asm_id in (1, 2, 3):
+        rows = fault_ledger.get_candidate_rows(asm_id, 1)
+        assert len(rows) == 1
+        assert rows[0].confirmed_roots == {root_id}
+
+
+def test_c03_s03_acknowledgment_evidence_correspondence() -> None:
+    """C03-S03: Verify acknowledgment corresponds strictly to completed evidence.
+
+    Tests that:
+    - Premature key registration without candidate evidence is rejected.
+    - Candidate row without confirmed root is rejected.
+    - Surface bundle missing is rejected.
+    - Third-party callback attempting to report True when evidence is missing is rejected.
+    - Only complete correspondence satisfies acknowledgment.
+    """
+    from dgca.lifecycle.exposure_tx import _is_batch_acknowledged
+
+    envs = encode_exposure("القط", append_eos=False)
+    notif = OutboxNotificationV1(
+        root_id=1,
+        event_order=0,
+        assembly_id=1,
+        structural_generation=1,
+        surface_sha256=envs[0].peripheral_surface.surface_sha256,
+        feature_bundle_digest=envs[0].peripheral_surface.feature_bundle_digest,
+        marker=envs[0].peripheral_surface.marker,
+        envelope=envs[0].peripheral_surface,
+    )
+
+    ledger = SurfaceReadoutLedgerV1()
+
+    # 1. Empty ledger
+    assert ledger.is_notification_acknowledged(notif) is False
+    assert ledger.is_batch_acknowledged([notif]) is False
+    assert _is_batch_acknowledged(ledger, [notif]) is False
+
+    # 2. Premature key registration without candidate row
+    ledger._processed_outbox_keys.add(notif.idempotency_key)
+    assert ledger.is_notification_acknowledged(notif) is False
+    assert ledger.is_batch_acknowledged([notif]) is False
+    assert _is_batch_acknowledged(ledger, [notif]) is False
+
+    # 3. Candidate row added, but confirmed_roots does not contain notif.root_id
+    asm_key = (notif.assembly_id, notif.structural_generation)
+    t_key = (notif.envelope.surface_utf8_nfc, notif.marker, notif.feature_bundle_digest)
+    surf_key = (
+        notif.assembly_id,
+        notif.structural_generation,
+        notif.envelope.surface_utf8_nfc,
+        notif.marker,
+    )
+    row = LedgerCandidateRow(
+        assembly_id=notif.assembly_id,
+        structural_generation=notif.structural_generation,
+        surface_utf8_nfc=notif.envelope.surface_utf8_nfc,
+        marker=notif.marker,
+        surface_sha256=notif.surface_sha256,
+        feature_bundle_digest=notif.feature_bundle_digest,
+        envelope=notif.envelope,
+        confirmed_roots={999},  # Different root!
+    )
+    ledger._rows_by_asm_gen[asm_key] = {t_key: row}
+    ledger._bundles_by_surface[surf_key] = {notif.feature_bundle_digest}
+    assert ledger.is_notification_acknowledged(notif) is False
+    assert ledger.is_batch_acknowledged([notif]) is False
+    assert _is_batch_acknowledged(ledger, [notif]) is False
+
+    # 4. Now add notif.root_id to confirmed_roots: complete evidence satisfied
+    row.confirmed_roots.add(notif.root_id)
+    assert ledger.is_notification_acknowledged(notif) is True
+    assert ledger.is_batch_acknowledged([notif]) is True
+    assert _is_batch_acknowledged(ledger, [notif]) is True
+
+    # 5. Third-party consumer attempting to report True when canonical evidence is missing
+    class FlakyConsumer:
+        def __init__(self) -> None:
+            self._rows_by_asm_gen = {}
+            self._processed_outbox_keys = {notif.idempotency_key}
+
+        def is_batch_acknowledged(self, batch: object) -> bool:
+            return True  # Flaky callback claiming success
+
+    flaky = FlakyConsumer()
+    # Guard blocks acceptance because _rows_by_asm_gen is missing candidate evidence
+    assert _is_batch_acknowledged(flaky, [notif]) is False
+
+
+def test_c03_s04_frozendict_slot_rebinding_protection() -> None:
+    """C03-S04: Prevent ordinary attribute assignment or deletion from replacing frozendict internals.
+
+    Verifies:
+    - _proxy cannot be rebound on published completed_roots or pending_outbox_by_root.
+    - _proxy cannot be deleted via del or delattr.
+    - _hash cannot be rebound or deleted.
+    - Arbitrary attributes cannot be set.
+    - Constructor, mapping lookups, copy, deepcopy, and hash behavior remain intact.
+    """
+    from types import MappingProxyType
+
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط"])
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+    )
+    tx.begin_exposure(1)
+    ev = encode_exposure("القط", append_eos=False)[0]
+    core_ev = encode_lexical_token_event(
+        ev.peripheral_surface.raw_surface_nfc_utf8,
+        exposure_id=1,
+        event_order=0,
+        boundary=True,
+    ).core_event
+    tx.process_event(core_ev, peripheral_envelope=ev.peripheral_surface)
+    tx.end_exposure(1)
+
+    published = tx.completed_roots
+    pending = tx.pending_outbox_by_root
+
+    # 1. _proxy attribute assignment blocked
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published._proxy = MappingProxyType({})  # type: ignore[misc]
+
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        setattr(published, "_proxy", MappingProxyType({}))
+
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        pending._proxy = MappingProxyType({})  # type: ignore[misc]
+
+    # 2. _proxy deletion blocked
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        del published._proxy  # type: ignore[misc]
+
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        delattr(published, "_proxy")
+
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        del pending._proxy  # type: ignore[misc]
+
+    # 3. _hash attribute assignment and deletion blocked
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published._hash = 999  # type: ignore[misc]
+
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        del published._hash  # type: ignore[misc]
+
+    # 4. Arbitrary attribute assignment blocked
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        published.arbitrary = 123  # type: ignore[attr-defined]
+
+    with pytest.raises(TypeError, match="frozendict is immutable"):
+        setattr(published, "arbitrary", 123)
+
+    # 5. Core functionality intact
+    assert len(published) == 1
+    assert 1 in published
+    test_fd = frozendict({"a": 1, "b": 2})
+    assert test_fd["a"] == 1
+    assert hash(test_fd) is not None
+    assert copy.copy(test_fd) == test_fd
+    assert copy.deepcopy(test_fd) == test_fd

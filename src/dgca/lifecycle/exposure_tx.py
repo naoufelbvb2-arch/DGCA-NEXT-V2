@@ -32,16 +32,45 @@ def _is_valid_outbox_consumer(consumer: object) -> bool:
 
 
 def _is_batch_acknowledged(consumer: object, batch: Sequence[object]) -> bool:
-    """Verify that consumer has acknowledged and accounted for every notification in the batch (Core §9.4, C02-S02).
+    """Verify that consumer has acknowledged and accounted for every notification in the batch (Core §9.4, C02-S02, C03-S03).
 
-    Requirements:
-    1. Every notification in the batch must be accounted for.
-    2. A genuinely new delivery must be recognized.
-    3. An already-consumed duplicate must be recognized as successfully accounted for.
-    4. A callable no-op consumer returning without recording must not be recognized as acknowledged.
+    Trust Boundary:
+    1. Canonical Ledger Contract: When the consumer possesses canonical ledger structures
+       (`_rows_by_asm_gen` and `_processed_outbox_keys`), acknowledgment requires BOTH
+       idempotency key recording AND completed candidate evidence with root confirmation.
+       Arbitrary consumer callbacks or premature key sets cannot weaken these canonical
+       acceptance requirements.
+    2. Third-Party Consumer Protocol: For custom consumers without canonical ledger structures,
+       the consumer must implement `is_batch_acknowledged(batch)` or `is_notification_acknowledged(notif)`
+       and reliably attest that all notifications in the batch have been safely consumed.
+    3. Structural Verification Guard: If the consumer possesses `_rows_by_asm_gen`, candidate
+       evidence is directly checked across all notifications regardless of callback results.
     """
     if consumer is None:
         return False
+
+    # Guard: If consumer has canonical ledger structures, verify actual recorded evidence
+    if hasattr(consumer, "_rows_by_asm_gen"):
+        row_map_root = getattr(consumer, "_rows_by_asm_gen", None)
+        if not isinstance(row_map_root, dict):
+            return False
+        processed_keys = getattr(consumer, "_processed_outbox_keys", None)
+        if not isinstance(processed_keys, (set, frozenset, dict)):
+            return False
+        for notif in batch:
+            idem_key = getattr(notif, "idempotency_key", None)
+            if idem_key is None or idem_key not in processed_keys:
+                return False
+            asm_key = (getattr(notif, "assembly_id", None), getattr(notif, "structural_generation", None))
+            row_map = row_map_root.get(asm_key)
+            if not row_map:
+                return False
+            env = getattr(notif, "envelope", None)
+            surf = getattr(env, "surface_utf8_nfc", None) if env else None
+            t_key = (surf, getattr(notif, "marker", None), getattr(notif, "feature_bundle_digest", None))
+            row = row_map.get(t_key)
+            if row is None or getattr(notif, "root_id", None) not in getattr(row, "confirmed_roots", ()):
+                return False
 
     # 1. Preferred canonical ledger interface: is_batch_acknowledged(batch)
     if callable(getattr(consumer, "is_batch_acknowledged", None)):
@@ -74,10 +103,11 @@ def _is_batch_acknowledged(consumer: object, batch: Sequence[object]) -> bool:
 
 
 class frozendict(Mapping[KT, VT]):
-    """Genuinely immutable mapping preserving standard Mapping interfaces (Core §10.2, C02-S01).
+    """Genuinely immutable mapping preserving standard Mapping interfaces (Core §10.2, C02-S01, C03-S04).
 
     Backed by MappingProxyType over a private defensive copy. Does NOT inherit from dict,
     eliminating all dict base-class mutation bypasses (e.g., dict.update, dict.__setitem__, dict.clear).
+    Slot assignments and deletions are strictly blocked via __setattr__ and __delattr__.
     """
 
     __slots__ = ("_proxy", "_hash")
@@ -119,10 +149,17 @@ class frozendict(Mapping[KT, VT]):
     def __hash__(self) -> int:
         if self._hash is None:
             try:
-                self._hash = hash(tuple(sorted(self._proxy.items())))
+                h = hash(tuple(sorted(self._proxy.items())))
             except TypeError:
                 raise TypeError("frozendict with unhashable values cannot be hashed") from None
+            super().__setattr__("_hash", h)
         return self._hash
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise TypeError("frozendict is immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise TypeError("frozendict is immutable")
 
     def __readonly__(self, *args: Any, **kwargs: Any) -> None:
         raise TypeError("frozendict is immutable")
