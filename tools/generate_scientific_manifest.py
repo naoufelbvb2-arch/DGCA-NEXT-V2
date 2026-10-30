@@ -218,13 +218,12 @@ def generate_manifest(
         target_configs = tuple(config_rel_paths)
 
     # Source integrity check
-    if require_clean:
-        is_clean, dirty_entries = check_source_cleanliness(resolved_repo_root)
-        if not is_clean:
-            raise RuntimeError(
-                f"Working tree has uncommitted modifications in relevant scientific paths; "
-                f"cannot generate authoritative manifest: {dirty_entries}"
-            )
+    is_clean, dirty_entries = check_source_cleanliness(resolved_repo_root)
+    if require_clean and not is_clean:
+        raise RuntimeError(
+            f"Working tree has uncommitted modifications in relevant scientific paths; "
+            f"cannot generate authoritative manifest: {dirty_entries}"
+        )
 
     commit_sha = get_git_commit_sha(resolved_repo_root)
 
@@ -253,16 +252,36 @@ def generate_manifest(
         }
         configuration_hashes[norm_rel] = digest
 
-    manifest: dict[str, Any] = {
-        "configuration_hashes": configuration_hashes,
-        "configurations": configurations,
-        "schema_version": SCHEMA_VERSION,
-        "source": {
-            "commit_sha": commit_sha,
-            "repository": REPOSITORY_IDENTIFIER,
-        },
-        "source_commit_sha": commit_sha,
-    }
+    if is_clean:
+        manifest: dict[str, Any] = {
+            "configuration_hashes": configuration_hashes,
+            "configurations": configurations,
+            "schema_version": SCHEMA_VERSION,
+            "source": {
+                "commit_sha": commit_sha,
+                "repository": REPOSITORY_IDENTIFIER,
+            },
+            "source_commit_sha": commit_sha,
+        }
+    else:
+        # Non-authoritative diagnostic manifest (clearly distinguished from authoritative clean source)
+        dirty_sha = f"{commit_sha}-DIRTY"
+        manifest = {
+            "authoritative": False,
+            "configuration_hashes": configuration_hashes,
+            "configurations": configurations,
+            "dirty": True,
+            "dirty_files": sorted(dirty_entries),
+            "schema_version": SCHEMA_VERSION,
+            "source": {
+                "authoritative": False,
+                "clean": False,
+                "commit_sha": dirty_sha,
+                "dirty_files": sorted(dirty_entries),
+                "repository": REPOSITORY_IDENTIFIER,
+            },
+            "source_commit_sha": dirty_sha,
+        }
 
     return manifest
 
@@ -318,6 +337,16 @@ def verify_manifest_against_repo(
             discrepancies.append(
                 f"Working tree has uncommitted modifications in relevant scientific paths: {dirty_entries}"
             )
+
+    # Rejection of non-authoritative / dirty manifests in authoritative verification
+    if manifest_data.get("authoritative") is False or manifest_data.get("dirty") is True:
+        discrepancies.append(
+            "Manifest is marked non-authoritative (dirty-source diagnostic) and cannot pass authoritative verification."
+        )
+    if "-DIRTY" in str(manifest_data.get("source_commit_sha", "")) or "-DIRTY" in str(manifest_data.get("source", {}).get("commit_sha", "")):
+        discrepancies.append(
+            "Manifest contains non-authoritative dirty commit SHA ('-DIRTY') and cannot pass authoritative verification."
+        )
 
     # 2. Type check
     if not isinstance(manifest_data, dict):
@@ -478,6 +507,64 @@ def verify_manifest_against_repo(
     return len(discrepancies) == 0, discrepancies
 
 
+def verify_manifest_bytes(
+    candidate_bytes: bytes,
+    repo_root: Path | None = None,
+) -> tuple[bool, list[str]]:
+    """Verify that candidate bytes match canonical manifest serialization byte-for-byte.
+
+    Enforces:
+    1. Rejection of UTF-8 BOM.
+    2. Valid UTF-8 decoding and JSON parsing.
+    3. Complete schema and repository state verification via verify_manifest_against_repo().
+    4. Exact byte-for-byte equality with serialize_manifest(expected_manifest).encode('utf-8').
+       (Strict exact-byte matching: no CRLF normalization, no whitespace tolerance).
+
+    Returns:
+        (is_valid, list_of_discrepancies)
+    """
+    discrepancies: list[str] = []
+    if repo_root is None:
+        repo_root = get_repo_root()
+    else:
+        repo_root = repo_root.resolve()
+
+    if candidate_bytes.startswith(b"\xef\xbb\xbf"):
+        discrepancies.append(
+            "Candidate bytes contain UTF-8 BOM; canonical format requires raw UTF-8 without BOM."
+        )
+
+    try:
+        candidate_text = candidate_bytes.decode("utf-8")
+        manifest_data = json.loads(candidate_text)
+    except UnicodeDecodeError as exc:
+        return False, [f"Candidate bytes are not valid UTF-8: {exc}"]
+    except json.JSONDecodeError as exc:
+        return False, [f"Candidate bytes are not valid JSON: {exc}"]
+
+    # 1. Semantic schema and repository state verification
+    valid, sem_discrepancies = verify_manifest_against_repo(
+        manifest_data,
+        repo_root=repo_root,
+        require_clean=True,
+    )
+    if not valid:
+        discrepancies.extend(sem_discrepancies)
+
+    # 2. Strict exact canonical-byte verification (no CRLF normalization)
+    try:
+        expected_manifest = generate_manifest(repo_root=repo_root, require_clean=True)
+        canonical_bytes = serialize_manifest(expected_manifest).encode("utf-8")
+        if candidate_bytes != canonical_bytes:
+            discrepancies.append(
+                "Candidate file bytes do not match canonical serialization byte-for-byte."
+            )
+    except Exception as exc:
+        discrepancies.append(f"Failed to generate canonical expected manifest: {exc}")
+
+    return len(discrepancies) == 0, discrepancies
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for deterministic scientific manifest generation."""
     parser = argparse.ArgumentParser(
@@ -510,7 +597,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-dirty",
         action="store_true",
-        help="Allow generation or checking against a dirty working tree (non-authoritative).",
+        help="Allow generation or checking against a dirty working tree (non-authoritative diagnostic only).",
     )
 
     args = parser.parse_args(argv)
@@ -525,34 +612,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         try:
             candidate_bytes = check_path.read_bytes()
-            try:
-                candidate_text = candidate_bytes.decode("utf-8")
-                manifest_data = json.loads(candidate_text)
-            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                sys.stderr.write(f"Manifest check FAILED: candidate is not valid UTF-8 JSON: {exc}\n")
-                return 1
-
-            valid, discrepancies = verify_manifest_against_repo(
-                manifest_data,
-                repo_root=repo_root,
-                require_clean=require_clean,
-            )
+            valid, discrepancies = verify_manifest_bytes(candidate_bytes, repo_root=repo_root)
             if not valid:
                 sys.stderr.write("Manifest check FAILED:\n")
                 for d in discrepancies:
                     sys.stderr.write(f"  - {d}\n")
-                return 1
-
-            # Exact canonical byte equality check (normalizing CRLF to LF for cross-platform portability)
-            expected_manifest = generate_manifest(
-                repo_root=repo_root,
-                require_clean=require_clean,
-            )
-            canonical_bytes = serialize_manifest(expected_manifest).encode("utf-8")
-            normalized_candidate = candidate_bytes.replace(b"\r\n", b"\n")
-            if normalized_candidate != canonical_bytes:
-                sys.stderr.write("Manifest check FAILED:\n")
-                sys.stderr.write("  - Candidate file bytes do not match canonical serialization byte-for-byte.\n")
                 return 1
 
             sys.stdout.write("Manifest check PASSED: canonical manifest matches repository state byte-for-byte.\n")

@@ -18,6 +18,8 @@ Acceptance Test Scenarios:
 - C01-S01: Complete Manifest Verification (rejection of incomplete/corrupted schemas)
 - C01-S02: Working Tree Source Cleanliness Detection (fail closed on uncommitted source)
 - C01-S03: Comprehensive Negative Scenario Suite
+- C02-S01: Distinguishable Non-Authoritative Dirty Artifact & Rejection Gate
+- C02-S02: Exact Canonical-Byte Enforcement (strict byte-for-byte matching without CRLF normalization)
 """
 
 from __future__ import annotations
@@ -48,6 +50,7 @@ from tools.generate_scientific_manifest import (
     main as manifest_main,
     serialize_manifest,
     verify_manifest_against_repo,
+    verify_manifest_bytes,
 )
 
 
@@ -55,6 +58,31 @@ from tools.generate_scientific_manifest import (
 def repo_root() -> Path:
     """Fixture providing authoritative repository root."""
     return get_repo_root()
+
+
+@pytest.fixture
+def clean_git_repo(tmp_path: Path) -> Path:
+    """Fixture providing an isolated, clean Git repository with standard configs."""
+    repo_dir = tmp_path / "authoritative_repo"
+    repo_dir.mkdir()
+    subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    configs_dir = repo_dir / "configs"
+    configs_dir.mkdir()
+    cfg1 = configs_dir / "lab_rc2_ablation.json"
+    cfg1.write_text('{"schema_version": "test-ablation"}', encoding="utf-8")
+    cfg2 = configs_dir / "lab_rc4_1_default.json"
+    cfg2.write_text('{"schema_version": "test-default"}', encoding="utf-8")
+
+    src_dir = repo_dir / "src"
+    src_dir.mkdir()
+    (src_dir / "model.py").write_text("# Authoritative source\ndef run(): pass\n", encoding="utf-8")
+
+    subprocess.run(["git", "add", "."], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial clean commit"], cwd=str(repo_dir), check=True, capture_output=True)
+    return repo_dir
 
 
 def test_m01_source_sha_accuracy(repo_root: Path) -> None:
@@ -68,12 +96,17 @@ def test_m01_source_sha_accuracy(repo_root: Path) -> None:
     )
     expected_sha = proc.stdout.strip().lower()
 
-    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
-
-    assert manifest["source_commit_sha"] == expected_sha
-    assert manifest["source"]["commit_sha"] == expected_sha
-    assert len(manifest["source_commit_sha"]) == 40
-    assert all(c in "0123456789abcdef" for c in manifest["source_commit_sha"])
+    is_clean, _ = check_source_cleanliness(repo_root)
+    if is_clean:
+        manifest = generate_manifest(repo_root=repo_root, require_clean=True)
+        assert manifest["source_commit_sha"] == expected_sha
+        assert manifest["source"]["commit_sha"] == expected_sha
+        assert len(manifest["source_commit_sha"]) == 40
+        assert all(c in "0123456789abcdef" for c in manifest["source_commit_sha"])
+    else:
+        manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+        assert manifest["source_commit_sha"] == f"{expected_sha}-DIRTY"
+        assert manifest["source"]["commit_sha"] == f"{expected_sha}-DIRTY"
 
 
 def test_m02_configuration_hash_accuracy(repo_root: Path) -> None:
@@ -221,16 +254,16 @@ def test_m08_frozen_regression_curriculum_integrity() -> None:
     assert K_R_PER_EVENT == 12
 
 
-def test_cli_flags_and_check(repo_root: Path) -> None:
-    """Verify CLI options: --canonical-digest, --output, --check."""
-    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+def test_cli_flags_and_check(clean_git_repo: Path, repo_root: Path) -> None:
+    """Verify CLI options: --canonical-digest, --output, --check against clean repo."""
+    manifest = generate_manifest(repo_root=clean_git_repo, require_clean=True)
     serialized = serialize_manifest(manifest)
     expected_digest = compute_manifest_digest(serialized)
 
     script_path = repo_root / "tools" / "generate_scientific_manifest.py"
     proc_digest = subprocess.run(
-        [sys.executable, str(script_path), "--canonical-digest", "--allow-dirty"],
-        cwd=str(repo_root),
+        [sys.executable, str(script_path), "--canonical-digest", "--repo-root", str(clean_git_repo)],
+        cwd=str(clean_git_repo),
         capture_output=True,
         text=True,
         check=True,
@@ -240,19 +273,19 @@ def test_cli_flags_and_check(repo_root: Path) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         out_file = Path(temp_dir) / "manifest.json"
         subprocess.run(
-            [sys.executable, str(script_path), "-o", str(out_file), "--allow-dirty"],
-            cwd=str(repo_root),
+            [sys.executable, str(script_path), "-o", str(out_file), "--repo-root", str(clean_git_repo)],
+            cwd=str(clean_git_repo),
             capture_output=True,
             text=True,
             check=True,
         )
         assert out_file.is_file()
-        assert out_file.read_text(encoding="utf-8") == serialized
+        assert out_file.read_bytes() == serialized.encode("utf-8")
 
-        # Check flag CLI: valid manifest passes with allow-dirty
+        # Check flag CLI: valid manifest passes
         proc_check_ok = subprocess.run(
-            [sys.executable, str(script_path), "--check", str(out_file), "--allow-dirty"],
-            cwd=str(repo_root),
+            [sys.executable, str(script_path), "--check", str(out_file), "--repo-root", str(clean_git_repo)],
+            cwd=str(clean_git_repo),
             capture_output=True,
             text=True,
         )
@@ -263,11 +296,11 @@ def test_cli_flags_and_check(repo_root: Path) -> None:
         tampered_data = json.loads(serialized)
         tampered_data["source_commit_sha"] = "0" * 40
         tampered_file = Path(temp_dir) / "tampered_manifest.json"
-        tampered_file.write_text(json.dumps(tampered_data), encoding="utf-8")
+        tampered_file.write_bytes(serialize_manifest(tampered_data).encode("utf-8"))
 
         proc_check_fail = subprocess.run(
-            [sys.executable, str(script_path), "--check", str(tampered_file), "--allow-dirty"],
-            cwd=str(repo_root),
+            [sys.executable, str(script_path), "--check", str(tampered_file), "--repo-root", str(clean_git_repo)],
+            cwd=str(clean_git_repo),
             capture_output=True,
             text=True,
         )
@@ -478,14 +511,12 @@ def test_c01_s02_working_tree_dirty_source_detection(tmp_path: Path) -> None:
 
 def test_c01_s03_failed_file_read_controlled_simulation(repo_root: Path, tmp_path: Path) -> None:
     """C01-S03: Verify controlled failure on unreadable or invalid file targets without fragile OS bits."""
-    # Pass directory instead of file
     dir_target = tmp_path / "dummy_dir"
     dir_target.mkdir()
 
     with pytest.raises(IsADirectoryError, match="not a file"):
         compute_file_sha256(dir_target)
 
-    # Non-existent file
     missing_target = tmp_path / "does_not_exist.json"
     with pytest.raises(FileNotFoundError, match="does not exist"):
         compute_file_sha256(missing_target)
@@ -504,9 +535,9 @@ def test_c01_s03_non_git_source_failure(tmp_path: Path) -> None:
     assert any("Git status" in d for d in dirty)
 
 
-def test_c01_s03_cli_check_exact_canonical_byte_enforcement(repo_root: Path) -> None:
+def test_c01_s03_cli_check_exact_canonical_byte_enforcement(clean_git_repo: Path, repo_root: Path) -> None:
     """C01-S03: Verify that --check rejects valid JSON that is not canonical bytes."""
-    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    manifest = generate_manifest(repo_root=clean_git_repo, require_clean=True)
     script_path = repo_root / "tools" / "generate_scientific_manifest.py"
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -516,10 +547,140 @@ def test_c01_s03_cli_check_exact_canonical_byte_enforcement(repo_root: Path) -> 
         test_file.write_text(non_canonical_json, encoding="utf-8")
 
         proc = subprocess.run(
-            [sys.executable, str(script_path), "--check", str(test_file), "--allow-dirty"],
-            cwd=str(repo_root),
+            [sys.executable, str(script_path), "--check", str(test_file), "--repo-root", str(clean_git_repo)],
+            cwd=str(clean_git_repo),
             capture_output=True,
             text=True,
         )
         assert proc.returncode == 1
         assert "Candidate file bytes do not match canonical serialization byte-for-byte" in proc.stderr
+
+
+# ==============================================================================
+# CORRECTION C02-S01 & C02-S02 TESTS: DIRTY OVERRIDE BOUNDARY & EXACT BYTES
+# ==============================================================================
+
+def test_c02_s01_dirty_manifest_distinguishable_and_rejected(tmp_path: Path) -> None:
+    """C02-S01: Mandatory reproduction verifying that dirty override produces an unambiguously
+    distinguishable non-authoritative artifact that is rejected by authoritative verification.
+    """
+    repo_dir = tmp_path / "test_repo"
+    repo_dir.mkdir()
+
+    # Initialize controlled git repo
+    subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    # 1. Create and commit valid source and configuration files
+    configs_dir = repo_dir / "configs"
+    configs_dir.mkdir()
+    cfg1 = configs_dir / "lab_rc2_ablation.json"
+    cfg1.write_text('{"schema_version": "test-ablation"}', encoding="utf-8")
+    cfg2 = configs_dir / "lab_rc4_1_default.json"
+    cfg2.write_text('{"schema_version": "test-default"}', encoding="utf-8")
+
+    src_dir = repo_dir / "src"
+    src_dir.mkdir()
+    src_file = src_dir / "model.py"
+    src_file.write_text('# Authoritative source code\ndef run(): pass\n', encoding="utf-8")
+
+    subprocess.run(["git", "add", "."], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    # 2. Generate clean authoritative manifest
+    clean_manifest = generate_manifest(repo_root=repo_dir, require_clean=True)
+    assert clean_manifest.get("authoritative", True) is True
+    assert "dirty" not in clean_manifest
+    assert "-DIRTY" not in clean_manifest["source_commit_sha"]
+
+    # 3. Modify a tracked source file without committing
+    src_file.write_text('# Tampered uncommitted source\ndef run(): raise Exception()\n', encoding="utf-8")
+
+    # Authoritative generation must fail closed
+    with pytest.raises(RuntimeError, match="uncommitted modifications"):
+        generate_manifest(repo_root=repo_dir, require_clean=True)
+
+    # 4. Invoke dirty override
+    dirty_manifest = generate_manifest(repo_root=repo_dir, require_clean=False)
+
+    # 5. Demonstrate that dirty artifact is unambiguously distinguishable from clean manifest
+    assert dirty_manifest != clean_manifest
+    assert dirty_manifest["authoritative"] is False
+    assert dirty_manifest["dirty"] is True
+    assert dirty_manifest["source_commit_sha"].endswith("-DIRTY")
+    assert dirty_manifest["source"]["authoritative"] is False
+    assert dirty_manifest["source"]["clean"] is False
+    assert dirty_manifest["dirty_files"] == [" M src/model.py"]
+
+    # 6. Verify that dirty-source output cannot pass authoritative verification
+    valid, discrepancies = verify_manifest_against_repo(dirty_manifest, repo_root=repo_dir, require_clean=True)
+    assert valid is False
+    assert any("non-authoritative" in d or "dirty" in d for d in discrepancies)
+
+    dirty_bytes = serialize_manifest(dirty_manifest).encode("utf-8")
+    valid_bytes, disc_bytes = verify_manifest_bytes(dirty_bytes, repo_root=repo_dir)
+    assert valid_bytes is False
+    assert any("non-authoritative" in d or "dirty" in d for d in disc_bytes)
+
+    # 7. Restore the source file
+    src_file.write_text('# Authoritative source code\ndef run(): pass\n', encoding="utf-8")
+
+    # 8. Verify normal authoritative generation and checking succeed again
+    clean_restored = generate_manifest(repo_root=repo_dir, require_clean=True)
+    assert clean_restored == clean_manifest
+    valid_restored, disc_restored = verify_manifest_against_repo(clean_restored, repo_root=repo_dir, require_clean=True)
+    assert valid_restored is True
+    assert disc_restored == []
+
+    clean_bytes_restored = serialize_manifest(clean_restored).encode("utf-8")
+    valid_bytes_restored, disc_bytes_restored = verify_manifest_bytes(clean_bytes_restored, repo_root=repo_dir)
+    assert valid_bytes_restored is True
+    assert disc_bytes_restored == []
+
+
+def test_c02_s02_exact_canonical_bytes_contract(clean_git_repo: Path) -> None:
+    """C02-S02: Mandatory exact canonical-byte verification tests."""
+    manifest = generate_manifest(repo_root=clean_git_repo, require_clean=True)
+    canonical_str = serialize_manifest(manifest)
+    canonical_bytes = canonical_str.encode("utf-8")
+
+    # 1. Canonical LF JSON passes
+    valid_lf, disc_lf = verify_manifest_bytes(canonical_bytes, repo_root=clean_git_repo)
+    assert valid_lf is True
+    assert disc_lf == []
+
+    # 2. Identical JSON with CRLF fails exact-byte verification
+    crlf_bytes = canonical_bytes.replace(b"\n", b"\r\n")
+    valid_crlf, disc_crlf = verify_manifest_bytes(crlf_bytes, repo_root=clean_git_repo)
+    assert valid_crlf is False
+    assert any("do not match canonical serialization byte-for-byte" in d for d in disc_crlf)
+
+    # 3. Whitespace changes fail (e.g. 4-space indentation)
+    ws_bytes = json.dumps(manifest, indent=4, sort_keys=True, ensure_ascii=False).encode("utf-8") + b"\n"
+    valid_ws, disc_ws = verify_manifest_bytes(ws_bytes, repo_root=clean_git_repo)
+    assert valid_ws is False
+    assert any("do not match canonical serialization byte-for-byte" in d for d in disc_ws)
+
+    # 4. Additional trailing newlines fail
+    extra_nl_bytes = canonical_bytes + b"\n"
+    valid_extra_nl, disc_extra_nl = verify_manifest_bytes(extra_nl_bytes, repo_root=clean_git_repo)
+    assert valid_extra_nl is False
+    assert any("do not match canonical serialization byte-for-byte" in d for d in disc_extra_nl)
+
+    # 5. UTF-8 BOM fails
+    bom_bytes = b"\xef\xbb\xbf" + canonical_bytes
+    valid_bom, disc_bom = verify_manifest_bytes(bom_bytes, repo_root=clean_git_repo)
+    assert valid_bom is False
+    assert any("BOM" in d or "byte-for-byte" in d for d in disc_bom)
+
+    # 6. Repeated clean generation remains byte-for-byte deterministic
+    manifest_repeat = generate_manifest(repo_root=clean_git_repo, require_clean=True)
+    canonical_bytes_repeat = serialize_manifest(manifest_repeat).encode("utf-8")
+    assert canonical_bytes == canonical_bytes_repeat
+
+    # 7. Existing schema validation continues to reject incomplete manifests
+    incomplete = {"source_commit_sha": get_git_commit_sha(clean_git_repo), "configurations": {}}
+    valid_inc, disc_inc = verify_manifest_against_repo(incomplete, repo_root=clean_git_repo, require_clean=True)
+    assert valid_inc is False
+    assert len(disc_inc) > 0
