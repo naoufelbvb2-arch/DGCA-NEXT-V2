@@ -79,13 +79,12 @@ Reproduction is automated via the standalone forensic tool:
    python tools/forensics/investigate_r2_b01_assembly_collision.py
    ```
 3. The script:
-   - Initializes a fresh, unseeded `MachineState()`, an empty `SurfaceReadoutLedgerV1()`, and a production `ExposureTransactionManager`.
-   - Attaches non-invasive pre- and post-invocation loggers to `_run_form_stage`, `_run_grow_stage`, and `_try_merge_pair` in memory without modifying disk source code.
-   - Streams 56 alternating exposure transactions:
-     - Odd roots ($1, 3, \dots, 55$): `القط يشرب حليب <EOS>` (Branch AB)
-     - Even roots ($2, 4, \dots, 56$): `النسر يشرب ماء <EOS>` (Branch DB)
-   - Performs autonomous multi-step rollout for prompts `['القط']` and `['النسر']`.
-   - Restores all original module functions before exit.
+   - Executes two independent 56-root curriculum runs from identical fresh initial states:
+     - **Run A (Untouched Production Reference):** Zero monkeypatching, pure frozen production execution.
+     - **Run B (Corrected Instrumented Observer):** Evaluates `_run_form_stage()` strictly once per root receiving the complete event list; passive line tracing via `sys.settrace` and `linecache` captures event attribution non-invasively.
+   - Performs a 56-root differential replay verifying 100% bit-for-bit equality across WState, HSlowState, ledger, diagnostics, and final rollout stop statuses.
+   - Runs sensitivity checks: Check A (empty formation diagnostic equivalence across Roots 1–6) and Check B (root-wide formation cap $K_{\text{FORM\_PER\_END}}=12$ across multi-event root).
+   - Revalidates the Assembly 5 and 6 structural convergence, MERGE rejection compliance, and Step 2 readout collision.
 
 ---
 
