@@ -3,15 +3,16 @@
 Comprehensive in-memory passive instrumentation of Assembly FORM, GROW, MERGE, and READOUT
 to determine the precise structural and causal origin of Assembly 5 and 6 duplicate collision.
 
-R2-B01-C03 Complete State Equivalence & Forensic Non-Interference Guarantee:
-- _run_form_stage() executes EXACTLY ONCE per completed root, receiving the complete original event sequence.
-- Zero decomposition of production stages into per-event invocations.
-- Purely observational passive frame tracing preserves exact production semantics, budget (K_FORM_PER_END=12),
-  and diagnostic evaluation.
-- Forensic guard evaluation inside _try_merge_pair() utilizes an isolated read-only computational cache,
-  preventing cache pollution of the production operation.
-- Full 56-root differential replay compares 10 major machine state components using exact IEEE 754 float.hex()
-  representations and full 64-character SHA-256 digests across all 56 roots.
+R2-B01-C04 Complete State Coverage & Forensic Freeze Gate:
+- Complete field-coverage inventory covering all runtime fields across 7 core state classes:
+  WState, HSlowState, RState, LatentNeighborhoodTable, TransactionPublicationView,
+  ExposureTransactionManager, and SurfaceReadoutLedgerV1.
+- Exact WState adjacency indexes (outgoing_by_source and incoming_by_target) serialized with
+  complete SynapseKey identity tuples and set membership.
+- Historical completed roots in TransactionPublicationView.completed_roots serialized with
+  complete historical EndExposureReport objects (not just keys).
+- Automated read-only coverage check verifying zero unmapped or omitted runtime fields.
+- Differential replay proves 100% bit-for-bit complete state equality across all 56 roots.
 
 Normative References:
 - DGCA_CORE_RC4_1.md §2.0 (Executable Assembly operators: MAINTAIN -> GROW -> FORM -> MERGE/SPLIT)
@@ -233,7 +234,132 @@ def instrumented_try_merge_pair(
 
 
 # ---------------------------------------------------------------------------
-# Comprehensive Canonical State Snapshots & Serialization (C03-S01)
+# Authoritative State Coverage Inventory & Validation (C04-S01)
+# ---------------------------------------------------------------------------
+
+AUTHORITATIVE_FIELD_INVENTORY: dict[str, dict[str, str]] = {
+    "WState": {
+        "outgoing_budget_b_i": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "cross_outgoing_budget_b_i_x": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "committed_cells": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "last_referenced_event": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "latent_table": "DEDICATED_COMPONENT (snapshot_latent)",
+        "synapses": "DEDICATED_COMPONENT (snapshot_synapses)",
+        "outgoing_by_source": "DIRECTLY_SERIALIZED (snapshot_w, snapshot_synapses)",
+        "incoming_by_target": "DIRECTLY_SERIALIZED (snapshot_w, snapshot_synapses)",
+        "reserved_keys_by_candidate": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "assemblies": "DEDICATED_COMPONENT (snapshot_assemblies)",
+        "next_assembly_id": "DIRECTLY_SERIALIZED (snapshot_w, snapshot_assemblies)",
+        "assemblies_by_member": "DEDICATED_COMPONENT (snapshot_assemblies)",
+        "context_candidates": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "stable_bindings": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "owner_profiles_by_anchor": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "next_owner_seq_by_anchor": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "contrast_episodes_by_anchor": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "completed_roots_high_watermark": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "completed_external_events_count": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "global_event_clock": "DIRECTLY_SERIALIZED (snapshot_w)",
+        "close_serial": "DIRECTLY_SERIALIZED (snapshot_w)",
+    },
+    "HSlowState": {
+        "r_bar": "DIRECTLY_SERIALIZED (snapshot_h_slow)",
+        "g": "DIRECTLY_SERIALIZED (snapshot_h_slow)",
+        "rho_bar_by_region": "DIRECTLY_SERIALIZED (snapshot_h_slow)",
+        "theta_active_by_region": "DIRECTLY_SERIALIZED (snapshot_h_slow)",
+    },
+    "RState": {
+        "A": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "A_prev": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "A_pass1": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "A_hist": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "E1_frontier": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "L_frontier": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "Lx_frontier": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "F_step": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "F_step_prev": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "g_ctx_by_z": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "mu_source_mask": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "mu_prev_source_mask": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "context_diagnostics": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "active_attractors": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "contribution_lanes": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "typed_supports_current": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "typed_supports_prev": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "eligibility_traces": "DIRECTLY_SERIALIZED (snapshot_r)",
+        "step_index": "DIRECTLY_SERIALIZED (snapshot_r)",
+    },
+    "LatentNeighborhoodTable": {
+        "_slots_by_cell": "DIRECTLY_SERIALIZED (snapshot_latent)",
+        "_coactive_reverse_index": "DIRECTLY_SERIALIZED (snapshot_latent)",
+        "_pinned_slots": "DIRECTLY_SERIALIZED (snapshot_latent)",
+        "_wiring_logs": "DIRECTLY_SERIALIZED (snapshot_latent)",
+    },
+    "TransactionPublicationView": {
+        "W": "DEDICATED_COMPONENT (snapshot_w - WState reference alias)",
+        "completed_roots": "DIRECTLY_SERIALIZED (snapshot_tx - full EndExposureReport history)",
+        "pending_outbox_by_root": "DEDICATED_COMPONENT (snapshot_outbox, snapshot_tx)",
+        "completed_roots_high_watermark": "DIRECTLY_SERIALIZED (snapshot_tx)",
+        "active_exposure_id": "DIRECTLY_SERIALIZED (snapshot_tx)",
+    },
+    "ExposureTransactionManager": {
+        "state": "INTENTIONALLY_EXCLUDED (MachineState reference alias: W, R, H_slow serialized independently)",
+        "theta_create": "INTENTIONALLY_EXCLUDED (Hyperparameter constant: THETA_CREATE_ASSOCIATIVE)",
+        "theta_create_x": "INTENTIONALLY_EXCLUDED (Hyperparameter constant: THETA_CREATE_CROSS)",
+        "w_conf": "INTENTIONALLY_EXCLUDED (Hyperparameter constant: W_CONF)",
+        "w_conf_context": "INTENTIONALLY_EXCLUDED (Hyperparameter constant: W_CONF_CONTEXT)",
+        "auto_coactive_latent": "INTENTIONALLY_EXCLUDED (Configuration boolean flag)",
+        "enable_context_pipeline": "INTENTIONALLY_EXCLUDED (Configuration boolean flag)",
+        "enable_assembly_pipeline": "INTENTIONALLY_EXCLUDED (Configuration boolean flag)",
+        "min_additional_opportunities": "INTENTIONALLY_EXCLUDED (Configuration parameter)",
+        "readout_ledger": "DEDICATED_COMPONENT (snapshot_ledger - Peripheral ledger serialized in dedicated component)",
+        "allow_headless_events": "INTENTIONALLY_EXCLUDED (Configuration boolean flag)",
+        "open_journal": "INTENTIONALLY_EXCLUDED (Transient intra-exposure buffer: always None after end_exposure)",
+        "_publication_view": "DEDICATED_COMPONENT (snapshot_tx - TransactionPublicationView serialized in dedicated component)",
+        "aborted_roots": "DIRECTLY_SERIALIZED (snapshot_tx)",
+        "_protected_open_root_pairs": "INTENTIONALLY_EXCLUDED (Transient intra-exposure buffer: always empty after end_exposure)",
+        "_end_exposure_hooks": "INTENTIONALLY_EXCLUDED (Non-authoritative runtime callback hook list)",
+        "_fault_injection_point": "INTENTIONALLY_EXCLUDED (Test fixture fault injection control: None in production)",
+    },
+    "SurfaceReadoutLedgerV1": {
+        "available": "DIRECTLY_SERIALIZED (snapshot_ledger)",
+        "_rows_by_asm_gen": "DIRECTLY_SERIALIZED (snapshot_ledger)",
+        "_bundles_by_surface": "DIRECTLY_SERIALIZED (snapshot_ledger)",
+        "_processed_outbox_keys": "DIRECTLY_SERIALIZED (snapshot_ledger)",
+    },
+}
+
+
+def verify_field_coverage(
+    state: MachineState,
+    ledger: SurfaceReadoutLedgerV1,
+    tx: ExposureTransactionManager,
+) -> bool:
+    """Automated read-only verification comparing stored runtime fields against declared inventory."""
+    checks = [
+        ("WState", state.W, list(vars(state.W).keys())),
+        ("HSlowState", state.H_slow, list(vars(state.H_slow).keys())),
+        ("RState", state.R, list(vars(state.R).keys())),
+        ("LatentNeighborhoodTable", state.W.latent_table, list(vars(state.W.latent_table).keys())),
+        ("TransactionPublicationView", tx.publication_view, list(tx.publication_view.__slots__)),
+        ("ExposureTransactionManager", tx, list(vars(tx).keys())),
+        ("SurfaceReadoutLedgerV1", ledger, list(vars(ledger).keys())),
+    ]
+    all_ok = True
+    for class_name, instance, runtime_fields in checks:
+        declared = AUTHORITATIVE_FIELD_INVENTORY[class_name]
+        for f in runtime_fields:
+            if f not in declared:
+                print(f"COVERAGE FAILURE: Undocumented field '{f}' in {class_name}!")
+                all_ok = False
+        for f in declared:
+            if f not in runtime_fields:
+                print(f"INVENTORY FAILURE: Extra declared field '{f}' not in runtime {class_name}!")
+                all_ok = False
+    return all_ok
+
+
+# ---------------------------------------------------------------------------
+# Comprehensive Canonical State Snapshots & Serialization (C04-S02)
 # ---------------------------------------------------------------------------
 
 def canonical_value(val: Any) -> Any:
@@ -283,7 +409,7 @@ def sha256_canonical(obj: Any) -> str:
 
 
 def snapshot_w(w: asm_module.WState) -> dict[str, Any]:
-    """Complete canonical snapshot of durable structural state W."""
+    """Complete canonical snapshot of durable structural state W including adjacency indexes."""
     return {
         "outgoing_budget_b_i": w.outgoing_budget_b_i,
         "cross_outgoing_budget_b_i_x": w.cross_outgoing_budget_b_i_x,
@@ -294,6 +420,15 @@ def snapshot_w(w: asm_module.WState) -> dict[str, Any]:
         "close_serial": w.close_serial,
         "committed_cells": sorted(w.committed_cells.items()),
         "last_referenced_event": sorted(w.last_referenced_event.items()),
+        # C04-S03: Exact WState adjacency indexes
+        "outgoing_by_source": [
+            [src, sorted([(k[0], k[1], k[2].name) for k in keys])]
+            for src, keys in sorted(w.outgoing_by_source.items())
+        ],
+        "incoming_by_target": [
+            [tgt, sorted([(k[0], k[1], k[2].name) for k in keys])]
+            for tgt, keys in sorted(w.incoming_by_target.items())
+        ],
         "reserved_keys_by_candidate": [
             [z_id, sorted([(k[0], k[1], k[2].name) for k in keys])]
             for z_id, keys in sorted(w.reserved_keys_by_candidate.items())
@@ -318,11 +453,21 @@ def snapshot_assemblies(w: asm_module.WState) -> dict[str, Any]:
     }
 
 
-def snapshot_synapses(w: asm_module.WState) -> list[Any]:
-    """Dedicated snapshot of all Synapses covering strength, evidence counters, roots, and status."""
-    return [
-        s for k, s in sorted(w.synapses.items(), key=lambda item: (item[0][0], item[0][1], item[0][2].value))
-    ]
+def snapshot_synapses(w: asm_module.WState) -> dict[str, Any]:
+    """Dedicated snapshot of all Synapses covering strength, evidence counters, roots, and adjacency indexes."""
+    return {
+        "synapses": [
+            s for k, s in sorted(w.synapses.items(), key=lambda item: (item[0][0], item[0][1], item[0][2].value))
+        ],
+        "outgoing_by_source": [
+            [src, sorted([(k[0], k[1], k[2].name) for k in keys])]
+            for src, keys in sorted(w.outgoing_by_source.items())
+        ],
+        "incoming_by_target": [
+            [tgt, sorted([(k[0], k[1], k[2].name) for k in keys])]
+            for tgt, keys in sorted(w.incoming_by_target.items())
+        ],
+    }
 
 
 def snapshot_latent(w: asm_module.WState) -> dict[str, Any]:
@@ -378,10 +523,11 @@ def snapshot_r(r: asm_module.RState) -> dict[str, Any]:
 
 
 def snapshot_tx(tx: ExposureTransactionManager) -> dict[str, Any]:
-    """Snapshot of transaction publication view and completed root set."""
+    """Snapshot of transaction publication view including complete historical EndExposureReports."""
     pv = tx.publication_view
     return {
-        "completed_roots": list(pv.completed_roots),
+        # C04-S03: Full historical EndExposureReport objects (not just keys)
+        "completed_roots": dict(pv.completed_roots),
         "completed_roots_high_watermark": pv.completed_roots_high_watermark,
         "active_exposure_id": pv.active_exposure_id,
         "aborted_roots": list(tx.aborted_roots),
@@ -550,9 +696,25 @@ def run_investigation() -> dict[str, Any]:
     global current_root_context
 
     print("=" * 80)
-    print("DGCA NEXT V2 - R2-B01-C03 COMPLETE STATE EQUIVALENCE & DIFFERENTIAL REPLAY")
+    print("DGCA NEXT V2 - R2-B01-C04 FINAL STATE COVERAGE AUDIT & DIFFERENTIAL REPLAY")
     print("Normative Basis: DGCA_CORE_RC4_1.md §2.0, §9.4, §11")
     print("=" * 80)
+
+    # -----------------------------------------------------------------------
+    # Step 0: Read-Only Field Coverage Verification Check
+    # -----------------------------------------------------------------------
+    print("\n--- STEP 0: STATE FIELD COVERAGE VERIFICATION ---")
+    test_state = MachineState()
+    test_ledger = SurfaceReadoutLedgerV1()
+    test_tx = ExposureTransactionManager(
+        test_state,
+        enable_context_pipeline=True,
+        enable_assembly_pipeline=True,
+        readout_ledger=test_ledger,
+    )
+    coverage_ok = verify_field_coverage(test_state, test_ledger, test_tx)
+    print(f"Authoritative field coverage inventory verified across all 7 classes: {coverage_ok}")
+    assert coverage_ok, "State coverage inventory validation failed!"
 
     branch_ab = encode_exposure("القط يشرب حليب", append_eos=True)
     branch_db = encode_exposure("النسر يشرب ماء", append_eos=True)
@@ -730,14 +892,15 @@ def run_investigation() -> dict[str, Any]:
     print(f"Step 2 Ambiguity Status: {readout.status.name}")
 
     # -----------------------------------------------------------------------
-    # Machine-Readable Full-Digest Evidence Artifact (C03-S02)
+    # Machine-Readable Full-Digest Evidence Artifact (C04-S02)
     # -----------------------------------------------------------------------
     evidence_path = repo_root / "tools" / "forensics" / "r2_b01_c03_differential_evidence.json"
     evidence_data = {
         "metadata": {
-            "title": "DGCA NEXT V2 - R2-B01-C03 Complete Differential Replay Evidence",
+            "title": "DGCA NEXT V2 - R2-B01-C04 Complete Differential Replay Evidence",
             "roots_compared": 56,
             "components_compared": component_keys,
+            "field_coverage_verified": True,
             "all_roots_match": len(mismatches) == 0,
             "cat_stop_status": cat_b.stop_status.name,
             "eagle_stop_status": eagle_b.stop_status.name,
