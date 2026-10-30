@@ -28,7 +28,7 @@ from dgca.lifecycle.exposure_tx import (
 )
 from dgca.peripheral.outbox import OutboxNotificationV1
 from dgca.peripheral.readout_ledger import LedgerCandidateRow, SurfaceReadoutLedgerV1
-from tests.test_r2_a01_patch2_acceptance import hash_state_snapshot
+from tests.test_r2_a01_patch2_acceptance import hash_state_snapshot, snapshot_ledger
 
 
 def _setup_assemblies_for_events(
@@ -1586,3 +1586,231 @@ def test_c03_s04_frozendict_slot_rebinding_protection() -> None:
     assert hash(test_fd) is not None
     assert copy.copy(test_fd) == test_fd
     assert copy.deepcopy(test_fd) == test_fd
+
+
+class KeyOnlyConsumer:
+    """Consumer exposing only raw idempotency key sets without candidate evidence (C04-S01)."""
+
+    def __init__(self) -> None:
+        self._processed_outbox_keys: set[object] = set()
+
+    def consume_outbox_batch(self, batch: Sequence[object]) -> int:
+        for notification in batch:
+            self._processed_outbox_keys.add(notification.idempotency_key)  # type: ignore[attr-defined]
+        return len(batch)
+
+
+def test_c04_s01_key_only_consumer_rejected() -> None:
+    """Correction C04-S01: Key-only consumer without acknowledgment interface or evidence is rejected.
+
+    Mandatory test:
+    - Real completed root with 3 pending notifications.
+    - Consumer invocation succeeds and records raw keys.
+    - No candidate evidence exists in consumer.
+    - Acknowledgment verification returns False.
+    - Pending Outbox remains intact in publication view.
+    - assert_outbox_ready() continues raising OUTBOX_DELIVERY_PENDING.
+    - Subsequent reconciliation with the canonical ledger succeeds.
+    """
+    from dgca.lifecycle.exposure_tx import _is_batch_acknowledged
+
+    state = MachineState()
+    _setup_assemblies_for_events(state, ["القط", "يشرب", "حليب"])
+
+    key_consumer = KeyOnlyConsumer()
+    tx = ExposureTransactionManager(
+        state,
+        enable_context_pipeline=False,
+        enable_assembly_pipeline=False,
+        readout_ledger=key_consumer,
+    )
+
+    envs = encode_exposure("القط يشرب حليب", append_eos=False)
+    root_id = 1
+    tx.begin_exposure(root_id)
+    for item in envs:
+        core_ev = encode_lexical_token_event(
+            item.peripheral_surface.raw_surface_nfc_utf8,
+            exposure_id=root_id,
+            event_order=item.core_event.event_order,
+            boundary=item.core_event.boundary,
+        ).core_event
+        tx.process_event(core_ev, peripheral_envelope=item.peripheral_surface)
+
+    # 1. End exposure: initial post-commit dispatch runs key_consumer.consume_outbox_batch()
+    rep = tx.end_exposure(root_id)
+
+    # Invariants:
+    assert rep.status == ExposureStatus.COMPLETED
+    assert tx.status == ExposureStatus.CLOSED
+    assert state.W.close_serial == 1
+    assert root_id in tx.completed_roots
+
+    # Consumer invocation succeeded and keys are recorded in its raw set
+    assert len(key_consumer._processed_outbox_keys) == 3
+
+    # Acknowledgment verification returns False
+    batch = tx.pending_outbox_by_root[root_id]
+    assert _is_batch_acknowledged(key_consumer, batch) is False
+
+    # Pending outbox remains intact
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+    with pytest.raises(ObservationError) as exc_info:
+        tx.assert_outbox_ready(root_id)
+    assert exc_info.value.code == StatusCode.OUTBOX_DELIVERY_PENDING
+
+    # 2. Reconcile explicitly with key_consumer: invocation succeeds, but batch is still retained
+    delivered = tx.reconcile_outbox(exposure_id=root_id, ledger=key_consumer)
+    assert delivered == 0
+    assert tx.has_pending_outbox(root_id) is True
+    assert tx.pending_outbox_count(root_id) == 3
+
+    # 3. Subsequent reconciliation with canonical ledger succeeds completely
+    canonical_ledger = SurfaceReadoutLedgerV1()
+    delivered_canon = tx.reconcile_outbox(exposure_id=root_id, ledger=canonical_ledger)
+    assert delivered_canon == 3
+    assert tx.has_pending_outbox(root_id) is False
+    assert tx.pending_outbox_count(root_id) == 0
+    tx.assert_outbox_ready(root_id)
+    assert canonical_ledger.is_batch_acknowledged(batch) is True
+    assert _is_batch_acknowledged(canonical_ledger, batch) is True
+
+
+def test_c04_s02_real_production_rollback_fresh_ledger() -> None:
+    """Correction C04-S02: Directly exercise real production rollback block on a fresh ledger.
+
+    Approach:
+    1. Construct real valid OutboxNotificationV1.
+    2. Capture complete ledger snapshot and SHA-256 digest.
+    3. Inject controlled failure into _processed_outbox_keys.add() after candidate and bundle evidence are updated.
+    4. Invoke original production consume_outbox_notification() method.
+    5. Verify exception propagates.
+    6. Verify exact ledger snapshot and SHA-256 equality with pre-operation state.
+    7. Remove fault and retry.
+    8. Confirm exactly one lawful root observation and successful acknowledgment.
+    """
+    envs = encode_exposure("القط", append_eos=False)
+    notif = OutboxNotificationV1(
+        root_id=1,
+        event_order=0,
+        assembly_id=1,
+        structural_generation=1,
+        surface_sha256=envs[0].peripheral_surface.surface_sha256,
+        feature_bundle_digest=envs[0].peripheral_surface.feature_bundle_digest,
+        marker=envs[0].peripheral_surface.marker,
+        envelope=envs[0].peripheral_surface,
+    )
+
+    ledger = SurfaceReadoutLedgerV1()
+    snap_pre = snapshot_ledger(ledger)
+    hash_pre = hash_state_snapshot(snap_pre)
+
+    class FailingSet(set):
+        def add(self, item: object) -> None:
+            raise RuntimeError("Injected failure during _processed_outbox_keys.add()")
+
+    # Inject failure into the final step of the production method
+    ledger._processed_outbox_keys = FailingSet()
+
+    # 4. Invoke original production method
+    with pytest.raises(RuntimeError, match="Injected failure during _processed_outbox_keys.add()"):
+        ledger.consume_outbox_notification(notif)
+
+    # 6. Verify exact ledger snapshot and digest equality with pre-operation state
+    snap_post = snapshot_ledger(ledger)
+    hash_post = hash_state_snapshot(snap_post)
+
+    assert snap_pre == snap_post, "Ledger structural snapshot drifted after rollback!"
+    assert hash_pre == hash_post, "Ledger cryptographic SHA-256 digest drifted after rollback!"
+    assert len(ledger._rows_by_asm_gen) == 0
+    assert len(ledger._bundles_by_surface) == 0
+    assert len(ledger._processed_outbox_keys) == 0
+
+    # 7. Remove fault and retry
+    ledger._processed_outbox_keys = set()
+    added = ledger.consume_outbox_notification(notif)
+    assert added is True
+
+    # 8. Confirm exactly one lawful root observation and acknowledgment
+    assert ledger.is_notification_acknowledged(notif) is True
+    rows = ledger.get_candidate_rows(1, 1)
+    assert len(rows) == 1
+    assert rows[0].confirmed_roots == {1}
+
+
+def test_c04_s02_real_production_rollback_existing_candidate_row() -> None:
+    """Correction C04-S02: Directly exercise real production rollback with a pre-existing candidate row.
+
+    Verifies:
+    - Pre-existing root (root 99) in candidate row is completely preserved.
+    - Failed new root confirmation (root 1) is rolled back cleanly.
+    - Snapshot and SHA-256 digest match pre-operation state exactly.
+    - Retry successfully confirms root 1 without duplicate observations or loss of root 99.
+    """
+    envs = encode_exposure("القط", append_eos=False)
+    notif_prior = OutboxNotificationV1(
+        root_id=99,
+        event_order=0,
+        assembly_id=1,
+        structural_generation=1,
+        surface_sha256=envs[0].peripheral_surface.surface_sha256,
+        feature_bundle_digest=envs[0].peripheral_surface.feature_bundle_digest,
+        marker=envs[0].peripheral_surface.marker,
+        envelope=envs[0].peripheral_surface,
+    )
+
+    ledger = SurfaceReadoutLedgerV1()
+    # Establish pre-existing candidate row with root 99
+    added_prior = ledger.consume_outbox_notification(notif_prior)
+    assert added_prior is True
+    assert ledger.is_notification_acknowledged(notif_prior) is True
+
+    snap_pre = snapshot_ledger(ledger)
+    hash_pre = hash_state_snapshot(snap_pre)
+
+    # Now prepare notification for root 1 for the same candidate tuple
+    notif_new = OutboxNotificationV1(
+        root_id=1,
+        event_order=0,
+        assembly_id=1,
+        structural_generation=1,
+        surface_sha256=envs[0].peripheral_surface.surface_sha256,
+        feature_bundle_digest=envs[0].peripheral_surface.feature_bundle_digest,
+        marker=envs[0].peripheral_surface.marker,
+        envelope=envs[0].peripheral_surface,
+    )
+
+    class FailingSet(set):
+        def add(self, item: object) -> None:
+            raise RuntimeError("Injected failure during _processed_outbox_keys.add()")
+
+    failing_keys = FailingSet(ledger._processed_outbox_keys)
+    ledger._processed_outbox_keys = failing_keys
+
+    # Invoke production method
+    with pytest.raises(RuntimeError, match="Injected failure during _processed_outbox_keys.add()"):
+        ledger.consume_outbox_notification(notif_new)
+
+    # Verify exact rollback: pre-existing root 99 preserved, root 1 reverted
+    snap_post = snapshot_ledger(ledger)
+    hash_post = hash_state_snapshot(snap_post)
+
+    assert snap_pre == snap_post, "Ledger snapshot drifted after existing-row rollback!"
+    assert hash_pre == hash_post, "Ledger cryptographic SHA-256 digest drifted after existing-row rollback!"
+    rows_post = ledger.get_candidate_rows(1, 1)
+    assert len(rows_post) == 1
+    assert rows_post[0].confirmed_roots == {99}
+    assert 1 not in rows_post[0].confirmed_roots
+
+    # Remove fault and retry
+    ledger._processed_outbox_keys = set(failing_keys)
+    added_new = ledger.consume_outbox_notification(notif_new)
+    assert added_new is True
+
+    # Both roots now confirmed lawfully; exactly one candidate row
+    assert ledger.is_notification_acknowledged(notif_prior) is True
+    assert ledger.is_notification_acknowledged(notif_new) is True
+    rows_final = ledger.get_candidate_rows(1, 1)
+    assert len(rows_final) == 1
+    assert rows_final[0].confirmed_roots == {99, 1}

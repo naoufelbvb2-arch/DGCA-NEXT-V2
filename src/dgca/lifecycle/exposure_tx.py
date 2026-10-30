@@ -32,19 +32,21 @@ def _is_valid_outbox_consumer(consumer: object) -> bool:
 
 
 def _is_batch_acknowledged(consumer: object, batch: Sequence[object]) -> bool:
-    """Verify that consumer has acknowledged and accounted for every notification in the batch (Core §9.4, C02-S02, C03-S03).
+    """Verify that consumer has acknowledged and accounted for every notification in the batch (Core §9.4, C02-S02, C03-S03, C04-S01).
 
     Trust Boundary:
-    1. Canonical Ledger Contract: When the consumer possesses canonical ledger structures
-       (`_rows_by_asm_gen` and `_processed_outbox_keys`), acknowledgment requires BOTH
-       idempotency key recording AND completed candidate evidence with root confirmation.
+    1. Canonical Ledger Contract: For SurfaceReadoutLedgerV1, acknowledgment requires BOTH
+       idempotency key recording AND completed candidate evidence with root confirmation
+       via the canonical `is_batch_acknowledged(batch)` or `is_notification_acknowledged(notif)` API.
        Arbitrary consumer callbacks or premature key sets cannot weaken these canonical
        acceptance requirements.
-    2. Third-Party Consumer Protocol: For custom consumers without canonical ledger structures,
-       the consumer must implement `is_batch_acknowledged(batch)` or `is_notification_acknowledged(notif)`
-       and reliably attest that all notifications in the batch have been safely consumed.
-    3. Structural Verification Guard: If the consumer possesses `_rows_by_asm_gen`, candidate
-       evidence is directly checked across all notifications regardless of callback results.
+    2. Third-Party Consumer Protocol: Supported external consumers must implement an explicit
+       acknowledgment interface (`is_batch_acknowledged(batch)` or `is_notification_acknowledged(notif)`).
+       Third-party acknowledgments are assertions made by the external consumer and cannot be
+       treated as independently verified canonical ledger evidence.
+    3. No Key-Only Fallback: Merely exposing raw key collections (e.g. `_processed_outbox_keys`)
+       without an explicit acknowledgment interface or canonical evidence verification is strictly
+       rejected (Correction C04-S01).
     """
     if consumer is None:
         return False
@@ -86,21 +88,8 @@ def _is_batch_acknowledged(consumer: object, batch: Sequence[object]) -> bool:
         except Exception:
             return False
 
-    # 3. Direct idempotency key tracking attribute inspection (_processed_outbox_keys)
-    processed_keys = getattr(consumer, "_processed_outbox_keys", None)
-    if isinstance(processed_keys, (set, frozenset, dict)):
-        try:
-            for notif in batch:
-                idem_key = getattr(notif, "idempotency_key", None)
-                if idem_key is None or idem_key not in processed_keys:
-                    return False
-            return True
-        except Exception:
-            return False
-
-    # Any consumer without an acknowledgment interface or verification proof cannot be verified as consumed
+    # Raw key collections without an explicit acknowledgment API are rejected (C04-S01)
     return False
-
 
 class frozendict(Mapping[KT, VT]):
     """Genuinely immutable mapping preserving standard Mapping interfaces (Core §10.2, C02-S01, C03-S04).
