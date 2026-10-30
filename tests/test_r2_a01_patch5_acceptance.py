@@ -15,10 +15,14 @@ Acceptance Test Scenarios:
 - M06: Invalid Environment Handling (explicit failure on missing/unreadable files)
 - M07: Persistence Boundary Isolation (no durability engine, WAL, or persistent DB)
 - M08: Frozen Regression Integrity (Patches 1-4 invariants preserved)
+- C01-S01: Complete Manifest Verification (rejection of incomplete/corrupted schemas)
+- C01-S02: Working Tree Source Cleanliness Detection (fail closed on uncommitted source)
+- C01-S03: Comprehensive Negative Scenario Suite
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -33,7 +37,9 @@ import pytest
 from dgca.common.serialization import DurablePersistenceService
 from tools.generate_scientific_manifest import (
     DEFAULT_CONFIG_FILES,
+    REPOSITORY_IDENTIFIER,
     SCHEMA_VERSION,
+    check_source_cleanliness,
     compute_file_sha256,
     compute_manifest_digest,
     generate_manifest,
@@ -53,7 +59,6 @@ def repo_root() -> Path:
 
 def test_m01_source_sha_accuracy(repo_root: Path) -> None:
     """M01: Verify that manifest source SHA matches actual Git commit SHA."""
-    # Obtain actual HEAD SHA via Git
     proc = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=str(repo_root),
@@ -63,7 +68,7 @@ def test_m01_source_sha_accuracy(repo_root: Path) -> None:
     )
     expected_sha = proc.stdout.strip().lower()
 
-    manifest = generate_manifest(repo_root=repo_root)
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
 
     assert manifest["source_commit_sha"] == expected_sha
     assert manifest["source"]["commit_sha"] == expected_sha
@@ -73,7 +78,7 @@ def test_m01_source_sha_accuracy(repo_root: Path) -> None:
 
 def test_m02_configuration_hash_accuracy(repo_root: Path) -> None:
     """M02: Verify that each recorded config hash matches SHA-256 computed directly from raw bytes."""
-    manifest = generate_manifest(repo_root=repo_root)
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
 
     for rel_path in DEFAULT_CONFIG_FILES:
         abs_path = repo_root / rel_path
@@ -92,10 +97,10 @@ def test_m02_configuration_hash_accuracy(repo_root: Path) -> None:
 
 def test_m03_deterministic_replay(repo_root: Path) -> None:
     """M03: Verify that two manifest generations under identical conditions produce identical canonical bytes."""
-    manifest_1 = generate_manifest(repo_root=repo_root)
+    manifest_1 = generate_manifest(repo_root=repo_root, require_clean=False)
     serialized_1 = serialize_manifest(manifest_1)
 
-    manifest_2 = generate_manifest(repo_root=repo_root)
+    manifest_2 = generate_manifest(repo_root=repo_root, require_clean=False)
     serialized_2 = serialize_manifest(manifest_2)
 
     # Byte-for-byte equality
@@ -117,7 +122,7 @@ def test_m04_path_portability(repo_root: Path) -> None:
 
     # 1. Run from repo root
     proc_root = subprocess.run(
-        [sys.executable, str(script_path)],
+        [sys.executable, str(script_path), "--allow-dirty"],
         cwd=str(repo_root),
         capture_output=True,
         text=True,
@@ -128,7 +133,7 @@ def test_m04_path_portability(repo_root: Path) -> None:
     # 2. Run from an external temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
         proc_temp = subprocess.run(
-            [sys.executable, str(script_path)],
+            [sys.executable, str(script_path), "--allow-dirty"],
             cwd=temp_dir,
             capture_output=True,
             text=True,
@@ -141,7 +146,7 @@ def test_m04_path_portability(repo_root: Path) -> None:
 
 def test_m05_no_hardcoded_paths(repo_root: Path) -> None:
     """M05: Verify that output contains no local machine paths, usernames, or IDE dependencies."""
-    manifest = generate_manifest(repo_root=repo_root)
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
     serialized = serialize_manifest(manifest)
 
     # Check for drive letters, backslashes, user names, or full repo directory strings
@@ -163,6 +168,7 @@ def test_m06_invalid_environment_handling(repo_root: Path) -> None:
         generate_manifest(
             repo_root=repo_root,
             config_rel_paths=["configs/nonexistent_file_definitely_missing.json"],
+            require_clean=False,
         )
 
     # 2. Path traversing outside repository root
@@ -170,6 +176,7 @@ def test_m06_invalid_environment_handling(repo_root: Path) -> None:
         generate_manifest(
             repo_root=repo_root,
             config_rel_paths=["../../outside_repo.json"],
+            require_clean=False,
         )
 
     # 3. Non-git directory
@@ -202,7 +209,6 @@ def test_m07_persistence_boundary_isolation() -> None:
 
 def test_m08_frozen_regression_curriculum_integrity() -> None:
     """M08: Verify that cold-start curriculum and dual-owner invariants remain intact."""
-    from dgca.common.hashing import Region
     from dgca.core.readout import M_READ, THETA_READ
     from dgca.core.assembly import RHO_CORE, THETA_OB
     from dgca.core.dynamics import K_R_PER_EVENT
@@ -217,14 +223,13 @@ def test_m08_frozen_regression_curriculum_integrity() -> None:
 
 def test_cli_flags_and_check(repo_root: Path) -> None:
     """Verify CLI options: --canonical-digest, --output, --check."""
-    # 1. Canonical digest CLI
-    manifest = generate_manifest(repo_root=repo_root)
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
     serialized = serialize_manifest(manifest)
     expected_digest = compute_manifest_digest(serialized)
 
     script_path = repo_root / "tools" / "generate_scientific_manifest.py"
     proc_digest = subprocess.run(
-        [sys.executable, str(script_path), "--canonical-digest"],
+        [sys.executable, str(script_path), "--canonical-digest", "--allow-dirty"],
         cwd=str(repo_root),
         capture_output=True,
         text=True,
@@ -232,11 +237,10 @@ def test_cli_flags_and_check(repo_root: Path) -> None:
     )
     assert proc_digest.stdout.strip() == expected_digest
 
-    # 2. Output flag CLI
     with tempfile.TemporaryDirectory() as temp_dir:
         out_file = Path(temp_dir) / "manifest.json"
         subprocess.run(
-            [sys.executable, str(script_path), "-o", str(out_file)],
+            [sys.executable, str(script_path), "-o", str(out_file), "--allow-dirty"],
             cwd=str(repo_root),
             capture_output=True,
             text=True,
@@ -245,9 +249,9 @@ def test_cli_flags_and_check(repo_root: Path) -> None:
         assert out_file.is_file()
         assert out_file.read_text(encoding="utf-8") == serialized
 
-        # 3. Check flag CLI: valid manifest passes
+        # Check flag CLI: valid manifest passes with allow-dirty
         proc_check_ok = subprocess.run(
-            [sys.executable, str(script_path), "--check", str(out_file)],
+            [sys.executable, str(script_path), "--check", str(out_file), "--allow-dirty"],
             cwd=str(repo_root),
             capture_output=True,
             text=True,
@@ -255,17 +259,267 @@ def test_cli_flags_and_check(repo_root: Path) -> None:
         assert proc_check_ok.returncode == 0
         assert "Manifest check PASSED" in proc_check_ok.stdout
 
-        # 4. Check flag CLI: tampered manifest fails
+        # Check flag CLI: tampered manifest fails
         tampered_data = json.loads(serialized)
         tampered_data["source_commit_sha"] = "0" * 40
         tampered_file = Path(temp_dir) / "tampered_manifest.json"
         tampered_file.write_text(json.dumps(tampered_data), encoding="utf-8")
 
         proc_check_fail = subprocess.run(
-            [sys.executable, str(script_path), "--check", str(tampered_file)],
+            [sys.executable, str(script_path), "--check", str(tampered_file), "--allow-dirty"],
             cwd=str(repo_root),
             capture_output=True,
             text=True,
         )
         assert proc_check_fail.returncode == 1
         assert "Manifest check FAILED" in proc_check_fail.stderr
+
+
+# ==============================================================================
+# CORRECTION C01-S01 & C01-S03 TESTS: COMPLETE MANIFEST VERIFICATION & NEGATIVES
+# ==============================================================================
+
+def test_c01_s01_incomplete_manifest_reproduction_and_rejection(repo_root: Path) -> None:
+    """C01-S01: Demonstrate that incomplete manifest with empty configurations is rejected."""
+    incomplete = {
+        "source_commit_sha": get_git_commit_sha(repo_root),
+        "configurations": {},
+    }
+    valid, discrepancies = verify_manifest_against_repo(
+        incomplete,
+        repo_root=repo_root,
+        require_clean=False,
+    )
+    assert valid is False
+    assert len(discrepancies) > 0
+    # Must report missing configuration entries and missing required fields
+    assert any("Missing required configuration entries" in d for d in discrepancies)
+    assert any("Missing required top-level field" in d for d in discrepancies)
+
+
+def test_c01_s01_missing_configuration_inventory_entry(repo_root: Path) -> None:
+    """C01-S01: Reject manifest missing one required configuration file."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    # Remove one required config
+    del manifest["configurations"]["configs/lab_rc2_ablation.json"]
+    del manifest["configuration_hashes"]["configs/lab_rc2_ablation.json"]
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Missing required configuration entries: ['configs/lab_rc2_ablation.json']" in d for d in discrepancies)
+
+
+def test_c01_s01_unexpected_configuration_entry(repo_root: Path) -> None:
+    """C01-S01: Reject manifest with extra unexpected configuration file."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    manifest["configurations"]["configs/unexpected_extra.json"] = {
+        "path": "configs/unexpected_extra.json",
+        "sha256": "0" * 64,
+        "size_bytes": 100,
+    }
+    manifest["configuration_hashes"]["configs/unexpected_extra.json"] = "0" * 64
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Unexpected configuration entries" in d for d in discrepancies)
+
+
+def test_c01_s01_invalid_schema_version(repo_root: Path) -> None:
+    """C01-S01: Reject manifest with wrong schema version."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    manifest["schema_version"] = "2.0.0"
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Schema version mismatch" in d for d in discrepancies)
+
+
+def test_c01_s01_conflicting_source_shas(repo_root: Path) -> None:
+    """C01-S01: Reject manifest where source.commit_sha != source_commit_sha."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    manifest["source"]["commit_sha"] = "a" * 40
+    manifest["source_commit_sha"] = "b" * 40
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Contradictory source commit SHAs" in d for d in discrepancies)
+
+
+def test_c01_s01_incorrect_repository_identifier(repo_root: Path) -> None:
+    """C01-S01: Reject manifest with incorrect repository identifier."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    manifest["source"]["repository"] = "other-org/other-repo"
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Repository identifier mismatch" in d for d in discrepancies)
+
+
+def test_c01_s01_incorrect_configuration_hash(repo_root: Path) -> None:
+    """C01-S01: Reject manifest with tampered configuration SHA-256."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    target = "configs/lab_rc2_ablation.json"
+    manifest["configurations"][target]["sha256"] = "f" * 64
+    manifest["configuration_hashes"][target] = "f" * 64
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Configuration hash mismatch" in d for d in discrepancies)
+
+
+def test_c01_s01_incorrect_configuration_size(repo_root: Path) -> None:
+    """C01-S01: Reject manifest with tampered configuration file size."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    target = "configs/lab_rc2_ablation.json"
+    manifest["configurations"][target]["size_bytes"] = 999999
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Configuration size mismatch" in d for d in discrepancies)
+
+
+def test_c01_s01_inconsistent_duplicate_hash_fields(repo_root: Path) -> None:
+    """C01-S01: Reject manifest where configuration_hashes diverges from configurations."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    target = "configs/lab_rc2_ablation.json"
+    manifest["configuration_hashes"][target] = "e" * 64
+
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_root, require_clean=False)
+    assert valid is False
+    assert any("Contradictory hash" in d for d in discrepancies)
+
+
+def test_c01_s01_invalid_configuration_path_format(repo_root: Path) -> None:
+    """C01-S01: Reject manifest with non-POSIX, absolute, or traversal path."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    # 1. Absolute path
+    manifest_abs = copy.deepcopy(manifest)
+    manifest_abs["configurations"]["/configs/lab_rc2_ablation.json"] = manifest_abs["configurations"].pop("configs/lab_rc2_ablation.json")
+    manifest_abs["configuration_hashes"]["/configs/lab_rc2_ablation.json"] = manifest_abs["configuration_hashes"].pop("configs/lab_rc2_ablation.json")
+
+    valid_abs, disc_abs = verify_manifest_against_repo(manifest_abs, repo_root=repo_root, require_clean=False)
+    assert valid_abs is False
+    assert any("must be relative" in d or "Unexpected configuration entries" in d for d in disc_abs)
+
+    # 2. Traversal path
+    manifest_trav = copy.deepcopy(manifest)
+    manifest_trav["configurations"]["configs/../configs/lab_rc2_ablation.json"] = manifest_trav["configurations"].pop("configs/lab_rc2_ablation.json")
+    manifest_trav["configuration_hashes"]["configs/../configs/lab_rc2_ablation.json"] = manifest_trav["configuration_hashes"].pop("configs/lab_rc2_ablation.json")
+
+    valid_trav, disc_trav = verify_manifest_against_repo(manifest_trav, repo_root=repo_root, require_clean=False)
+    assert valid_trav is False
+    assert any("must not traverse outside" in d or "Unexpected configuration entries" in d for d in disc_trav)
+
+
+# ==============================================================================
+# CORRECTION C01-S02 TEST: WORKING TREE SOURCE CLEANLINESS IN CONTROLLED GIT REPO
+# ==============================================================================
+
+def test_c01_s02_working_tree_dirty_source_detection(tmp_path: Path) -> None:
+    """C01-S02: Mandatory controlled test verifying detection of uncommitted source changes."""
+    repo_dir = tmp_path / "test_repo"
+    repo_dir.mkdir()
+
+    # Initialize controlled git repo
+    subprocess.run(["git", "init"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Test Runner"], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    # 1. Create valid configs
+    configs_dir = repo_dir / "configs"
+    configs_dir.mkdir()
+    cfg1 = configs_dir / "lab_rc2_ablation.json"
+    cfg1.write_text('{"schema_version": "test-ablation"}', encoding="utf-8")
+    cfg2 = configs_dir / "lab_rc4_1_default.json"
+    cfg2.write_text('{"schema_version": "test-default"}', encoding="utf-8")
+
+    # Create tracked scientific source file
+    src_dir = repo_dir / "src"
+    src_dir.mkdir()
+    src_file = src_dir / "model.py"
+    src_file.write_text('# Authoritative source code\ndef run(): pass\n', encoding="utf-8")
+
+    # Initial commit
+    subprocess.run(["git", "add", "."], cwd=str(repo_dir), check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(repo_dir), check=True, capture_output=True)
+
+    # 2. Authoritative generation succeeds on clean tree
+    manifest = generate_manifest(repo_root=repo_dir, require_clean=True)
+    assert manifest["source_commit_sha"] is not None
+    valid, discrepancies = verify_manifest_against_repo(manifest, repo_root=repo_dir, require_clean=True)
+    assert valid is True
+    assert discrepancies == []
+
+    # 3. Modify a relevant tracked source file without committing
+    src_file.write_text('# Tampered uncommitted source code\ndef run(): raise Exception()\n', encoding="utf-8")
+
+    # 4. Verify that generator detects dirty source condition and fails closed
+    with pytest.raises(RuntimeError, match="uncommitted modifications"):
+        generate_manifest(repo_root=repo_dir, require_clean=True)
+
+    valid_dirty, disc_dirty = verify_manifest_against_repo(manifest, repo_root=repo_dir, require_clean=True)
+    assert valid_dirty is False
+    assert any("uncommitted modifications" in d for d in disc_dirty)
+
+    # 5. Restore the file to original committed state
+    src_file.write_text('# Authoritative source code\ndef run(): pass\n', encoding="utf-8")
+
+    # 6. Verify that authoritative manifest generation succeeds again
+    manifest_restored = generate_manifest(repo_root=repo_dir, require_clean=True)
+    assert manifest_restored["source_commit_sha"] == manifest["source_commit_sha"]
+    valid_restored, disc_restored = verify_manifest_against_repo(manifest_restored, repo_root=repo_dir, require_clean=True)
+    assert valid_restored is True
+    assert disc_restored == []
+
+
+# ==============================================================================
+# CORRECTION C01-S03 TESTS: ADDITIONAL NEGATIVE FAILURE INJECTION SCENARIOS
+# ==============================================================================
+
+def test_c01_s03_failed_file_read_controlled_simulation(repo_root: Path, tmp_path: Path) -> None:
+    """C01-S03: Verify controlled failure on unreadable or invalid file targets without fragile OS bits."""
+    # Pass directory instead of file
+    dir_target = tmp_path / "dummy_dir"
+    dir_target.mkdir()
+
+    with pytest.raises(IsADirectoryError, match="not a file"):
+        compute_file_sha256(dir_target)
+
+    # Non-existent file
+    missing_target = tmp_path / "does_not_exist.json"
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        compute_file_sha256(missing_target)
+
+
+def test_c01_s03_non_git_source_failure(tmp_path: Path) -> None:
+    """C01-S03: Verify fail-fast on directories without Git object database."""
+    empty_dir = tmp_path / "not_a_git_repo"
+    empty_dir.mkdir()
+
+    with pytest.raises(RuntimeError, match="cannot establish source commit identity"):
+        get_git_commit_sha(empty_dir)
+
+    is_clean, dirty = check_source_cleanliness(empty_dir)
+    assert is_clean is False
+    assert any("Git status" in d for d in dirty)
+
+
+def test_c01_s03_cli_check_exact_canonical_byte_enforcement(repo_root: Path) -> None:
+    """C01-S03: Verify that --check rejects valid JSON that is not canonical bytes."""
+    manifest = generate_manifest(repo_root=repo_root, require_clean=False)
+    script_path = repo_root / "tools" / "generate_scientific_manifest.py"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Non-canonical formatting: 4-space indentation and extra newline
+        non_canonical_json = json.dumps(manifest, indent=4) + "\n\n"
+        test_file = Path(temp_dir) / "non_canonical.json"
+        test_file.write_text(non_canonical_json, encoding="utf-8")
+
+        proc = subprocess.run(
+            [sys.executable, str(script_path), "--check", str(test_file), "--allow-dirty"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 1
+        assert "Candidate file bytes do not match canonical serialization byte-for-byte" in proc.stderr

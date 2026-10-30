@@ -40,6 +40,8 @@ DEFAULT_CONFIG_FILES: tuple[str, ...] = (
     "configs/lab_rc4_1_default.json",
 )
 
+RELEVANT_SOURCE_PATHS: tuple[str, ...] = ("src", "configs", "tools")
+
 
 def get_repo_root() -> Path:
     """Resolve the repository root directory relative to this script's location.
@@ -49,6 +51,61 @@ def get_repo_root() -> Path:
     """
     # tools/generate_scientific_manifest.py -> repo_root is parent of tools
     return Path(__file__).resolve().parent.parent
+
+
+def check_source_cleanliness(
+    repo_root: Path,
+    relevant_paths: Sequence[str] | None = None,
+) -> tuple[bool, list[str]]:
+    """Check whether relevant tracked source or configuration files have uncommitted modifications.
+
+    Distinguishes:
+    - Clean committed source.
+    - Modified tracked source (staged or unstaged).
+    - Relevant untracked source files in relevant scientific directories.
+    - Irrelevant build caches and harmless artifacts (ignored via .gitignore).
+
+    Returns:
+        (is_clean, list_of_dirty_entries)
+    """
+    if relevant_paths is None:
+        existing_targets = [p for p in RELEVANT_SOURCE_PATHS if (repo_root / p).exists()]
+        if not existing_targets:
+            target_args: list[str] = []
+        else:
+            target_args = ["--"] + existing_targets
+    else:
+        target_args = ["--"] + list(relevant_paths)
+
+    cmd = ["git", "status", "--porcelain"] + target_args
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (FileNotFoundError, OSError) as exc:
+        return False, [f"Failed to execute git status: {exc}"]
+
+    if proc.returncode != 0:
+        err = proc.stderr.strip() if proc.stderr else f"exit code {proc.returncode}"
+        return False, [f"Git status returned error: {err}"]
+
+    dirty: list[str] = []
+    for line in proc.stdout.splitlines():
+        trimmed = line.strip()
+        if not trimmed:
+            continue
+        status_code = line[:2]
+        path_part = line[3:].strip()
+        # Filter out harmless temporary/cache patterns if any leaked through
+        if any(ignored in path_part for ignored in ("__pycache__", ".pytest_cache", ".coverage")):
+            continue
+        dirty.append(f"{status_code} {path_part}")
+
+    return len(dirty) == 0, dirty
 
 
 def get_git_commit_sha(repo_root: Path) -> str:
@@ -129,6 +186,7 @@ def compute_file_sha256(file_path: Path) -> str:
 def generate_manifest(
     repo_root: Path | None = None,
     config_rel_paths: Sequence[str] | None = None,
+    require_clean: bool = True,
 ) -> dict[str, Any]:
     """Generate the deterministic scientific manifest dictionary.
 
@@ -136,10 +194,18 @@ def generate_manifest(
         repo_root: Optional explicit repository root. Defaults to auto-resolved root.
         config_rel_paths: Optional sequence of repo-relative configuration paths.
                          Defaults to DEFAULT_CONFIG_FILES.
+        require_clean: Whether to enforce that relevant scientific source files have
+                       no uncommitted modifications. Defaults to True.
 
     Returns:
         Deterministic manifest dictionary containing source SHA, configuration hashes,
         repository-relative paths, and schema version.
+
+    Raises:
+        RuntimeError: If working tree contains uncommitted changes in relevant paths
+                      and require_clean is True, or if Git identity cannot be resolved.
+        FileNotFoundError: If a configuration file is missing.
+        ValueError: If a path resolves outside the repository root.
     """
     if repo_root is None:
         resolved_repo_root = get_repo_root()
@@ -150,6 +216,15 @@ def generate_manifest(
         target_configs = DEFAULT_CONFIG_FILES
     else:
         target_configs = tuple(config_rel_paths)
+
+    # Source integrity check
+    if require_clean:
+        is_clean, dirty_entries = check_source_cleanliness(resolved_repo_root)
+        if not is_clean:
+            raise RuntimeError(
+                f"Working tree has uncommitted modifications in relevant scientific paths; "
+                f"cannot generate authoritative manifest: {dirty_entries}"
+            )
 
     commit_sha = get_git_commit_sha(resolved_repo_root)
 
@@ -208,8 +283,24 @@ def compute_manifest_digest(manifest_str: str) -> str:
 def verify_manifest_against_repo(
     manifest_data: dict[str, Any],
     repo_root: Path | None = None,
+    require_clean: bool = True,
 ) -> tuple[bool, list[str]]:
-    """Verify that an existing manifest matches current repository state.
+    """Verify that a manifest satisfies the complete canonical schema and matches repo state.
+
+    Enforces:
+    1. Working tree cleanliness in relevant scientific paths (if require_clean is True).
+    2. Exact top-level required fields (no missing, no unexpected).
+    3. Exact schema version.
+    4. Exact repository identifier.
+    5. Authoritative source commit SHA matching repository HEAD.
+    6. Exact consistency between source.commit_sha and source_commit_sha.
+    7. Complete authoritative configuration inventory (no missing, no unexpected entries).
+    8. SHA-256 digest match for every configuration file directly against disk.
+    9. Byte size match for every configuration file directly against disk.
+    10. Exact correspondence between configuration_hashes and configurations.
+    11. Rejection of malformed field types.
+    12. Rejection of repository-escaping or absolute configuration paths.
+    13. Rejection of contradictory metadata.
 
     Returns:
         (is_valid, list_of_discrepancies)
@@ -220,31 +311,169 @@ def verify_manifest_against_repo(
     else:
         repo_root = repo_root.resolve()
 
-    # Verify commit SHA
-    try:
-        current_sha = get_git_commit_sha(repo_root)
-        manifest_sha = manifest_data.get("source_commit_sha") or manifest_data.get("source", {}).get("commit_sha")
-        if manifest_sha != current_sha:
+    # 1. Working tree cleanliness
+    if require_clean:
+        is_clean, dirty_entries = check_source_cleanliness(repo_root)
+        if not is_clean:
             discrepancies.append(
-                f"Source commit SHA mismatch: recorded {manifest_sha!r} != actual {current_sha!r}"
+                f"Working tree has uncommitted modifications in relevant scientific paths: {dirty_entries}"
             )
-    except Exception as exc:
-        discrepancies.append(f"Failed to inspect repository Git commit: {exc}")
 
-    # Verify configurations
-    configs = manifest_data.get("configurations", {})
-    for rel_path, meta in configs.items():
-        norm_rel = Path(rel_path).as_posix()
-        abs_path = (repo_root / norm_rel).resolve()
-        expected_hash = meta.get("sha256") if isinstance(meta, dict) else meta
-        try:
-            actual_hash = compute_file_sha256(abs_path)
-            if actual_hash != expected_hash:
+    # 2. Type check
+    if not isinstance(manifest_data, dict):
+        return False, ["Manifest root must be a JSON object (dict)"]
+
+    # 3. Required top-level keys
+    expected_top_keys = {
+        "configuration_hashes",
+        "configurations",
+        "schema_version",
+        "source",
+        "source_commit_sha",
+    }
+    actual_top_keys = set(manifest_data.keys())
+    missing_top_keys = expected_top_keys - actual_top_keys
+    if missing_top_keys:
+        discrepancies.append(f"Missing required top-level field(s): {sorted(missing_top_keys)}")
+    unexpected_top_keys = actual_top_keys - expected_top_keys
+    if unexpected_top_keys:
+        discrepancies.append(f"Unexpected top-level field(s) under canonical schema: {sorted(unexpected_top_keys)}")
+
+    # 4. Schema version
+    if manifest_data.get("schema_version") != SCHEMA_VERSION:
+        discrepancies.append(
+            f"Schema version mismatch: recorded {manifest_data.get('schema_version')!r} != expected {SCHEMA_VERSION!r}"
+        )
+
+    # 5. Source object and Commit SHA
+    source_obj = manifest_data.get("source")
+    source_commit_sha = manifest_data.get("source_commit_sha")
+
+    if not isinstance(source_obj, dict):
+        discrepancies.append("Field 'source' must be a JSON object (dict)")
+    else:
+        expected_source_keys = {"commit_sha", "repository"}
+        if set(source_obj.keys()) != expected_source_keys:
+            discrepancies.append(
+                f"Field 'source' must contain exactly {sorted(expected_source_keys)}, got {sorted(source_obj.keys())}"
+            )
+        if source_obj.get("repository") != REPOSITORY_IDENTIFIER:
+            discrepancies.append(
+                f"Repository identifier mismatch: recorded {source_obj.get('repository')!r} != expected {REPOSITORY_IDENTIFIER!r}"
+            )
+
+        nested_sha = source_obj.get("commit_sha")
+        if nested_sha != source_commit_sha:
+            discrepancies.append(
+                f"Contradictory source commit SHAs: source.commit_sha={nested_sha!r} != source_commit_sha={source_commit_sha!r}"
+            )
+
+        if not isinstance(nested_sha, str) or len(nested_sha) != 40 or not all(c in "0123456789abcdef" for c in nested_sha.lower()):
+            discrepancies.append(f"Malformed source commit SHA format in source.commit_sha: {nested_sha!r}")
+        elif not isinstance(source_commit_sha, str) or len(source_commit_sha) != 40 or not all(c in "0123456789abcdef" for c in source_commit_sha.lower()):
+            discrepancies.append(f"Malformed source commit SHA format in source_commit_sha: {source_commit_sha!r}")
+        else:
+            try:
+                actual_sha = get_git_commit_sha(repo_root)
+                if nested_sha != actual_sha:
+                    discrepancies.append(
+                        f"Source commit SHA mismatch: recorded {nested_sha!r} != actual repository HEAD {actual_sha!r}"
+                    )
+            except Exception as exc:
+                discrepancies.append(f"Failed to inspect repository Git commit: {exc}")
+
+    # 6. Configurations inventory and validation
+    configs_obj = manifest_data.get("configurations")
+    if not isinstance(configs_obj, dict):
+        discrepancies.append("Field 'configurations' must be a JSON object (dict)")
+    else:
+        expected_configs = set(DEFAULT_CONFIG_FILES)
+        actual_configs = set(configs_obj.keys())
+
+        missing_configs = expected_configs - actual_configs
+        if missing_configs:
+            discrepancies.append(f"Missing required configuration entries: {sorted(missing_configs)}")
+
+        unexpected_configs = actual_configs - expected_configs
+        if unexpected_configs:
+            discrepancies.append(f"Unexpected configuration entries under canonical schema: {sorted(unexpected_configs)}")
+
+        for rel_path, meta in configs_obj.items():
+            if not isinstance(rel_path, str):
+                discrepancies.append(f"Configuration key must be a string, got {type(rel_path).__name__}")
+                continue
+
+            # Path formatting and safety
+            if "\\" in rel_path:
+                discrepancies.append(f"Configuration path {rel_path!r} must use POSIX forward slashes")
+            if Path(rel_path).is_absolute() or rel_path.startswith("/"):
+                discrepancies.append(f"Configuration path {rel_path!r} must be relative, not absolute")
+            if ".." in Path(rel_path).parts:
+                discrepancies.append(f"Configuration path {rel_path!r} must not traverse outside repository")
+
+            if not isinstance(meta, dict):
+                discrepancies.append(f"Configuration entry for {rel_path!r} must be a dict")
+                continue
+
+            expected_meta_keys = {"path", "sha256", "size_bytes"}
+            if set(meta.keys()) != expected_meta_keys:
+                discrepancies.append(f"Configuration entry {rel_path!r} must contain {sorted(expected_meta_keys)}, got {sorted(meta.keys())}")
+
+            if meta.get("path") != rel_path:
+                discrepancies.append(f"Contradictory path in entry {rel_path!r}: meta.path={meta.get('path')!r}")
+
+            recorded_hash = meta.get("sha256")
+            if not isinstance(recorded_hash, str) or len(recorded_hash) != 64 or not all(c in "0123456789abcdef" for c in recorded_hash.lower()):
+                discrepancies.append(f"Malformed sha256 digest in entry {rel_path!r}: {recorded_hash!r}")
+
+            recorded_size = meta.get("size_bytes")
+            if not isinstance(recorded_size, int) or recorded_size < 0:
+                discrepancies.append(f"Malformed size_bytes in entry {rel_path!r}: {recorded_size!r}")
+
+            # Direct verification against actual filesystem
+            norm_rel = Path(rel_path).as_posix()
+            abs_target = (repo_root / norm_rel).resolve()
+            try:
+                abs_target.relative_to(repo_root)
+            except ValueError:
+                discrepancies.append(f"Configuration path {rel_path!r} resolves outside repository root")
+                continue
+
+            if not abs_target.is_file():
+                discrepancies.append(f"Configuration file does not exist on disk: {rel_path}")
+            else:
+                try:
+                    actual_hash = compute_file_sha256(abs_target)
+                    actual_size = abs_target.stat().st_size
+                    if recorded_hash != actual_hash:
+                        discrepancies.append(
+                            f"Configuration hash mismatch for {rel_path}: recorded {recorded_hash} != actual {actual_hash}"
+                        )
+                    if recorded_size != actual_size:
+                        discrepancies.append(
+                            f"Configuration size mismatch for {rel_path}: recorded {recorded_size} != actual {actual_size}"
+                        )
+                except Exception as exc:
+                    discrepancies.append(f"Failed to read configuration file {rel_path}: {exc}")
+
+    # 7. Configuration hashes mapping correspondence
+    hashes_obj = manifest_data.get("configuration_hashes")
+    if not isinstance(hashes_obj, dict):
+        discrepancies.append("Field 'configuration_hashes' must be a JSON object (dict)")
+    else:
+        if isinstance(configs_obj, dict):
+            if set(hashes_obj.keys()) != set(configs_obj.keys()):
                 discrepancies.append(
-                    f"Configuration hash mismatch for {rel_path}: recorded {expected_hash} != actual {actual_hash}"
+                    f"Keys in configuration_hashes {sorted(hashes_obj.keys())} do not match configurations {sorted(configs_obj.keys())}"
                 )
-        except Exception as exc:
-            discrepancies.append(f"Failed to verify configuration {rel_path}: {exc}")
+            for k, recorded_h in hashes_obj.items():
+                if not isinstance(recorded_h, str) or len(recorded_h) != 64:
+                    discrepancies.append(f"Malformed sha256 in configuration_hashes[{k!r}]: {recorded_h!r}")
+                cfg_h = configs_obj.get(k, {}).get("sha256") if isinstance(configs_obj.get(k), dict) else None
+                if recorded_h != cfg_h:
+                    discrepancies.append(
+                        f"Contradictory hash for {k!r}: configuration_hashes has {recorded_h!r} but configurations has {cfg_h!r}"
+                    )
 
     return len(discrepancies) == 0, discrepancies
 
@@ -278,10 +507,16 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Verify an existing manifest file against current repository state.",
     )
+    parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow generation or checking against a dirty working tree (non-authoritative).",
+    )
 
     args = parser.parse_args(argv)
 
     repo_root = Path(args.repo_root).resolve() if args.repo_root else get_repo_root()
+    require_clean = not args.allow_dirty
 
     if args.check:
         check_path = Path(args.check).resolve()
@@ -289,21 +524,45 @@ def main(argv: list[str] | None = None) -> int:
             sys.stderr.write(f"Error: Manifest file to check not found: {check_path}\n")
             return 1
         try:
-            manifest_data = json.loads(check_path.read_text(encoding="utf-8"))
-            valid, discrepancies = verify_manifest_against_repo(manifest_data, repo_root=repo_root)
+            candidate_bytes = check_path.read_bytes()
+            try:
+                candidate_text = candidate_bytes.decode("utf-8")
+                manifest_data = json.loads(candidate_text)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                sys.stderr.write(f"Manifest check FAILED: candidate is not valid UTF-8 JSON: {exc}\n")
+                return 1
+
+            valid, discrepancies = verify_manifest_against_repo(
+                manifest_data,
+                repo_root=repo_root,
+                require_clean=require_clean,
+            )
             if not valid:
                 sys.stderr.write("Manifest check FAILED:\n")
                 for d in discrepancies:
                     sys.stderr.write(f"  - {d}\n")
                 return 1
-            sys.stdout.write("Manifest check PASSED: current repository state matches manifest.\n")
+
+            # Exact canonical byte equality check (normalizing CRLF to LF for cross-platform portability)
+            expected_manifest = generate_manifest(
+                repo_root=repo_root,
+                require_clean=require_clean,
+            )
+            canonical_bytes = serialize_manifest(expected_manifest).encode("utf-8")
+            normalized_candidate = candidate_bytes.replace(b"\r\n", b"\n")
+            if normalized_candidate != canonical_bytes:
+                sys.stderr.write("Manifest check FAILED:\n")
+                sys.stderr.write("  - Candidate file bytes do not match canonical serialization byte-for-byte.\n")
+                return 1
+
+            sys.stdout.write("Manifest check PASSED: canonical manifest matches repository state byte-for-byte.\n")
             return 0
         except Exception as exc:
             sys.stderr.write(f"Error during manifest verification: {exc}\n")
             return 1
 
     try:
-        manifest = generate_manifest(repo_root=repo_root)
+        manifest = generate_manifest(repo_root=repo_root, require_clean=require_clean)
         canonical_str = serialize_manifest(manifest)
     except Exception as exc:
         sys.stderr.write(f"Error generating scientific manifest: {exc}\n")
@@ -318,7 +577,7 @@ def main(argv: list[str] | None = None) -> int:
         out_path = Path(args.output).resolve()
         try:
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(canonical_str, encoding="utf-8")
+            out_path.write_bytes(canonical_str.encode("utf-8"))
         except OSError as exc:
             sys.stderr.write(f"Error writing manifest to '{out_path}': {exc}\n")
             return 1
