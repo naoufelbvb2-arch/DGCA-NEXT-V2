@@ -1,11 +1,16 @@
 # DGCA NEXT V2 — R2-B01 FORENSIC INVESTIGATION REPORT
 
 ## Assembly Duplicate Formation & Readout Collision Forensic Investigation
+### (Corrected Post-Audit Baseline — R2-B01-C01 Reconciled)
 
-- **Author:** Principal Cognitive Architecture Research Engineer, Neural Graph Forensics Specialist, Scientific Verification Engineer
+- **Author:** Principal Scientific Verification Engineer, Formal Specification Auditor, Neural Architecture Research Engineer
 - **Date:** October 30, 2026
 - **Investigation Branch:** `investigation/r2-b01-assembly-forensics`
 - **Starting Authoritative Baseline:** `faf361b6b95de6287b466eb1dc524ea49c732635` (frozen `main`)
+- **Normative References:**
+  - `DGCA_CORE_RC4_1.md` §2.0 (Executable Assembly Operators: `MAINTAIN → GROW → FORM → MERGE/SPLIT`)
+  - `DGCA_CORE_RC4_1.md` §9.4 (I/O Envelope, Readout Ledger & Structural Generation Invalidation)
+  - `DGCA_LLA_RC4_1.md` §6.6, §8.2 & §8.3 (LG-T01, LG-T02, LG-T03, LG-T16)
 - **Status:** **`R2-B01 FORENSIC INVESTIGATION COMPLETE — AWAITING DESIGN REVIEW`**
 
 ---
@@ -21,15 +26,17 @@ $$\text{Eagle Branch: } [\text{'النسر'}] \longrightarrow (\text{'يشرب'}
 This investigation conducted non-invasive, bit-exact instrumentation of the frozen production pipeline across all 56 roots to establish the precise structural and causal origin of this collision. 
 
 The empirical findings establish that:
-1. **Assemblies 5 and 6 are an `EXACT_DUPLICATE` pair.** At Root 56, both assemblies have identical membership tuples: `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)`, identical structural generation ($7$), identical status (`LIVE`), and identical attestation on the peripheral ledger (`<EOS>`, `Marker.EOS`).
-2. **They were born disjoint in Root 8, Event 3 (`<EOS>`).** In Root 8, fresh unassigned emitters formed two completely disjoint triangles: Assembly 5 (`[8834, 9209, 10570]`) and Assembly 6 (`[10646, 10915, 11153]`) with $\text{Jaccard} = 0.0000$.
-3. **They converged via GROW in Root 9.** During the subsequent exposure, symmetric coactivation and high mutual support recruited the other triangle's cells, rendering both assemblies 100% structurally identical at Root 9 ($8$ cells) and Root 10 ($9$ cells).
-4. **MERGE failed to merge them due to a specific predicate defect.** In all 49 consecutive roots from Root 8 to Root 56, `_try_merge_pair(5, 6)` was evaluated. While $\text{Jaccard} = 1.0 \ge \Theta_{\text{merge}} (0.70)$ and union cardinality $\le K_{\text{max}} (12)$, the implementation computes `between_strength` strictly over $(A \setminus B) \times (B \setminus A)$. Because $A = B$, both exclusive sets are empty (`excl_a = []`, `excl_b = []`), triggering the fallback:
+1. **Assemblies 5 and 6 are an `EXACT_DUPLICATE` pair.** At Root 56, both assemblies have identical ordered membership tuples: `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)`, identical structural generation ($7$), identical status (`LIVE`), and identical attestation on the peripheral ledger (`<EOS>`, `Marker.EOS`).
+2. **They were legally born disjoint during Root 8, Event 3 (`<EOS>`).** In Root 8, Event 3, unassigned committed fresh emitters formed two completely disjoint triangles: Assembly 5 (`[8834, 9209, 10570]`) and Assembly 6 (`[10646, 10915, 11153]`) with initial $\text{Jaccard} = 0.0000$. All six seed cells qualified as fresh emitters exclusively in Event 3.
+3. **They converged via root-close GROW in Root 9.** During the Root 9 root-close assembly pipeline (`END_EXPOSURE`), symmetric co-activation and mutual support in the shared co-active context drove mutual recruitment. Assembly 5 recruited Assembly 6's cells and vice versa, rendering both assemblies 100% structurally identical at Root 9 ($8$ cells) and Root 10 ($9$ cells).
+4. **MERGE rejected the pair under strict compliance with the frozen Core specification.** In all 49 consecutive roots from Root 8 to Root 56, `_try_merge_pair(5, 6)` was evaluated. While $\text{Jaccard} = 1.0 \ge \Theta_{\text{merge}} (0.70)$ and union cardinality $9 \le K_{\text{max}} (16)$, `DGCA_CORE_RC4_1.md` §2.0 item 4 explicitly defines:
+   $$\text{between\_strength} = \text{mean}\{R_{ij}^B : i \in A \setminus B, j \in B \setminus A\}, \quad \text{with } (\text{empty exclusive side} \implies 0)$$
+   Because $A_5 = A_6$, both exclusive sets are empty (`excl_a = []`, `excl_b = []`). The production implementation:
    ```python
    if not excl_a or not excl_b:
        between_strength = 0.0
    ```
-   This assigned `between_strength = 0.0`, failing the gate `between_strength >= THETA_OB (0.40)` and permanently blocking MERGE.
+   faithfully executes this specification. The resulting `between_strength = 0.0 < THETA_OB (0.40)` rejected the merge. This is classified as a **contract-compliant structural consolidation limitation**, not a software implementation defect.
 5. **Readout collision is an exact floating-point and Q6 score tie.** At Step 2 of Eagle readout (`ماء` $\to$ `<EOS>`), Assemblies 5 and 6 both computed $\text{score} = 0.2069442431$ ($\text{Q6} = 206944$). The score margin was exactly $0.0000000000 < M_{\text{read}} (0.04)$, legally forcing `StatusCode.AMBIGUOUS` and `GEN_STOP_AMBIGUOUS`.
 
 ---
@@ -78,7 +85,7 @@ Reproduction is automated via the standalone forensic tool:
      - Odd roots ($1, 3, \dots, 55$): `القط يشرب حليب <EOS>` (Branch AB)
      - Even roots ($2, 4, \dots, 56$): `النسر يشرب ماء <EOS>` (Branch DB)
    - Performs autonomous multi-step rollout for prompts `['القط']` and `['النسر']`.
-   - Restores all monkeypatched module functions before exit.
+   - Restores all original module functions before exit.
 
 ---
 
@@ -101,41 +108,38 @@ Across the 56 roots of training, a total of 12 assemblies were formed in $W$. Th
 | **11** | Root 15 | AB (Cat) | Event 2 (`حليب`) | `[9183, 9951, 11463]` | 8 | 6 | `('حليب', NONE)` | `LIVE` |
 | **12** | Root 16 | DB (Eagle) | Event 2 (`ماء`) | `[8809, 9740, 10634]` | 7 | 5 | `('ماء', NONE)` | `LIVE` |
 
-*Note:* Roots 1–6 yielded zero assemblies because cell commit density and mutual support had not yet reached the formation threshold. Roots 17–56 yielded zero new assemblies because all events met the core coverage threshold ($C_t \ge \rho_{\text{core}} = 0.40$).
+*Note:* Roots 1–6 yielded zero assemblies because cell commit density and mutual support had not yet reached the formation threshold. Roots 17–56 yielded zero new assemblies because all events met the core coverage threshold ($\text{CoreCoverage}(A, t) \ge \rho_{\text{core}} = 0.70$).
 
 ---
 
-## 5. Birth Histories of Assemblies 5 and 6
+## 5. Birth Histories & Event Attribution of Assemblies 5 and 6
 
-Both Assembly 5 and Assembly 6 were born in **Root 8** during **Event 3** (`<EOS>`):
+Both Assembly 5 and Assembly 6 were born in **Root 8** during the **Event 3** pass of Stage 3 (`FORM`):
 
 ```
 Root 8, Event 3 Context:
 - Stimulus: <EOS> (Marker.EOS)
-- Pre-event committed emitters in event: 16 cells
+- Pre-event committed emitters in event: 87 cells
 - Live assemblies before Event 3: Assemblies 1, 2, 3, 4
-- Assemblies covering Event 3: Assembly 2 covered 8 cells (Core coverage >= 0.40)
+- Assemblies covering Event 3: Assembly 2 covered 14 cells with CoreCoverage >= RHO_CORE (0.70)
 - Unassigned committed fresh emitter pool U_t:
   U_t = [8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116] (8 cells)
 ```
 
-### Formation Sequence:
-1. Candidate enumeration identified all 3-cell subsets of $U_t$ exhibiting reciprocal triangle mutual support ($N_{\text{rec}} \ge 1.0$).
-2. Triangle 1 was selected: `[8834, 9209, 10570]`.
-   - Created **Assembly 5** (Gen 1).
-   - Cells `8834, 9209, 10570` were assigned locally to Assembly 5.
-3. Remaining unassigned emitters in Event 3: `[10646, 10915, 11153, 11583, 12116]` (5 cells).
-4. Candidate enumeration evaluated the remaining pool and identified a second valid reciprocal triangle: `[10646, 10915, 11153]`.
-   - Created **Assembly 6** (Gen 1).
-   - Cells `10646, 10915, 11153` were assigned locally to Assembly 6.
-5. Remaining unassigned cells (`11583, 12116`) could not form a 3-cell triangle and remained unassigned.
-
-**Direct Empirical Observation:** At the end of Root 8, Assemblies 5 and 6 were **completely disjoint**:
-$$\text{Members}(A_5) \cap \text{Members}(A_6) = \emptyset, \quad \text{Jaccard}(A_5, A_6) = 0.0000$$
+### Reproducible Proof of Event 3 Attribution:
+1. **Fresh Emitter Qualification:** Inspecting the event journal demonstrates that all three seed cells of Assembly 5 (`8834, 9209, 10570`) and all three seed cells of Assembly 6 (`10646, 10915, 11153`) qualified as fresh emitters ($A_j^+ \ge \theta_{\text{emit}}$) **strictly in Event 3**. In Events 0, 1, and 2, zero of these cells met the fresh emitter qualification.
+2. **Sequential Triangle Formation:**
+   - Candidate enumeration identified valid 3-cell reciprocal triangles ($d(v, \text{tri})=2, D \ge 0.70, Spec \ge 0.30$) within $U_t$.
+   - The first lexicographic triangle was formed: `[8834, 9209, 10570]` $\to$ **Assembly 5** (Gen 1).
+   - In accordance with Core §2.0 item 3, these three cells were added to `assigned_in_event` to ensure disjoint triangle seeds.
+   - The second lexicographic triangle was enumerated over remaining cells: `[10646, 10915, 11153]` $\to$ **Assembly 6** (Gen 1).
+   - Remaining cells (`11583, 12116`) could not form a third 3-cell triangle.
+3. **Disjoint Status at Birth:** At the end of Root 8, Assemblies 5 and 6 were completely disjoint:
+   $$\text{Members}(A_5) \cap \text{Members}(A_6) = \emptyset, \quad \text{Jaccard}(A_5, A_6) = 0.0000$$
 
 ---
 
-## 6. Exact Membership Comparison
+## 6. Exact Membership Comparison & Growth Evolution
 
 The table below traces the structural evolution of Assemblies 5 and 6 from birth (Root 8) through convergence to the final curriculum root (Root 56):
 
@@ -148,49 +152,50 @@ The table below traces the structural evolution of Assemblies 5 and 6 from birth
 | **...** | *(identical for Roots 12 through 55)* | *(identical for Roots 12 through 55)* | **True** | 9 | 9 | 1.0000 | $\emptyset$ | $\emptyset$ | 7 / 7 |
 | **Root 56** | `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)` | `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)` | **True** | 9 | 9 | 1.0000 | $\emptyset$ | $\emptyset$ | 7 / 7 |
 
-### Structural Classification:
-- **Root 08 Classification:** `DISTINCT_STRUCTURE`
-- **Roots 09–56 Classification:** **`EXACT_DUPLICATE`**
-  $$\text{Members}(A_5) = \text{Members}(A_6), \quad A_5 \Delta A_6 = \emptyset, \quad \text{Jaccard}(A_5, A_6) = 1.000000$$
+### Reconciliation of GROW Lifecycle:
+- **Execution Timing:** In accordance with Core §2.0, Stage 2 (`GROW`) executes **at root close** (`END_EXPOSURE` assembly pipeline pass) on the whole-root consolidated evidence graph $W^*$, NOT during individual event passes.
+- **Root 09 Convergence:** During the Root 9 root close:
+  - Assembly 5 added cells `[10646, 10915, 11153, 11583, 12116]`.
+  - Assembly 6 added cells `[8834, 9209, 10570, 11583, 12116]`.
+  - Structural generation advanced from 1 to 6 on each addition.
+- **Root 10 Extension:** Both assemblies added cell `[12117]`, advancing generation to 7.
+- **Structural Classification:**
+  - Root 08: `DISTINCT_STRUCTURE`
+  - Roots 09–56: **`EXACT_DUPLICATE`** ($A_5 = A_6, A_5 \Delta A_6 = \emptyset, \text{Jaccard} = 1.0000$).
 
 ---
 
-## 7. FORM Eligibility Analysis
+## 7. FORM Eligibility Analysis & Normative Constants
 
-The investigation examined whether the creation of both assemblies in Root 8, Event 3 complied with Core §9.1:
+The investigation audited the formation of Assemblies 5 and 6 against authoritative Core §2.0 parameters:
 
-1. **Fresh Emitter Eligibility:** All 8 cells in $U_t$ were committed before Event 3 and satisfied:
-   $$\text{live\_assembly\_count}(c) < M_{\text{max}} = 2$$
-   None of the 8 cells were assigned to any live assembly.
-2. **Core Coverage:** Existing Assembly 2 had core coverage:
-   $$C_t(A_2) = \frac{|\text{Members}(A_2) \cap E_t|}{|\text{Members}(A_2)|} = \frac{4}{4} = 1.0 \ge \rho_{\text{core}} (0.40)$$
-   However, Assembly 2 only accounted for 8 committed emitters, leaving 8 committed emitters completely uncovered.
-3. **Reciprocal Triangle Test:** Both seed triples satisfied the triangle formation criteria:
-   $$\min_{(i, j) \in \text{Triangle}} N_{\text{rec}}(i, j) \ge 1.0$$
-4. **Legality Finding:** Under the frozen rules of `_run_form_stage`, both Assembly 5 and Assembly 6 were **100% legally admitted**. The algorithm permits multiple triangles to be seeded within a single event when $|U_t| \ge 6$, provided no cell is assigned to more than one triangle in that event.
+| Parameter | Normative Symbol | Frozen Value | Observed Value at Formation | Status |
+|:---|:---:|:---:|:---:|:---:|
+| Core Coverage Threshold | $\rho_{\text{core}}$ | `0.70` | Uncovered cells had $C_t < 0.70$ | **PASS** |
+| Max Cell Assembly Membership | $M_{\text{max}}$ | `12` | All seed cells had count $0 < 12$ | **PASS** |
+| Min Assembly Size | $K_{\text{min}}$ | `3` | Seed triangles had size $3$ | **PASS** |
+| Max Assembly Size | $K_{\text{max}}$ | `16` | Seed triangles had size $3 \le 16$ | **PASS** |
+| Min Reciprocal Degree | $d_{\text{min}}$ | `2` | All triangle vertices had $d = 2$ | **PASS** |
+| Prospective Density | $\rho_G$ | `0.50` | Triangle vertices had $D \ge 0.70 \ge 0.50$ | **PASS** |
+| Prospective Specificity | $\sigma_G$ | `0.30` | Triangle vertices had $\text{Spec} \ge 0.30$ | **PASS** |
+| Triangle Seed Overlap | — | Disjoint | Disjoint seeds within event | **PASS** |
+| Max FORM per Root | $K_{\text{FORM\_PER\_END}}$ | `12` | 4 formed in Root 8 $\le 12$ | **PASS** |
+
+Both Assembly 5 and Assembly 6 were **strictly compliant** with every normative FORM acceptance predicate.
 
 ---
 
-## 8. MERGE Predicate Analysis
+## 8. MERGE Predicate Analysis & Specification Compliance
 
-Given that Assemblies 5 and 6 reached $\text{Jaccard} = 1.0$ at Root 9, the investigation examined why `_try_merge_pair(5, 6)` never merged them.
+Given that Assemblies 5 and 6 reached $\text{Jaccard} = 1.0$ at Root 9, the investigation examined the exact behavior of `_try_merge_pair(5, 6)`.
 
-### Evaluation History:
-- The pair $(5, 6)$ was evaluated by `_try_merge_pair` in **49 consecutive roots** (Root 8 through Root 56).
-- **At Root 08:**
-  - $\text{Jaccard} = 0.0000 < \Theta_{\text{merge}} (0.70)$
-  - Between-strength $= 0.239667 < \Theta_{\text{ob}} (0.40)$
-  - Result: Correctly rejected (not eligible).
-- **At Roots 09 through 56 (48 consecutive evaluations):**
-  - Status: Both `AssemblyStatus.LIVE` $\implies$ **PASS**
-  - Cooldown: $0$ (neither assembly recently underwent merge/split) $\implies$ **PASS**
-  - Union Size: $|A_5 \cup A_6| = 8$ (Root 9) and $9$ (Roots 10–56) $\le K_{\text{max}} (12) \implies$ **PASS**
-  - Jaccard Similarity: $\text{Jaccard} = 1.0000 \ge \Theta_{\text{merge}} (0.70) \implies$ **PASS**
+### Frozen Specification Contract:
+`DGCA_CORE_RC4_1.md` §2.0 item 4 normatively defines the MERGE operator:
+> "with Jaccard of member sets $\ge \theta_{\text{merge}} = .70$, $\text{between\_strength} \ge \theta_{\text{ob}} = .40$ where $\text{between\_strength} = \text{mean}\{R_{ij}^B : i \in A \setminus B, j \in B \setminus A\}$ **(empty exclusive side $\implies$ 0)**; require $|\text{union}| \le 16$ and every proposed union member meets the MAINTAIN guards and membership limits."
 
-### The Source Code Blocker:
-In [`src/dgca/core/assembly.py`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/assembly.py#L538-L551):
+### Production Implementation:
+In [`src/dgca/core/assembly.py#L538-L551`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/assembly.py#L538-L551):
 ```python
-# Check mutual support between exclusive sets (Core §9.3)
 excl_a = sorted(set_a - set_b)
 excl_b = sorted(set_b - set_a)
 if not excl_a or not excl_b:
@@ -207,159 +212,139 @@ if between_strength < THETA_OB:
     return False
 ```
 
-### Mathematical & Logical Mechanism:
-1. When two assemblies are structurally identical ($A_5 = A_6$):
+### Formal Evaluation:
+1. When $A_5 = A_6$, the exclusive sets are empty:
    $$\text{excl\_a} = A_5 \setminus A_6 = \emptyset, \quad \text{excl\_b} = A_6 \setminus A_5 = \emptyset$$
-2. Because `excl_a` and `excl_b` are empty, the guard `if not excl_a or not excl_b:` branch executes.
-3. It explicitly assigns:
-   $$\text{between\_strength} = 0.0$$
-4. Next, the predicate tests:
+2. The code sets `between_strength = 0.0`, precisely conforming to `(empty exclusive side => 0)`.
+3. The predicate evaluates:
    $$\text{between\_strength} < \Theta_{\text{ob}} \iff 0.0 < 0.40 \implies \mathbf{True}$$
-5. The function immediately executes `return False`.
+4. The function executes `return False`.
 
-**Causal Verdict:** The condition `if not excl_a or not excl_b: between_strength = 0.0` treats exact identity as **zero mutual support**. This single line permanently blocked the legal merge of Assemblies 5 and 6 for 48 consecutive roots.
+### Distinction of Correctness vs. Limitation:
+- **Specification Compliance:** The production code is **100% compliant** with the frozen Core specification.
+- **Empirical Consequence:** Under this specification, structurally identical assemblies ($\text{Jaccard} = 1.0$) are mathematically forbidden from merging, because an empty exclusive set unconditionally yields zero between-strength.
+- **Classification:** This is a **contract-compliant structural consolidation limitation** in the specification itself, NOT an implementation bug.
 
 ---
 
-## 9. Readout Score and Ranking Comparison
+## 9. Downstream Guard Status & Counterfactual Distinction
 
-At Root 56, episode generation was evaluated on both autonomous prompt sequences:
+In accordance with scientific verification rigor, we explicitly distinguish the observed failure point from unreached downstream predicates and unproven counterfactual claims:
+
+1. **Observed Rejection Condition:**
+   `_try_merge_pair(5, 6)` aborted execution at line 551 (`if between_strength < THETA_OB: return False`) across all 48 evaluations from Root 9 to Root 56.
+2. **Unreached Downstream Predicates in Frozen Execution:**
+   The lines following line 551 were never reached in live execution:
+   ```python
+   for x in union_tuple:
+       live_after = (_live_assembly_ids_for_cell(x, w) - {b_id}) | {a_id}
+       if len(live_after) > M_MAX:
+           return False
+       if not check_maintain_keep_guards(x, union_tuple, w, n_rec_cache):
+           return False
+   ```
+3. **Read-Only Counterfactual Analysis:**
+   Evaluating these downstream predicates against the frozen runtime state at Root 56 reveals:
+   - Union Cardinality: $|A_5 \cup A_6| = 9 \le K_{\text{max}} (16) \implies$ **PASS**
+   - Post-Merge Cell Membership: All 9 cells have $|\text{live\_after}| \le 2 \le M_{\text{max}} (12) \implies$ **PASS**
+   - MAINTAIN Keep Guards on Union: Every cell satisfies $d \ge 2, D \ge \rho_{\text{keep}} (0.35), \text{Spec} \ge \sigma_{\text{keep}} (0.20)$ on the union set $\implies$ **PASS**
+4. **Untested Dynamic Counterfactuals:**
+   While the static guards pass in read-only analysis, dynamically merging $A_5$ and $A_6$ would trigger several consequential state transitions:
+   - Advancing $A_5$'s structural generation ($7 \to 8$).
+   - Transitioning $A_6$ to `AssemblyStatus.ARCHIVED`.
+   - Applying merge cooldown ($T_c = 200$).
+   - Bypassing or triggering subsequent SPLIT evaluation.
+   Whether a modified MERGE operator produces overall system stability remains an untested hypothesis that requires formal design in R2-B02.
+5. **Rejection of Hypothetical Values:**
+   We explicitly reject assigning `between_strength = 1.0` as an empirical measurement. Because the Cartesian product $(A \setminus B) \times (B \setminus A)$ is empty ($\emptyset \times \emptyset = \emptyset$), cross-set mutual support is undefined without an axiomatic contract convention.
+
+---
+
+## 10. Readout Score and Ranking Comparison
+
+At Root 56, autonomous episode generation was evaluated on both prompt sequences:
 
 ### Autonomous Prompt 1: `['القط']` (Cat Branch)
-- **Step 0 (`القط` $\to$ `يشرب`):**
-  - Top Candidate: Assembly 4 ($\text{score} = 0.5137547311$, $\text{Q6} = 513755$, elig = 7/7)
-  - Runner-Up: Assembly 1 ($\text{score} = 0.4029698664$, $\text{Q6} = 402970$, elig = 4/5)
-  - Margin: $0.1107848647 > M_{\text{read}} (0.04) \implies$ **OK**
-  - Emitted: `'يشرب'`
-- **Step 1 (`يشرب` $\to$ `حليب`):**
-  - Top Candidate: Assembly 8 ($\text{score} = 0.0907288892$, $\text{Q6} = 90729$, elig = 2/4)
-  - Runner-Up: Assembly 1 ($\text{score} = 0.0000000000$, $\text{Q6} = 0$, elig = 0/5)
-  - Margin: $0.0907288892 > M_{\text{read}} (0.04) \implies$ **OK**
-  - Emitted: `'حليب'`
+- **Step 0 (`القط` $\to$ `يشرب`):** Top Assembly 4 ($\text{score} = 0.513755$, elig 7/7) vs Assembly 1 ($\text{score} = 0.402970$, elig 4/5). Margin: $0.110785 > M_{\text{read}} (0.04) \implies$ **OK**. Emitted: `'يشرب'`.
+- **Step 1 (`يشرب` $\to$ `حليب`):** Top Assembly 8 ($\text{score} = 0.090729$, elig 2/4) vs Assembly 1 ($\text{score} = 0.000000$, elig 0/5). Margin: $0.090729 > M_{\text{read}} (0.04) \implies$ **OK**. Emitted: `'حليب'`.
 - **Step 2 (`حليب` $\to$ `<EOS>`):**
-  - Top Candidate: Assembly 2 ($\text{score} = 0.6484484204$, $\text{Q6} = 648448$, elig = 4/4)
-  - Runner-Up: Assembly 5 ($\text{score} = 0.5118424509$, $\text{Q6} = 511842$, elig = 7/9)
-  - Third Place: Assembly 6 ($\text{score} = 0.5118424509$, $\text{Q6} = 511842$, elig = 7/9)
-  - Margin: $0.6484484204 - 0.5118424509 = 0.1366059695 > M_{\text{read}} (0.04) \implies$ **OK**
-  - Emitted: `'<EOS>'` (`Marker.EOS`)
-- **Final Result:** **`StatusCode.GEN_STOP_EOS`** (Clean Success).
-  *Note:* Although Assemblies 5 and 6 tied for 2nd and 3rd place, Assembly 2 won by a decisive margin of $0.1366 > 0.04$, avoiding ambiguity.
+  - Winner: Assembly 2 ($\text{score} = 0.648448$, $\text{Q6} = 648448$, elig 4/4)
+  - Runner-Up: Assembly 5 ($\text{score} = 0.511842$, $\text{Q6} = 511842$, elig 7/9)
+  - Third Place: Assembly 6 ($\text{score} = 0.511842$, $\text{Q6} = 511842$, elig 7/9)
+  - Margin: $0.648448 - 0.511842 = 0.136606 > M_{\text{read}} (0.04) \implies$ **OK**. Emitted: `'<EOS>'` (`Marker.EOS`).
+- **Result:** **`StatusCode.GEN_STOP_EOS`** (Clean Success).
+  *Note:* Assembly 2 won decisively, so the tie between 5 and 6 in 2nd/3rd place did not trigger ambiguity.
 
 ---
 
 ### Autonomous Prompt 2: `['النسر']` (Eagle Branch)
-- **Step 0 (`النسر` $\to$ `يشرب`):**
-  - Top Candidate: Assembly 4 ($\text{score} = 0.5082440878$, $\text{Q6} = 508244$, elig = 7/7)
-  - Runner-Up: Assembly 1 ($\text{score} = 0.3986255487$, $\text{Q6} = 398626$, elig = 4/5)
-  - Margin: $0.1096185392 > M_{\text{read}} (0.04) \implies$ **OK**
-  - Emitted: `'يشرب'`
-- **Step 1 (`يشرب` $\to$ `ماء`):**
-  - Top Candidate: Assembly 10 ($\text{score} = 0.1279571503$, $\text{Q6} = 127957$, elig = 2/4)
-  - Runner-Up: Assembly 1 ($\text{score} = 0.0000000000$, $\text{Q6} = 0$, elig = 0/5)
-  - Margin: $0.1279571503 > M_{\text{read}} (0.04) \implies$ **OK**
-  - Emitted: `'ماء'`
+- **Step 0 (`النسر` $\to$ `يشرب`):** Top Assembly 4 ($\text{score} = 0.508244$, elig 7/7) vs Assembly 1 ($\text{score} = 0.398626$, elig 4/5). Margin: $0.109619 > M_{\text{read}} (0.04) \implies$ **OK**. Emitted: `'يشرب'`.
+- **Step 1 (`يشرب` $\to$ `ماء`):** Top Assembly 10 ($\text{score} = 0.127957$, elig 2/4) vs Assembly 1 ($\text{score} = 0.000000$, elig 0/5). Margin: $0.127957 > M_{\text{read}} (0.04) \implies$ **OK**. Emitted: `'ماء'`.
 - **Step 2 (`ماء` $\to$ `<EOS>`):**
-  - Candidate 1: Assembly 5 ($\text{score} = 0.2069442431$, $\text{Q6} = 206944$, elig = 3/9)
-  - Candidate 2: Assembly 6 ($\text{score} = 0.2069442431$, $\text{Q6} = 206944$, elig = 3/9)
-  - Candidate 3: Assembly 2 ($\text{score} = 0.0935894215$, $\text{Q6} = 93589$, elig = 1/4)
-  - Top Score: $0.2069442431$
-  - Second Score: $0.2069442431$
-  - Score Margin: **$0.0000000000$**
+  - Candidate 1: Assembly 5 ($\text{score} = 0.2069442431$, $\text{Q6} = 206944$, elig 3/9)
+  - Candidate 2: Assembly 6 ($\text{score} = 0.2069442431$, $\text{Q6} = 206944$, elig 3/9)
+  - Candidate 3: Assembly 2 ($\text{score} = 0.0935894215$, $\text{Q6} = 93589$, elig 1/4)
+  - Margin: **$0.0000000000$**
   - Ambiguity Gate: $\text{Margin } (0.0000) < M_{\text{read}} (0.04) \implies \mathbf{True}$
   - Step Status: `StatusCode.AMBIGUOUS`
-- **Final Result:** **`StatusCode.GEN_STOP_AMBIGUOUS`** (Ambiguity Safe-Halt).
-
-### Score Tie Breakdown:
-The tie between Assemblies 5 and 6 at Step 2 is an **exact IEEE 754 64-bit binary float equality**:
-$$\text{Score}(A_5) = \text{Score}(A_6) = \frac{1}{|A|} \sum_{c \in A} \text{gain}(c) = 0.20694424312674403$$
-Because both assemblies contain the identical 9 cell IDs, evaluate over identical synaptic weights, and have identical generation 7, their readout scores are mathematically guaranteed to be identical down to the last binary bit.
+- **Result:** **`StatusCode.GEN_STOP_AMBIGUOUS`** (Ambiguity Safe-Halt).
 
 ---
 
-## 10. Verified Root-Cause Classification
+## 11. Ledger Invalidation & Attestation Constraints
 
-The forensic evidence demonstrates a **twin-stage structural and algorithmic failure chain**:
+`DGCA_CORE_RC4_1.md` §2.0 and §9.4 establish fundamental invariants governing peripheral ledger attestations:
 
-```
-[Root 8, Event 3]
-  Dense unassigned emitters (8 cells) form TWO legal, disjoint triangles
-  --> Assembly 5: [8834, 9209, 10570]
-  --> Assembly 6: [10646, 10915, 11153]
-         │
-         ▼
-[Root 9, Event 3]
-  GROW stage evaluates mutual support in shared context
-  Both assemblies recruit each other's cells and fresh emitters
-  --> Assembly 5 becomes [8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116]
-  --> Assembly 6 becomes [8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116]
-  STRUCTURAL CONVERGENCE TO EXACT DUPLICATE (Jaccard = 1.0)
-         │
-         ▼
-[Roots 9 to 56]
-  MERGE stage evaluates pair (5, 6) on every root:
-  Jaccard = 1.0 >= 0.70 (PASS)
-  Union size = 9 <= 12 (PASS)
-  Status = LIVE (PASS)
-  --> BUT excl_a = [] and excl_b = []
-  --> Predicate sets between_strength = 0.0
-  --> 0.0 < THETA_OB (0.40) strictly REJECTS MERGE
-  MERGE IS PERMANENTLY DISABLED FOR IDENTICAL ASSEMBLIES
-         │
-         ▼
-[Root 56, Prompt 'النسر']
-  Step 2 readout evaluates candidate assemblies:
-  Both Assembly 5 and Assembly 6 compute score = 0.2069442431
-  Score margin = 0.0000000000 < M_read (0.04)
-  --> StatusCode.AMBIGUOUS triggered
-  --> Safe-halt with StatusCode.GEN_STOP_AMBIGUOUS
-```
+> "Each membership change increments structural_generation, invalidating prior ledger readout attestation until re-confirmed."
+> "Any `MERGE/SPLIT/ARCHIVE` invalidates an old matching ledger binding; loss of a printable surface must be reported, never resolved by fetching a historical archived Assembly ID."
+
+### Implications for Merge Remediation:
+1. **No Automatic Attestation Transfer:** A surviving assembly cannot inherit historical ledger attestations without violating the invalidation contract. If Assembly 5's generation is incremented from 7 to 8 upon merging with Assembly 6, the candidate row `(5, 8)` has **0 confirmed roots**.
+2. **No Archived ID Aliasing:** The peripheral ledger cannot resolve readout requests by aliasing archived Assembly ID 6 to surviving ID 5. Fetching archived IDs is explicitly prohibited.
+3. **Mandatory Re-Attestation Consideration:** If a merge occurs at Root $R$, the surviving assembly will require at least $\text{MIN\_ATTESTED\_EXTERNAL\_ROOTS} = 2$ subsequent external exposures before it can legally participate as an attested winner. This is a critical timing and training budget constraint for R2-B02.
 
 ---
 
-## 11. Competing Alternative Explanations
+## 12. Competing Alternative Explanations
 
 | Hypothesis | Proposed Mechanism | Empirical Finding | Causal Verdict |
 |:---|:---|:---|:---:|
 | **H1: Distinct Structures, Coincidental Tie** | Assemblies 5 and 6 have different cells but coincidentally computed identical scores. | Disproved. $A_5$ and $A_6$ share all 9 cells ($A_5 \Delta A_6 = \emptyset$). | **REFUTED** |
 | **H2: Duplicate FORM Birth** | FORM stage created two identical assemblies at birth. | Disproved. At birth (Root 8), $A_5$ and $A_6$ had 0 cells in common ($\text{Jaccard} = 0.0$). | **REFUTED** |
 | **H3: Ledger Attestation Collision** | Ledger attestation failed or confused token envelopes. | Disproved. Both assemblies recorded 46 confirmed roots for `<EOS>` with valid distinct outbox entries. | **REFUTED** |
-| **H4: MERGE Never Evaluated Pair** | Pair $(5, 6)$ was never checked by `_try_merge_pair` due to ordering, cooldown, or capacity. | Disproved. Pair was evaluated in 49 consecutive roots; failed exclusively on `between_strength = 0.0`. | **REFUTED** |
+| **H4: MERGE Never Evaluated Pair** | Pair $(5, 6)$ was never checked by `_try_merge_pair` due to ordering, cooldown, or capacity. | Disproved. Pair was evaluated in 49 consecutive roots; rejected strictly by `between_strength = 0.0`. | **REFUTED** |
 
 ---
 
-## 12. Candidate Repair Strategies & Architectural Risks
+## 13. Candidate Repair Strategies & Architectural Risks (for R2-B02)
 
-The forensic findings point to three potential architectural interventions for the upcoming R2-B02 design phase:
+The forensic findings identify three candidate architectural strategies for the future R2-B02 design contract:
 
-### Candidate Strategy 1: Correct Empty Exclusive-Set Handling in MERGE (Recommended)
-- **Concept:** When $\text{Jaccard}(A, B) \ge \Theta_{\text{merge}}$ and either exclusive set is empty ($A \subseteq B$ or $A = B$), `between_strength` should reflect total mutual support (or bypass `THETA_OB`), because identical assemblies by definition have maximal mutual support ($1.0$), not zero ($0.0$).
-- **Defect Addressed:** Directly removes the artificial `between_strength = 0.0` blocker.
+### Candidate Strategy 1: Formal Specification Amendment to MERGE (Recommended)
+- **Concept:** Amend Core §2.0 item 4 to define an exception or alternative rule for identical or superset assemblies: when $\text{Jaccard}(A, B) \ge \Theta_{\text{merge}}$ and exclusive sets are empty, between-strength check is bypassed or defined as satisfying the threshold.
 - **Architectural Risks:**
-  - *ID Selection:* A deterministic rule must dictate which assembly ID survives (e.g. $\min(\text{ID}_A, \text{ID}_B)$) and which is archived.
-  - *Ledger Aliasing:* The peripheral ledger must alias or transfer attestations of the archived ID to the surviving ID so historical evidence is not orphaned.
-  - *Generation Bump:* The surviving assembly's generation must increment cleanly without violating immutability or outbox ordering.
+  - *Attestation Lag:* Generation bump invalidates prior `<EOS>` attestation. The system would require additional training roots for the merged assembly to re-attest before generation succeeds.
+  - *Cooldown Interaction:* Merge puts survivor into cooldown ($T_c = 200$), preventing subsequent merges during that window.
 
-### Candidate Strategy 2: Pre-Convergence GROW / FORM Invariant
-- **Concept:** Inhibit dual triangle formation within the same event if unassigned emitters have high cross-mutual support, or prevent GROW from adding cells that cause $\text{Jaccard} \ge \Theta_{\text{merge}}$.
-- **Defect Addressed:** Prevents exact duplicate formation from occurring in the first place.
+### Candidate Strategy 2: Pre-Convergence GROW / FORM Constraints
+- **Concept:** Inhibit dual triangle formation within a single event when unassigned emitters exhibit high coactive density, or restrict GROW from adding cells that create duplicate assemblies.
 - **Architectural Risks:**
-  - Alters core neural learning dynamics in Core §9.1 and §9.2.
-  - High risk of regression on other token sequences where multiple independent assemblies legitimately emerge from the same token.
+  - High risk of suppressing legitimate parallel feature representations in multi-word vocabularies.
+  - Modifies core neural dynamics (Core §2–§8).
 
-### Candidate Strategy 3: Readout Deduplication Gate
-- **Concept:** In `evaluate_full_vs_control_readout` or `generate_episode`, collapse candidate assemblies that have identical membership tuples before computing score margin.
-- **Defect Addressed:** Prevents identical assemblies from colliding at the readout margin check.
+### Candidate Strategy 3: Readout Deduplication Layer
+- **Concept:** In `evaluate_full_vs_control_readout`, deduplicate candidate assemblies having identical membership tuples prior to evaluating margin ambiguity.
 - **Architectural Risks:**
-  - Circumvents Core assembly lifecycle; leaves duplicate assemblies proliferating unchecked in $W$.
-  - Leaks assembly structural inspection into readout evaluation, violating separation of concerns.
+  - Circumvents Core assembly lifecycle; leaves duplicate assemblies proliferating in $W$.
+  - Violates separation of concerns between Core graph topology and peripheral readout.
 
 ---
 
-## 13. Full Regression Evidence
+## 14. Full Regression Evidence
 
-All frozen test suites were executed on `investigation/r2-b01-assembly-forensics` to confirm zero regression and complete baseline stability:
+The frozen test suites confirm zero regressions on `investigation/r2-b01-assembly-forensics`:
 
-### 1. Full Master Regression Suite
+### 1. Master Regression Suite
 ```bash
 python -m pytest tests/ -q
 ```
@@ -370,35 +355,20 @@ python -m pytest tests/ -q
 python -m pytest tests/forensics/ -v
 ```
 **Result:** `9 passed in 14.24s` (100% PASS).
-- `test_f01_02_scenario_1_pre_commit_failure_zero_attestations`: PASSED
-- `test_f01_02_scenario_2_post_commit_dispatch_partial_failure`: PASSED
-- `test_f01_02_scenario_3_completed_root_cannot_abort`: PASSED
-- `test_f01_02_scenario_4_post_commit_failure_readiness_barrier`: PASSED
-- `test_f01_02_scenario_5_reconciliation_retry_and_idempotency`: PASSED
-- `test_f01_task5_strengthened_cold_start_learning_from_zero`: PASSED
-- `test_f01_task6_reencoded_eos_discrepancy_and_outbox_bypass`: PASSED
-- `test_f01_task6_canonical_eos_learning_and_multistep_rollout`: PASSED
-- `test_f01_persistence_not_implemented`: PASSED
 
 ---
 
-## 14. Explicit Unresolved Questions
+## 15. Explicit Unresolved Questions & Recommended Scope for R2-B02
 
-1. **Surviving Assembly Identity:** When Assemblies 5 and 6 merge, does Assembly 5 survive because it has the lower ID, or does the assembly with the higher attestation count survive?
-2. **Peripheral Ledger Attestation Migration:** If Assembly 6 is marked `AssemblyStatus.ARCHIVED`, how should `SurfaceReadoutLedgerV1` treat lookups for Assembly 6? Should the ledger maintain an explicit alias mapping `alias[6] -> 5`?
-3. **Outbox Notification Contract on MERGE:** When a merge occurs during `END_EXPOSURE`, what outbox notifications must be emitted to the ledger? Does the merge event itself produce an outbox attestation update?
+### Unresolved Decision Questions:
+1. **Surviving Assembly Selection:** When Assemblies 5 and 6 merge, does $\min(\text{ID}_A, \text{ID}_B)$ strictly apply, or is the survivor determined by attestation maturity?
+2. **Re-Attestation Budget:** When structural generation increments on merge, how many training roots must follow before autonomous readout is expected to pass?
+3. **Specification Amendment Form:** Should the Core §2.0 specification amendment define `between_strength` for empty exclusive sets as $1.0$, or should it specify an explicit bypass condition `if Jaccard >= theta_merge and not excl_a and not excl_b:`?
 
----
-
-## 15. Recommended Scope for R2-B02 Design Contract
-
-The future R2-B02 design contract should be strictly bounded to:
-1. **Mathematical correction of `_try_merge_pair()`:**
-   - Formalize the predicate for empty exclusive sets: when $\text{Jaccard}(A, B) \ge \Theta_{\text{merge}}$ and $\min(|A \setminus B|, |B \setminus A|) = 0$, define between-support as $1.0$ (or bypass the cross-support check).
-2. **Deterministic merge reconciliation in $W$:**
-   - Specify surviving ID selection, member set union, status transition (`ARCHIVED`), and cooldown application.
-3. **Peripheral ledger attestation reconciliation:**
-   - Specify whether the peripheral ledger aliases merged assembly IDs or aggregates evidence counts across identical structural generations.
-4. **Hard Boundary:**
-   - Zero changes to neural equations (Core §2–§8).
-   - Zero changes to LLA, transaction boundaries, or outbox dispatch architecture (R2-A01).
+### Recommended Scope for R2-B02 Design Contract:
+- Scope strictly bounded to:
+  1. Formal scientific amendment to Core §2.0 Assembly MERGE law for exact/superset duplicates.
+  2. Training curriculum design to accommodate post-merge re-attestation requirements.
+- Hard Boundaries:
+  - Zero changes to neural equations (Core §2–§8).
+  - Zero changes to LLA, transactional boundaries, or outbox pipelines (R2-A01).

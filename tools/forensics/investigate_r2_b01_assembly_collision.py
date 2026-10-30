@@ -2,6 +2,10 @@
 
 Comprehensive in-memory instrumentation of Assembly FORM, GROW, MERGE, and READOUT
 to determine the precise structural and causal origin of Assembly 5 and 6 duplicate collision.
+
+Normative References:
+- DGCA_CORE_RC4_1.md §2.0 (Executable Assembly operators: MAINTAIN -> GROW -> FORM -> MERGE/SPLIT)
+- DGCA_CORE_RC4_1.md §9.4 (Readout ledger & structural generation invalidation)
 """
 
 from __future__ import annotations
@@ -25,14 +29,24 @@ sys.path.insert(0, str(repo_root / "src"))
 import dgca.core.assembly as asm_module
 from dgca.common.errors import StatusCode
 from dgca.core.assembly import (
+    D_MIN,
+    K_FORM_PER_END,
     K_MAX,
+    K_MIN,
     M_MAX,
     RHO_CORE,
+    RHO_G,
+    RHO_KEEP,
     SIGMA_G,
+    SIGMA_KEEP,
+    T_C_COOLDOWN,
+    THETA_A,
     THETA_MERGE,
     THETA_OB,
     Assembly,
     AssemblyStatus,
+    check_maintain_keep_guards,
+    compute_assembly_member_metrics,
     compute_core_coverage,
     compute_mutual_support_r_b,
 )
@@ -64,7 +78,11 @@ def instrumented_run_form_stage(
     preexisting_live_assemblies: list[Assembly],
     n_rec_cache: dict[int, dict[int, float]],
 ) -> tuple[list[int], list[StatusCode]]:
+    """Non-invasive logger for Stage 3 FORM with exact event-order attribution."""
     global current_root_context
+    formed_ids: list[int] = []
+    diagnostics: list[StatusCode] = []
+
     for ev in sorted(event_results, key=lambda e: e.event_order):
         covered = set()
         for a in w.assemblies.values():
@@ -81,41 +99,55 @@ def instrumented_run_form_stage(
             and len(asm_module._live_assembly_ids_for_cell(cid, w)) < M_MAX
             and asm_module._is_externally_grounded_fresh_emitter(cid, ev, h_slow, w)
         )
+
+        asms_before = set(w.assemblies.keys())
+        sub_formed, sub_diag = orig_run_form_stage(
+            w, h_slow, [ev], preexisting_live_assemblies, n_rec_cache
+        )
+        asms_after = set(w.assemblies.keys())
+        new_in_event = sorted(asms_after - asms_before)
+
+        formed_ids.extend(sub_formed)
+        diagnostics.extend(sub_diag)
+
         form_events_log.append({
             "root_id": current_root_context,
             "event_order": ev.event_order,
             "covered_cells_count": len(covered),
             "u_t_count": len(u_t),
             "u_t": u_t,
+            "new_assemblies": new_in_event,
         })
-
-    formed_ids, diags = orig_run_form_stage(
-        w, h_slow, event_results, preexisting_live_assemblies, n_rec_cache
-    )
-    for aid in formed_ids:
-        asm = w.assemblies[aid]
-        form_events_log.append({
-            "root_id": current_root_context,
-            "action": "FORMED",
-            "assembly_id": aid,
-            "members": list(asm.member_cell_ids),
-        })
-    return formed_ids, diags
+        for aid in new_in_event:
+            asm = w.assemblies[aid]
+            form_events_log.append({
+                "root_id": current_root_context,
+                "event_order": ev.event_order,
+                "action": "FORMED",
+                "assembly_id": aid,
+                "members": list(asm.member_cell_ids),
+            })
+    return formed_ids, diagnostics
 
 
 def instrumented_run_grow_stage(
     w: asm_module.WState,
     n_rec_cache: dict[int, dict[int, float]],
 ) -> list[int]:
+    """Non-invasive logger for Stage 2 GROW (executes at root close)."""
     global current_root_context
-    # Snapshot before grow
-    pre_members = {aid: list(asm.member_cell_ids) for aid, asm in w.assemblies.items() if asm.status == AssemblyStatus.LIVE}
+    pre_members = {
+        aid: list(asm.member_cell_ids)
+        for aid, asm in w.assemblies.items()
+        if asm.status == AssemblyStatus.LIVE
+    }
     grown_ids = orig_run_grow_stage(w, n_rec_cache)
     for aid in grown_ids:
         post_m = list(w.assemblies[aid].member_cell_ids)
         added = sorted(set(post_m) - set(pre_members.get(aid, [])))
         grow_events_log.append({
             "root_id": current_root_context,
+            "stage": "ROOT_CLOSE_GROW",
             "assembly_id": aid,
             "added_cells": added,
             "new_members": post_m,
@@ -130,6 +162,7 @@ def instrumented_try_merge_pair(
     w: asm_module.WState,
     n_rec_cache: dict[int, dict[int, float]],
 ) -> bool:
+    """Non-invasive logger for Stage 4 MERGE evaluating frozen rule compliance and downstream guards."""
     global current_root_context
     asm_a = w.assemblies.get(a_id)
     asm_b = w.assemblies.get(b_id)
@@ -150,12 +183,13 @@ def instrumented_try_merge_pair(
             "status_a": asm_a.status.name,
             "status_b": asm_b.status.name,
             "jaccard": jaccard,
+            "union_size": len(union_set),
             "excl_a": excl_a,
             "excl_b": excl_b,
         })
         if not excl_a or not excl_b:
             attempt_info["between_strength"] = 0.0
-            attempt_info["blocked_by"] = "EMPTY_EXCLUSIVE_SET_ZERO_BETWEEN_STRENGTH"
+            attempt_info["blocked_by"] = "SPEC_CONTRACT_EMPTY_EXCLUSIVE_SIDE_ZERO_BETWEEN_STRENGTH"
         else:
             cross_vals = [
                 compute_mutual_support_r_b(i, j, w)
@@ -166,6 +200,19 @@ def instrumented_try_merge_pair(
             attempt_info["between_strength"] = bs
             if bs < THETA_OB:
                 attempt_info["blocked_by"] = "BETWEEN_STRENGTH_BELOW_THETA_OB"
+
+        # Downstream guard evaluation in read-only mode (unreached in frozen code when between_strength < THETA_OB)
+        union_tuple = tuple(sorted(union_set))
+        downstream_m_max_pass = True
+        downstream_keep_guards_pass = True
+        for x in union_tuple:
+            live_after = (asm_module._live_assembly_ids_for_cell(x, w) - {b_id}) | {a_id}
+            if len(live_after) > M_MAX:
+                downstream_m_max_pass = False
+            if not check_maintain_keep_guards(x, union_tuple, w, n_rec_cache):
+                downstream_keep_guards_pass = False
+        attempt_info["downstream_m_max_pass"] = downstream_m_max_pass
+        attempt_info["downstream_keep_guards_pass"] = downstream_keep_guards_pass
 
     res = orig_try_merge_pair(a_id, b_id, w, n_rec_cache)
     attempt_info["result"] = res
@@ -184,6 +231,7 @@ def run_investigation() -> dict[str, Any]:
 
     print("=" * 80)
     print("DGCA NEXT V2 - R2-B01 ASSEMBLY FORENSIC INVESTIGATION")
+    print("Normative Basis: DGCA_CORE_RC4_1.md §2.0 & §9.4")
     print("=" * 80)
 
     state = MachineState()
@@ -229,13 +277,12 @@ def run_investigation() -> dict[str, Any]:
     print("FORENSIC TRACE A: ASSEMBLY BIRTH & FORMATION TIMELINE")
     print("=" * 80)
 
-    # Find which events in Root 8 produced Asm 5 and Asm 6
     root8_forms = [f for f in form_events_log if f.get("root_id") == 8]
-    print("\nRoot 8 Form Stage Log:")
+    print("\nRoot 8 Form Stage Log (Exact Event Attribution):")
     for entry in root8_forms:
         if entry.get("action") == "FORMED":
-            print(f"  --> FORMED Assembly {entry['assembly_id']}: {entry['members']}")
-        else:
+            print(f"  --> Event {entry['event_order']}: FORMED Assembly {entry['assembly_id']}: {entry['members']}")
+        elif "u_t_count" in entry:
             print(f"  Event {entry.get('event_order')}: covered={entry.get('covered_cells_count')}, u_t_count={entry.get('u_t_count')}, u_t={entry.get('u_t')}")
 
     # -----------------------------------------------------------------------
@@ -256,13 +303,13 @@ def run_investigation() -> dict[str, Any]:
             if r <= 16 or r == first_identical_root or r == 56:
                 print(f"  Root {r:02d}: Asm 5 ({len(m5)} cells)={m5} | Asm 6 ({len(m6)} cells)={m6} | Match: {is_equal}")
 
-    print(f"\n>>> Assemblies 5 and 6 became 100% IDENTICAL at Root {first_identical_root}!")
+    print(f"\n>>> Assemblies 5 and 6 became 100% IDENTICAL at Root {first_identical_root} (post-exposure GROW)!")
 
     # Print all grow events for 5 and 6
     grows_5_6 = [g for g in grow_events_log if g["assembly_id"] in (5, 6)]
-    print(f"\nAll GROW events for Assemblies 5 and 6:")
+    print(f"\nAll GROW events for Assemblies 5 and 6 (Executed during root-close assembly pipeline):")
     for g in grows_5_6:
-        print(f"  Root {g['root_id']:02d}: Assembly {g['assembly_id']} added {g['added_cells']} -> now {g['new_members']} (Gen {g['new_generation']})")
+        print(f"  Root {g['root_id']:02d} [{g['stage']}]: Assembly {g['assembly_id']} added {g['added_cells']} -> now {g['new_members']} (Gen {g['new_generation']})")
 
     # -----------------------------------------------------------------------
     # Trace C: MERGE Predicate Evaluation
@@ -273,10 +320,10 @@ def run_investigation() -> dict[str, Any]:
 
     merges_5_6 = [m for m in merge_attempts_log if m["pair"] == (5, 6)]
     print(f"Total merge evaluations of pair (5, 6): {len(merges_5_6)}")
-    for m in merges_5_6[:10]:
-        print(f"  Root {m['root_id']:02d}: Jaccard={m.get('jaccard', 0):.4f}, excl_a={m.get('excl_a')}, excl_b={m.get('excl_b')}, between_strength={m.get('between_strength')}, blocked_by={m.get('blocked_by')}")
-    if len(merges_5_6) > 10:
-        print(f"  ... ({len(merges_5_6) - 10} more identical evaluations)")
+    for m in merges_5_6[:5]:
+        print(f"  Root {m['root_id']:02d}: Jaccard={m.get('jaccard', 0):.4f}, union={m.get('union_size')}, excl_a={m.get('excl_a')}, excl_b={m.get('excl_b')}, between_strength={m.get('between_strength')}, blocked_by={m.get('blocked_by')}, downstream_keep_guards={m.get('downstream_keep_guards_pass')}")
+    if len(merges_5_6) > 5:
+        print(f"  ... ({len(merges_5_6) - 5} more identical evaluations)")
 
     # -----------------------------------------------------------------------
     # Trace D: Readout Collision on Eagle
