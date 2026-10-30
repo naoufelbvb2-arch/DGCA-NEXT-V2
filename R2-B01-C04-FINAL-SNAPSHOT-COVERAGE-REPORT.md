@@ -190,32 +190,36 @@ $$\mathbf{Autonomous\ Generation\ Stop\ Statuses:\ Cat\ (GEN\_STOP\_EOS)\ \mid\ 
 
 ### Milestone Full 64-Character Combined SHA-256 Digests (Extended Coverage)
 
+> [!NOTE]
+> **Provenance Reconciliation:** The milestone checkpoint digests and Root 56 component breakdown below are generated programmatically and directly extracted from the canonical evidence artifact [`tools/forensics/r2_b01_c03_differential_evidence.json`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tools/forensics/r2_b01_c03_differential_evidence.json) (SHA-256: `d25bbc99acab44d99eee8e3a33168541dcaad30243a5c3e63248b569aa328a9e`). For full evidence provenance and reconciliation across independent executions, see [`R2-B01-FINAL-EVIDENCE-ATTESTATION.md`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B01-FINAL-EVIDENCE-ATTESTATION.md).
+
 | Root | Milestone Stimulus Branch | Run A (Untouched Reference) Combined SHA-256 | Run B (Instrumented Observer) Combined SHA-256 | Match |
 |:---:|:---|:---:|:---:|:---:|
-| **01** | Cat AB (`القط يشرب حليب <EOS>`) — Cold Start | `fbfbce18d9600e1cf91bfd83ea74719c24097f48b11fb93fe01b34ec14693992` | `fbfbce18d9600e1cf91bfd83ea74719c24097f48b11fb93fe01b34ec14693992` | **MATCH** |
-| **06** | Eagle DB (`النسر يشرب ماء <EOS>`) — Pre-Formation | `cff98bfba82b67fcf98d6ddc90c7e2c9430c5c4e97ea5ea1887e2b10e303ca7a` | `cff98bfba82b67fcf98d6ddc90c7e2c9430c5c4e97ea5ea1887e2b10e303ca7a` | **MATCH** |
-| **07** | Cat AB — Birth of Assemblies 1 & 2 | `a9634e9e1bb3d5e2365dc1334c264bbbe8ec379cb06d50ffec6c74b125f4fb4f` | `a9634e9e1bb3d5e2365dc1334c264bbbe8ec379cb06d50ffec6c74b125f4fb4f` | **MATCH** |
-| **08** | Eagle DB — Birth of Assemblies 3, 4, 5, 6 | `fdb62e105eeb430d43f05d5cbb40ebdb36b12a233b2a2aa43d32cb0c32607590` | `fdb62e105eeb430d43f05d5cbb40ebdb36b12a233b2a2aa43d32cb0c32607590` | **MATCH** |
-| **09** | Cat AB — Structural Convergence of Asm 5 & 6 | `3d43b2361a3501a35791a826c71040445d4f3b79c5c2d338be29472e391b1063` | `3d43b2361a3501a35791a826c71040445d4f3b79c5c2d338be29472e391b1063` | **MATCH** |
-| **10** | Eagle DB — Membership Extension to 9 Cells | `3136894c50259b9ec2f8728a50c8227b40974cf16a75f28c538a3cfcaecf9c8f` | `3136894c50259b9ec2f8728a50c8227b40974cf16a75f28c538a3cfcaecf9c8f` | **MATCH** |
-| **16** | Eagle DB — Final Assembly Birth (Asm 12) | `4c7bf697ec8c3b74966cb179a61763e00cf7eeb4cbe65ff35e9858348b61394c` | `4c7bf697ec8c3b74966cb179a61763e00cf7eeb4cbe65ff35e9858348b61394c` | **MATCH** |
-| **56** | Eagle DB — Final Curriculum Completion | `f1bb1ff21c6052dc36214197c36e4fce9d0840b2a65d706beff0985c5b16e45d` | `f1bb1ff21c6052dc36214197c36e4fce9d0840b2a65d706beff0985c5b16e45d` | **MATCH** |
+| **01** | Cat AB (`القط يشرب حليب <EOS>`) — Cold Start | `dbe07a73e2cbba9798eb3d4ae698845fd70638ca23d77a835efebb49ccda8220` | `dbe07a73e2cbba9798eb3d4ae698845fd70638ca23d77a835efebb49ccda8220` | **MATCH** |
+| **06** | Eagle DB (`النسر يصيد سمك <EOS>`) — Pre-Formation | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | **MATCH** |
+| **07** | Cat AB — Birth of Assemblies 1 & 2 | `8537fae3706092113a8c380b841b6d85820edde01e874cecf4a57d835f2b00bd` | `8537fae3706092113a8c380b841b6d85820edde01e874cecf4a57d835f2b00bd` | **MATCH** |
+| **08** | Eagle DB — Birth of Assemblies 3, 4, 5, 6 | `1589c622b88c5e145c15616443c854ac2f046b5cbed0f7548cf710e98351375d` | `1589c622b88c5e145c15616443c854ac2f046b5cbed0f7548cf710e98351375d` | **MATCH** |
+| **09** | Cat AB — Structural Convergence of Asm 5 & 6 | `f90dd9dd4e19078120744e4c09cfc221877af219fe9af36b234183f49e83682a` | `f90dd9dd4e19078120744e4c09cfc221877af219fe9af36b234183f49e83682a` | **MATCH** |
+| **10** | Eagle DB — Membership Extension to 9 Cells | `718ec655e343bf43cf07c794de6c6ba8780836cb33321e0ce060902d83da640b` | `718ec655e343bf43cf07c794de6c6ba8780836cb33321e0ce060902d83da640b` | **MATCH** |
+| **16** | Eagle DB — Final Assembly Birth (Asm 12) | `bfc3f7246f7de14ff7e4023b1824fa8ba809bef226f74b9097a4fef143264a1c` | `bfc3f7246f7de14ff7e4023b1824fa8ba809bef226f74b9097a4fef143264a1c` | **MATCH** |
+| **28** | Cat AB — Mid-Curriculum Attractor Solidification | `238533a92105d4d54784a68bb76de80ec60c314e0408d9e5c7def59f4d124cbc` | `238533a92105d4d54784a68bb76de80ec60c314e0408d9e5c7def59f4d124cbc` | **MATCH** |
+| **56** | Eagle DB — Final Curriculum Completion | `b5429b5a66ee4fa093ef5ff4385b657f8e2bc298841cec08fca979cbbb5b8ebc` | `b5429b5a66ee4fa093ef5ff4385b657f8e2bc298841cec08fca979cbbb5b8ebc` | **MATCH** |
 
 ### Root 56 Component-by-Component SHA-256 Breakdown
 
 ```
 Root 56 Extended Component Digests:
-- W State:           85da8457e53f1d8ddc0ba36ce9d077c5d0eb1c855a909675231c51842be4fb5e (MATCH)
-- H_slow State:      ca2d09e3e70f8a746f0cef660c031886eaab8dfc1a96f5e54c53830e42fdb5af (MATCH)
-- R State:           6fae978bc157da139fe702e888f4ea60c7a9240dba6e52fb00d3e749a1ad83a9 (MATCH)
-- Assemblies:        805cd00714636fb560d08a2cc03e378475beeffc162a6d350f0664201a147797 (MATCH)
-- Synaptic Graph:    6ebcf3901b8a531641b38f82862d2d9bfeaa1f79c234b9d0ecba5be3b6f959c9 (MATCH)
-- Latent Table:      fab46bf7dbcf216baf73e31c8496f2dd2129a0d0087535802847df1e3f562fbf (MATCH)
-- Transaction View:  2e2df5e08b1a5e12ec5845c479427b38d789e924d5f4fe61b17d09a0fe9df123 (MATCH)
-- Root Report:       54d3bcaf54b2bb333fcb7ed351c3d593d120b57b601c5ed27a8c6a382fc203d2 (MATCH)
-- Readout Ledger:    08686bd520a038ca93f49f8c67eb27999cc62405fafc676c040c1d2b2565768f (MATCH)
-- Outbox Queue:      fa83673068f843c9cb17a644f4e498571501ee3ec047e1ff6acf7a4f96944b11 (MATCH)
-- Combined SHA-256:  f1bb1ff21c6052dc36214197c36e4fce9d0840b2a65d706beff0985c5b16e45d (MATCH)
+- W State:             10cd37509ef01ede5b4c414c1b7121610a7ceba8a15d6259b3afe655f7bc952d (MATCH)
+- H_slow State:        ca2d09e3e70f8a746f0cef660c031886eaab8dfc1a96f5e54c53830e42fdb5af (MATCH)
+- R State:             6fae978bc157da139fe702e888f4ea60c7a9240dba6e52fb00d3e749a1ad83a9 (MATCH)
+- Assemblies:          805cd00714636fb560d08a2cc03e378475beeffc162a6d350f0664201a147797 (MATCH)
+- Synaptic Graph:      867cab67f192233790128d8073a153501f47e5e194c48423562fed86c4e23e14 (MATCH)
+- Latent Table:        fab46bf7dbcf216baf73e31c8496f2dd2129a0d0087535802847df1e3f562fbf (MATCH)
+- Transaction View:    88e2547ab4a676e709e0eddedd65bcf3ef79bebb6052f957a5ff8cdce2dc87c7 (MATCH)
+- Root Report:         54d3bcaf54b2bb333fcb7ed351c3d593d120b57b601c5ed27a8c6a382fc203d2 (MATCH)
+- Readout Ledger:      08686bd520a038ca93f49f8c67eb27999cc62405fafc676c040c1d2b2565768f (MATCH)
+- Outbox Queue:        fa83673068f843c9cb17a644f4e498571501ee3ec047e1ff6acf7a4f96944b11 (MATCH)
+- Combined SHA-256:    b5429b5a66ee4fa093ef5ff4385b657f8e2bc298841cec08fca979cbbb5b8ebc (MATCH)
 ```
 
 The updated machine-readable evidence artifact is saved at:
@@ -228,11 +232,11 @@ The updated machine-readable evidence artifact is saved at:
 ```bash
 # Master Regression Suite
 python -m pytest tests/ -q
-# Result: 192 passed in 53.51s (100% PASS)
+# Result: 192 passed in 95.13s (100% PASS)
 
 # Forensic Test Suite
 python -m pytest tests/forensics/ -v
-# Result: 9 passed in 22.66s (100% PASS)
+# Result: 9 passed in 36.29s (100% PASS)
 ```
 
 Zero lines in `src/dgca/`, `configs/`, or frozen tests were modified.
