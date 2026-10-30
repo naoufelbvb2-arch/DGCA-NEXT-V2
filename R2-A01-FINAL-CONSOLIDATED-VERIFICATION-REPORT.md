@@ -6,7 +6,7 @@
 - **Repository:** `naoufelbvb2-arch/DGCA-NEXT-V2`  
 - **Isolated Review Branch:** `review/r2-a01-final-consolidated`  
 - **Starting Authoritative SHA (Frozen Patch 5 Baseline):** [`d6f79eed1cb6b6994b39feae4c3d1725fd4b0b67`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2)  
-- **Review Date:** October 30, 2026  
+- **Review Date:** October 30, 2026 (Updated under Review Correction C01)  
 - **Scope:** Verification-Only Review (Zero production code modifications; documentation deliverable only)  
 - **Final Status:** `R2-A01 FINAL CONSOLIDATED VERIFICATION PASSED — AWAITING LEAD ENGINEER FREEZE`  
 
@@ -26,16 +26,16 @@ All five R2-A01 remediation patches have completed independent engineering revie
 
 ---
 
-## 2. Consolidated Contract Traceability Matrix
+## 2. Consolidated Contract Traceability Matrix (Audited & Corrected C01)
 
-The table below reconciles the frozen technical design contracts ([`R2-A01-REMEDIATION-DESIGN-CONTRACT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2), [`R2-A01-FINAL-TECHNICAL-ADDENDUM.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2), and [`R2-A01-TEST-ACCEPTANCE-MATRIX.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2)) against their concrete production implementations, test files, and measured empirical evidence.
+The table below reconciles the frozen technical design contracts ([`R2-A01-REMEDIATION-DESIGN-CONTRACT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2), [`R2-A01-FINAL-TECHNICAL-ADDENDUM.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2), and [`R2-A01-TEST-ACCEPTANCE-MATRIX.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2)) against exact, verified pytest node IDs and empirical verification evidence.
 
-| Scenario ID | Contract Requirement | Production Implementation | Acceptance Test Reference | Measured Verification Evidence | Final Verdict |
+| Scenario ID | Contract Requirement | Production Implementation | Exact Pytest Node Reference | Measured Verification Evidence | Final Verdict |
 | :---: | :--- | :--- | :--- | :--- | :---: |
-| **P1-01** | Read-Only Retrieval Immutability | [`run_read_only_episode()`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/lifecycle/exposure_tx.py#L860) executes without modifying permanent state $W$ | [`tests/test_r2_a01_patch2_acceptance.py::TestPatch2RetrievalImmutability::test_p1_01_retrieve_immutability`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | SHA-256 of $W$ before/after matches byte-for-byte; latent keys unchanged; 0 drift | **Verified PASS** |
-| **P1-02** | Stale Binding Read-Only Isolation | Context gate evaluation on corrupted binding closes without mutating `binding.status` in permanent $W$ | [`tests/test_r2_a01_patch2_acceptance.py::TestPatch2ContextGateImmutability::test_p1_02_stale_binding_read_only_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | `binding.status == ACTIVE` in permanent $W$; diagnostic reported in read-only result | **Verified PASS** |
-| **P1-03** | Homeostasis Scratch Isolation | Slow homeostasis adaptation evaluated on scratch copy during retrieval | [`tests/test_r2_a01_patch2_acceptance.py::TestPatch2HomeostasisImmutability::test_p1_03_homeostasis_scratch_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | `state.H_slow` identical down to exact float equality before and after retrieval | **Verified PASS** |
-| **P1-04** | Transactional STALE Transition | Stale binding detected during candidate settlement discards on ABORT and persists on COMMIT | [`tests/test_r2_a01_patch2_acceptance.py::TestPatch2TransactionalStale::test_p1_04_transactional_stale_transition`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | ABORT preserves `ACTIVE`; COMMIT records `STALE`; verified across dual lifecycles | **Verified PASS** |
+| **P1-01** | Read-Only Retrieval Immutability | [`run_read_only_episode()`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/lifecycle/exposure_tx.py#L860) executes without modifying permanent state $W$ | [`tests/test_r2_a01_patch2_acceptance.py::test_p1_01_complete_retrieve_immutability_gate`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | SHA-256 of $W$ before/after matches byte-for-byte; latent keys unchanged; 0 drift | **Verified PASS** |
+| **P1-02** | Stale Binding Read-Only Isolation | Context gate evaluation on corrupted binding closes without mutating `binding.status` in permanent $W$ | [`tests/test_r2_a01_patch2_acceptance.py::test_p1_02_stale_binding_read_only_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | `binding.status == ACTIVE` in permanent $W$; diagnostic reported in read-only result | **Verified PASS** |
+| **P1-03** | Homeostasis Scratch Isolation | Slow homeostasis adaptation evaluated on scratch copy during retrieval | [`tests/test_r2_a01_patch2_acceptance.py::test_p1_03_homeostasis_scratch_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | `state.H_slow` identical down to exact float equality before and after retrieval | **Verified PASS** |
+| **P1-04** | Transactional STALE Transition | Stale binding detected during candidate settlement discards on ABORT and persists on COMMIT | [`tests/test_r2_a01_patch2_acceptance.py::test_p1_04_transactional_stale_transition_abort_vs_commit`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) | ABORT preserves `ACTIVE`; COMMIT records `STALE`; verified across dual lifecycles | **Verified PASS** |
 | **P2-01** | Canonical Lexical Provenance Acceptance | Mechanical feature derivation and envelope bundle digest validated | [`tests/test_r2_a01_patch1_acceptance.py::TestPatch1ProvenanceAndEOS::test_p2_01_canonical_lexical_provenance_acceptance`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch1_acceptance.py) | `event_order == 0`; `feature_bundle_digest` matches envelope; outbox receives notification | **Verified PASS** |
 | **P2-02** | Canonical EOS Acceptance | Canonical EOS event (`Marker.EOS`, `\x1fEOS#0..2`) accepted and recorded | [`tests/test_r2_a01_patch1_acceptance.py::TestPatch1ProvenanceAndEOS::test_p2_02_canonical_eos_acceptance`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch1_acceptance.py) | Feature bundle digest matches; envelope marker `Marker.EOS` staged in outbox | **Verified PASS** |
 | **P2-03** | Digest Mismatch Rejection | Mismatched envelope feature digest fails fast | [`tests/test_r2_a01_patch1_acceptance.py::TestPatch1ProvenanceAndEOS::test_p2_03_digest_mismatch_rejection`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch1_acceptance.py) | `ObservationError(PROVENANCE_DIGEST_MISMATCH)` raised; journal length remains 0; $W$ untouched | **Verified PASS** |
@@ -51,11 +51,11 @@ The table below reconciles the frozen technical design contracts ([`R2-A01-REMED
 | **P3-04** | Envelope Marker Conflict Rejection | Conflicting envelope marker on duplicate order rejected | [`tests/test_r2_a01_patch1_acceptance.py::TestPatch1EventIdentityAndRetries::test_p3_04_envelope_marker_conflict_rejection`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch1_acceptance.py) | `ObservationError(ENVELOPE_MARKER_CONFLICT)` raised; zero state side-effects | **Verified PASS** |
 | **P3-05** | Feature Copy Conflict Rejection | Conflicting feature copy on duplicate order rejected | [`tests/test_r2_a01_patch1_acceptance.py::TestPatch1EventIdentityAndRetries::test_p3_05_envelope_feature_copy_conflict_rejection`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch1_acceptance.py) | `ObservationError(ENVELOPE_FEATURE_COPY_CONFLICT)` raised | **Verified PASS** |
 | **P3-06** | Retroactive Envelope Attachment Rejection | Supplying envelope on duplicate retry of headless event rejected | [`tests/test_r2_a01_patch1_acceptance.py::TestPatch1EventIdentityAndRetries::test_p3_06_retroactive_envelope_attachment_rejection`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch1_acceptance.py) | `ObservationError(RETROACTIVE_ENVELOPE_FORBIDDEN)` raised | **Verified PASS** |
-| **P4-01** | Latent Slot Allocation Abort Rollback | Aborted exposure completely restores `_slots_by_cell` | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_01_latent_slot_allocation_abort_rollback`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | `_slots_by_cell` identical before and after abort; newly allocated slots removed | **Verified PASS** |
-| **P4-02** | Latent Reverse Target Abort Rollback | Coactive reverse targets added during exposure rolled back on abort | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_02_latent_reverse_target_abort_rollback`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Reverse targets for preexisting cells returned to exact snapshot state | **Verified PASS** |
-| **P4-03** | Latent Reverse Index Restoration | Complete reverse index table restored to pre-exposure state | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_03_latent_reverse_index_full_restoration`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | `_coactive_reverse_index == R_0`; 0 orphaned reverse index entries | **Verified PASS** |
-| **P4-04** | Duplicate Abort Safety & Idempotency | Repeated calls to `abort_exposure()` return safely without corruption | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_04_duplicate_abort_safety_and_idempotency`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Returns `ExposureStatus.ABORTED`; zero state changes; idempotent execution | **Verified PASS** |
-| **P4-05** | Multi-Root Latent Rollback Isolation | Mid-sequence abort in Root 3 completely rolls back without affecting Roots 1, 2, or 4 | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_05_multi_root_latent_rollback_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Latent index at Root 4 reflects only Roots 1, 2, and 4; Root 3 zero-bleed verified | **Verified PASS** |
+| **P4-01** | Abort Sensory Preservation (Core §10.1) | Newly committed sensory cells preserved with lawful metadata; watermark preserved; root-local coactive topology rolled back to BEGIN state; virtual slot access without storage allocation | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_01_abort_sensory_preservation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Sensory cells in `committed_cells`; watermark updated; `_slots_by_cell` empty; virtual lookup non-allocating | **Verified PASS** |
+| **P4-02** | Coactive Latent Slot Rollback on ABORT | Rollback of >= 100 coactive slot assignments, intra/inter allocations, and recycling mutations across all 24 slots; materialized key set, values, and SHA-256 match BEGIN exactly | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_02_abort_coactive_latent_slot_rollback`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | >= 120 mutations rolled back; all 24 slots restored; snapshot and SHA-256 match BEGIN exactly | **Verified PASS** |
+| **P4-03** | Reverse-Index Symmetry & Audit Log Rollback | Genuine coactive assignments modify reverse index, pins, and audit logs; ABORT restores reverse index, pins, and audit logs with zero orphan entries | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_03_reverse_index_symmetry`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Reverse index restored; zero orphan reverse-index entries; forward/reverse neighborhood symmetry holds | **Verified PASS** |
+| **P4-04** | Duplicate ABORT Idempotency | Calling `abort_exposure()` multiple times on an already aborted root returns `ABORTED`; no secondary rollback; subsequent completed roots unaffected | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_04_duplicate_abort_idempotency`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Returns `ExposureStatus.ABORTED`; zero state changes; idempotent execution | **Verified PASS** |
+| **P4-05** | Multi-Root Latent Rollback Isolation | Sequential transactions where mid-sequence root aborts cleanly without corrupting prior or subsequent completed roots | [`tests/test_r2_a01_patch3_acceptance.py::test_p4_05_multi_root_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch3_acceptance.py) | Latent index at Root 4 reflects only Roots 1, 2, and 4; Root 3 zero-bleed verified | **Verified PASS** |
 | **P5-01** | Indivisible Atomic Root Commit Success | Single-reference swap to `_publication_view` before outbox dispatch | [`tests/test_r2_a01_patch4_acceptance.py::test_p5_01_atomic_root_commit_success`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch4_acceptance.py) | Root marked `COMPLETED`; attestations delivered; pending outbox cleared atomically | **Verified PASS** |
 | **P5-02** | Pre-Commit Failure State Isolation | Fault on shadow state leaves machine state uncommitted and ledger empty | [`tests/test_r2_a01_patch4_acceptance.py::test_p5_02_pre_commit_failure_isolation`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch4_acceptance.py) | 0 attestations in peripheral ledger; root remains `OPEN`; sensory cells preserved | **Verified PASS** |
 | **P5-03** | Post-Commit Outbox Delivery Failure | Outbox delivery failure retains batch in `pending_outbox_by_root` | [`tests/test_r2_a01_patch4_acceptance.py::test_p5_03_post_commit_dispatch_failure`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch4_acceptance.py) | Root is `COMPLETED`; pending queue holds notifications; reconcilable | **Verified PASS** |
@@ -107,10 +107,24 @@ Each of the twelve frozen `GATE-REG` requirements was independently audited with
 - **Measured Result:** Autonomous rollout produced `("يشرب", "ماء")`; exact score tie between duplicate Assemblies 5 & 6 (0.206944 vs 0.206944) yielded score margin $0.0000 < 0.02$, deterministically halting with `StatusCode.GEN_STOP_AMBIGUOUS`.
 - **Verdict:** **Verified PASS**
 
-### 3.7 GATE-REG-07 — Exact Retrieval Immutability
-- **Requirement:** Hash of $W$ before and after 100 read-only episodes must be identical down to the byte; latent table materialized keys 100% unchanged.
-- **Executed Command:** `python -m pytest tests/test_r2_a01_patch2_acceptance.py::TestPatch2RetrievalImmutability::test_p1_01_retrieve_immutability -v`
-- **Measured Result:** SHA-256 digest of serialized $W$ structures before and after retrieval matched byte-for-byte; zero newly materialized latent keys; `_slots_by_cell` key set identity verified.
+### 3.7 GATE-REG-07 — Exact Retrieval Immutability Across 100 Consecutive Episodes
+- **Requirement:** 100 consecutive read-only episodes on a genuinely trained machine state with a populated peripheral ledger must exhibit 100% exact state immutability, zero new materialized latent keys, and deterministic outputs.
+- **Executed Command:** Comprehensive 100-episode verification script (`verify_gate_reg_07_100_episodes.py`) and [`tests/test_r2_a01_patch2_acceptance.py::test_p1_01_complete_retrieve_immutability_gate`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py).
+- **Initial Trained State (Roots 1..56):** 2 stable bindings, 12 assemblies, 89 materialized latent cells, 776 synapses, 15 tracked ledger assemblies.
+- **Measured Evidence Across Exactly 100 Consecutive Read-Only Episodes:**
+  - Completed Episodes: Exactly **100/100** without resetting or reconstructing state.
+  - Pre-Episode WState SHA-256: `446dc1bd86a2acfedd44354cb84b021d32ca381ccbbb85bb786cd3f61871f082`
+  - Post-Episode WState SHA-256: `446dc1bd86a2acfedd44354cb84b021d32ca381ccbbb85bb786cd3f61871f082` (**EXACT MATCH**)
+  - Pre-Episode HSlowState SHA-256: `dec7645bc296a014d1cd0c732fce1892204a6a359b79cafbc19ebe592a6ab8e6`
+  - Post-Episode HSlowState SHA-256: `dec7645bc296a014d1cd0c732fce1892204a6a359b79cafbc19ebe592a6ab8e6` (**EXACT MATCH**)
+  - Pre-Episode Caller RState SHA-256: `90b207cde1e7a4acc42a9f25353fc36b0c998341f2d235a338979779d02d1b5d`
+  - Post-Episode Caller RState SHA-256: `90b207cde1e7a4acc42a9f25353fc36b0c998341f2d235a338979779d02d1b5d` (**EXACT MATCH**)
+  - Pre-Episode Ledger SHA-256: `c14d5df323f44770ec599c4218f6447459537c489b89b58c8fb965a9cf80acc2`
+  - Post-Episode Ledger SHA-256: `c14d5df323f44770ec599c4218f6447459537c489b89b58c8fb965a9cf80acc2` (**EXACT MATCH**)
+  - New Materialized Latent Keys: **0** (Initial: 89, Final: 89; key sets identical).
+  - Reverse Index: Exact preservation across all cells and targets.
+  - Learning Evidence Increments: **0** across all 776 synapses.
+  - Deterministic Outputs: 100% deterministic outputs across repeating prompt cycles.
 - **Verdict:** **Verified PASS**
 
 ### 3.8 GATE-REG-08 — Provenance Rejection Zero-Bleed
@@ -128,7 +142,7 @@ Each of the twelve frozen `GATE-REG` requirements was independently audited with
 ### 3.10 GATE-REG-10 — Latent Topology Abort Invariant
 - **Requirement:** 100% of latent slots and reverse index entries created during an aborted root are restored to pre-exposure state.
 - **Executed Command:** `python -m pytest tests/test_r2_a01_patch3_acceptance.py -v` and `python benchmarks/bench_r2_a01_p4_latent_scaling.py`
-- **Measured Result:** 1,000 stress cycles: Initial (500) vs Final (500) materialized cells and reverse targets matched exactly with 0 drift and 0 net memory leak.
+- **Measured Result:** 1,000 stress cycles: Initial (500) vs Final (500) materialized cells and reverse targets matched exactly with 0 drift and 0 net memory leak in the latent table.
 - **Verdict:** **Verified PASS**
 
 ### 3.11 GATE-REG-11 — Deterministic Duplicate-Event Replay
@@ -200,7 +214,7 @@ tests/forensics/test_f01_cold_start_and_persistence.py::test_f01_persistence_not
 ============================= 9 passed in 13.88s ==============================
 ```
 
-### 4.3 Latent Scaling Benchmark (`benchmarks/bench_r2_a01_p4_latent_scaling.py`)
+### 4.3 Latent Scaling Stress Benchmark (`benchmarks/bench_r2_a01_p4_latent_scaling.py`)
 Executed across 1,000 stress cycles and multiple scale tiers:
 ```text
 ==============================================================================
@@ -225,6 +239,7 @@ Final Verification Summary:
 - Initial vs Final Materialized Cells: 500 (Exact Match, 0 drift)
 - Initial vs Final Reverse Targets:    500 (Exact Match, 0 drift)
 - Retained History Records: 1000 aborted roots (Lawful Transaction Log)
+- Retained Memory Growth: Lawful transaction history growth (0.00 KB -> 1477.27 KB)
 ==============================================================================
 BENCH-R2-A01-P4 COMPLETE — ZERO LATENT LEAK VERIFIED ACROSS ABORT & COMMIT
 ==============================================================================
@@ -264,7 +279,7 @@ git diff --stat 31721fd1ba7559b72d9fe11f037ea0c0d1e91ed2 HEAD -- src/dgca/ confi
 1. **Transaction Lifecycle & Provenance:** Patch 1 envelope validation occurs strictly prior to Core event execution. Replayed events hit the cache without re-entering neural updates.
 2. **Read-Only Immutability & Abort Rollback:** Read-only retrieval bypasses transaction logging and operates on scratch homeostasis, preventing any latent index mutation. When an exposure aborts, Patch 3 latent rollback correctly restores `_slots_by_cell` and `_coactive_reverse_index` without corrupting committed sensory cells.
 3. **Publication Visibility & Ledger Acknowledgment:** Patch 4 atomic publication ensures that `_publication_view` references are updated atomically upon `end_exposure()`, and peripheral outbox notifications are dispatched only post-publication. Mid-dispatch failures are held in `pending_outbox_by_root` until idempotent reconciliation.
-4. **Reproducibility & Persistence Protocol:** Patch 5 generator deterministically fingerprints source commit and configurations. The persistence boundary protocol in `serialization.py` strictly prevents ad-hoc serialization by raising `NotImplementedError`.
+4. **Reproducibility & Persistence Protocol (Corrected C01):** Patch 5 generator deterministically fingerprints source commit and configurations. The persistence boundary declaration in [`src/dgca/common/serialization.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/common/serialization.py) defines `DurablePersistenceService` as a formal `typing.Protocol` with method declarations containing `...` (ellipsis). It serves strictly as an architectural specification boundary for future durable persistence (R1-B03 scope). No disk durability engine, Write-Ahead Log (WAL), checkpointing mechanism, or background sync worker is implemented.
 5. **Zero Frozen Module Drift:**
    - `src/dgca/encoder/`: **0 lines modified**
    - `src/dgca/lla/`: **0 lines modified**
@@ -273,17 +288,18 @@ git diff --stat 31721fd1ba7559b72d9fe11f037ea0c0d1e91ed2 HEAD -- src/dgca/ confi
 
 ---
 
-## 6. Explicit Remaining Limitations
+## 6. Explicit Remaining Limitations & Boundaries (Corrected C01)
 
 1. **In-Process Single-Threaded Boundary:** In strict adherence to R2-A01 architecture contracts, the transaction manager assumes serialized, in-process execution. Multi-threaded or distributed concurrency is out of scope and deferred to future releases.
-2. **Durable Storage Persistence Deferred to R2-B:** While in-memory outbox recovery and idempotent ledger reconciliation are complete, durable on-disk state databases (e.g. SQLite/WAL or checkpoint files) remain intentionally unimplemented. The persistence boundary protocol raises `NotImplementedError`.
-3. **Eagle Duplicate Assembly Collision Preserved:** The exact tie and resulting ambiguity stop (`StatusCode.GEN_STOP_AMBIGUOUS`) for prompt `['النسر']` is an inherent empirical property of duplicate Assemblies 5 & 6 from Phase 1 curriculum, preserved intentionally for resolution in R2-B.
+2. **Durable Storage Persistence Deferred to R1-B03:** While in-memory outbox recovery and idempotent ledger reconciliation are complete within the executing process, durable on-disk state databases (e.g. SQLite/WAL or checkpoint files) remain intentionally unimplemented. The persistence interface is formally defined as a `typing.Protocol` with method declarations containing `...`.
+3. **Distinction of Latent Topology Invariants vs Process Memory Growth:** The zero-drift guarantee verified in `benchmarks/bench_r2_a01_p4_latent_scaling.py` applies to the neural latent topology (500 initial == 500 final cells/targets; zero unreferenced latent slots or reverse index leakage). Total process memory growth during the 1,000-cycle stress test (0.00 KB to 1477.27 KB) is lawful and expected, resulting from the cumulative retention of transaction history records in the completed root log.
+4. **Eagle Duplicate Assembly Collision Preserved:** The exact tie and resulting ambiguity stop (`StatusCode.GEN_STOP_AMBIGUOUS`) for prompt `['النسر']` is an inherent empirical property of duplicate Assemblies 5 & 6 from Phase 1 curriculum, preserved intentionally for resolution in R2-B.
 
 ---
 
 ## 7. Final Acceptance Recommendation
 
-The consolidated R2-A01 remediation across Patches 1 through 5 has been verified with 100% test pass rates, zero regression gate failures, zero memory leaks, and complete architectural consistency.
+The consolidated R2-A01 remediation across Patches 1 through 5 has been verified with 100% test pass rates across all 192 regression tests, zero regression gate failures, zero latent topology drift, verified 100-episode retrieval immutability, accurate contract traceability, and complete architectural consistency.
 
 **Final Status Declaration:**
 ```text
