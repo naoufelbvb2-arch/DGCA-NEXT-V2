@@ -29,14 +29,16 @@ The empirical findings establish that:
 1. **Assemblies 5 and 6 are an `EXACT_DUPLICATE` pair.** At Root 56, both assemblies have identical ordered membership tuples: `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)`, identical structural generation ($7$), identical status (`LIVE`), and identical attestation on the peripheral ledger (`<EOS>`, `Marker.EOS`).
 2. **They were legally born disjoint during Root 8, Event 3 (`<EOS>`).** In Root 8, Event 3, unassigned committed fresh emitters formed two completely disjoint triangles: Assembly 5 (`[8834, 9209, 10570]`) and Assembly 6 (`[10646, 10915, 11153]`) with initial $\text{Jaccard} = 0.0000$. All six seed cells qualified as fresh emitters exclusively in Event 3.
 3. **They converged via root-close GROW in Root 9.** During the Root 9 root-close assembly pipeline (`END_EXPOSURE`), symmetric co-activation and mutual support in the shared co-active context drove mutual recruitment. Assembly 5 recruited Assembly 6's cells and vice versa, rendering both assemblies 100% structurally identical at Root 9 ($8$ cells) and Root 10 ($9$ cells).
-4. **MERGE rejected the pair under strict compliance with the frozen Core specification.** In all 49 consecutive roots from Root 8 to Root 56, `_try_merge_pair(5, 6)` was evaluated. While $\text{Jaccard} = 1.0 \ge \Theta_{\text{merge}} (0.70)$ and union cardinality $9 \le K_{\text{max}} (16)$, `DGCA_CORE_RC4_1.md` §2.0 item 4 explicitly defines:
+4. **MERGE rejected the pair under strict compliance with the frozen Core specification.** Across Roots 8 to 56, `_try_merge_pair(5, 6)` was evaluated 49 times:
+   - *Root 8 (Birth Root, 1 evaluation):* Assemblies 5 and 6 had disjoint seed memberships ($\text{Jaccard} = 0.0000 < \Theta_{\text{merge}} = 0.70$), rejected by `JACCARD_BELOW_THETA_MERGE`.
+   - *Roots 9–56 (Post-Convergence, 48 evaluations):* Assemblies 5 and 6 were 100% structurally identical ($\text{Jaccard} = 1.0000 \ge \Theta_{\text{merge}} = 0.70$, union cardinality $\le 16$). However, `DGCA_CORE_RC4_1.md` §2.0 item 4 explicitly defines:
    $$\text{between\_strength} = \text{mean}\{R_{ij}^B : i \in A \setminus B, j \in B \setminus A\}, \quad \text{with } (\text{empty exclusive side} \implies 0)$$
    Because $A_5 = A_6$, both exclusive sets are empty (`excl_a = []`, `excl_b = []`). The production implementation:
    ```python
    if not excl_a or not excl_b:
        between_strength = 0.0
    ```
-   faithfully executes this specification. The resulting `between_strength = 0.0 < THETA_OB (0.40)` rejected the merge. This is classified as a **contract-compliant structural consolidation limitation**, not a software implementation defect.
+   faithfully executes this specification. The resulting `between_strength = 0.0 < THETA_OB (0.40)` rejected the merge in all 48 opportunities. This is classified as a **contract-compliant structural consolidation limitation**, not a software implementation defect.
 5. **Readout collision is an exact floating-point and Q6 score tie.** At Step 2 of Eagle readout (`ماء` $\to$ `<EOS>`), Assemblies 5 and 6 both computed $\text{score} = 0.2069442431$ ($\text{Q6} = 206944$). The score margin was exactly $0.0000000000 < M_{\text{read}} (0.04)$, legally forcing `StatusCode.AMBIGUOUS` and `GEN_STOP_AMBIGUOUS`.
 
 ---
@@ -311,7 +313,7 @@ At Root 56, autonomous episode generation was evaluated on both prompt sequences
 | **H1: Distinct Structures, Coincidental Tie** | Assemblies 5 and 6 have different cells but coincidentally computed identical scores. | Disproved. $A_5$ and $A_6$ share all 9 cells ($A_5 \Delta A_6 = \emptyset$). | **REFUTED** |
 | **H2: Duplicate FORM Birth** | FORM stage created two identical assemblies at birth. | Disproved. At birth (Root 8), $A_5$ and $A_6$ had 0 cells in common ($\text{Jaccard} = 0.0$). | **REFUTED** |
 | **H3: Ledger Attestation Collision** | Ledger attestation failed or confused token envelopes. | Disproved. Both assemblies recorded 46 confirmed roots for `<EOS>` with valid distinct outbox entries. | **REFUTED** |
-| **H4: MERGE Never Evaluated Pair** | Pair $(5, 6)$ was never checked by `_try_merge_pair` due to ordering, cooldown, or capacity. | Disproved. Pair was evaluated in 49 consecutive roots; rejected strictly by `between_strength = 0.0`. | **REFUTED** |
+| **H4: MERGE Never Evaluated Pair** | Pair $(5, 6)$ was never checked by `_try_merge_pair` due to ordering, cooldown, or capacity. | Disproved. Pair was evaluated in 49 consecutive roots (Root 8 rejected by Jaccard=0.0; Roots 9–56 rejected strictly by `between_strength = 0.0`). | **REFUTED** |
 
 ---
 

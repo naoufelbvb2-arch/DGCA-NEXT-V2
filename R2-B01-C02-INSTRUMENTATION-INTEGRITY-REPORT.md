@@ -219,9 +219,10 @@ Using the proven non-interfering passive observer, all principal findings of R2-
   $$\text{Members}(A_5) = \text{Members}(A_6) = [8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117]$$
 - **Root 56:** Identical 9-cell membership remains stable through curriculum end.
 
-### 3. MERGE Rejection Compliance (Roots 9–56)
-- Evaluated across 49 consecutive roots.
-- In every evaluation: $\text{Jaccard} = 1.0000$, $\text{excl\_a} = \emptyset$, $\text{excl\_b} = \emptyset$.
+### 3. MERGE Rejection Compliance (Roots 8–56)
+- Evaluated across 49 consecutive roots (Roots 8 through 56).
+- **Root 8 (Birth Root, 1 evaluation):** $\text{Jaccard} = 0.0000 < \Theta_{\text{merge}} (0.70)$, blocked by `JACCARD_BELOW_THETA_MERGE` (disjoint seeds).
+- **Roots 9–56 (Post-Convergence, 48 evaluations):** In every evaluation, $\text{Jaccard} = 1.0000$, $\text{excl\_a} = \emptyset$, $\text{excl\_b} = \emptyset$.
 - Under `DGCA_CORE_RC4_1.md` §2.0 item 4:
   $$\text{between\_strength} = 0.0 < \Theta_{\text{OB}} (0.40)$$
 - Blocked strictly by `SPEC_CONTRACT_EMPTY_EXCLUSIVE_SIDE_ZERO_BETWEEN_STRENGTH`.
