@@ -213,7 +213,7 @@ Rollback governance is structured strictly around the future non-fast-forward me
    Execute:
    ```powershell
    git checkout main
-   git revert -m 1 <merge_commit_sha> -m "revert: rollback exact-duplicate merge amendment"
+   git revert -m 1 --no-edit <merge_commit_sha>
    ```
 3. **Atomic State Restoration:**  
    - Restores `src/dgca/core/assembly.py` to `faf361b`.

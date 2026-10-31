@@ -34,9 +34,13 @@ All technical and scientific verification gates have passed:
 
 ---
 
-## 2. Complete Cumulative File Inventory
+## 2. Complete Cumulative File Inventory (13-File Baseline vs 14-File Candidate)
 
-Comparing `experiment/r2-b03-exact-duplicate-merge` to frozen production baseline `faf361b6b95de6287b466eb1dc524ea49c732635`, exactly 13 files are modified or introduced. The table below provides an exhaustive classification across all 6 categories:
+Comparing `experiment/r2-b03-exact-duplicate-merge` to frozen production baseline `faf361b6b95de6287b466eb1dc524ea49c732635`:
+- **Historical 13-File Snapshot (Commit `b1b8f5a`):** Consisted of 1 production file, 2 test fixtures, 2 rebaselined legacy tests, 2 new acceptance test suites, 1 normative amendment, and 5 historical reports (ending at R2-B05).
+- **Current 14-File Release Candidate (Commit `ce7cc49`):** Incorporates the formal R2-B05-C01 integrity attestation (`R2-B05-C01-FINAL-NORMATIVE-INTEGRITY-ATTESTATION.md`).
+
+The table below provides an exhaustive classification across all 6 categories:
 
 | Category | File Path | Status | Diff Statistics / Hash | Purpose & Scope |
 | :--- | :--- | :--- | :--- | :--- |
@@ -52,7 +56,8 @@ Comparing `experiment/r2-b03-exact-duplicate-merge` to frozen production baselin
 | **6. Release Reports** | `R2-B03-C01-SCIENTIFIC-ACCEPTANCE-EVIDENCE-REPORT.md` | Added | `273  0` (+273 / -0) | Scientific evidence attestation and legacy oracle rebaseline justification |
 | **6. Release Reports** | `R2-B03-C02-FINAL-SCIENTIFIC-ACCEPTANCE-REPORT.md` | Added | `290  0` (+290 / -0) | Final acceptance report confirming 215/215 tests passing |
 | **6. Release Reports** | `R2-B04-FINAL-PROMOTION-READINESS-REPORT.md` | Added | `232  0` (+232 / -0) | Technical promotion readiness and diff reconciliation report |
-| **6. Release Reports** | `R2-B05-NORMATIVE-PROMOTION-PREPARATION-REPORT.md` | Added | Current file | Final normative promotion preparation and release governance report |
+| **6. Release Reports** | `R2-B05-NORMATIVE-PROMOTION-PREPARATION-REPORT.md` | Added | `302  0` (+302 / -0) | Normative promotion preparation and release governance report |
+| **6. Release Reports** | [`R2-B05-C01-FINAL-NORMATIVE-INTEGRITY-ATTESTATION.md`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B05-C01-FINAL-NORMATIVE-INTEGRITY-ATTESTATION.md) | Added | `248  0` (+248 / -0) | Final normative integrity attestation report |
 
 ---
 
@@ -149,9 +154,13 @@ The normative specification document [`DGCA_CORE_AMENDMENT_R2_B02_EXACT_DUPLICAT
    > *"Exact structural equality satisfies only the exclusive mutual-support gate, not complete merge eligibility."*  
    > Exact duplicates must still satisfy live status, cooldown, Jaccard overlap, union size, membership caps, and keep guards.
 2. **Branch 4b (Partial Overlap Consolidation):**
-   $$\text{Members}(A) \ne \text{Members}(B) \implies E_A \ne \emptyset \land E_B \ne \emptyset$$
-   $$\text{BetweenStrength}(A, B) = \frac{1}{|E_A| \cdot |E_B|} \sum_{i \in E_A} \sum_{j \in E_B} R_{ij}^B(W) \ge \Theta_{\text{ob}} = 0.40$$
-   Proper subsets ($A \subset B$) or proper supersets ($B \subset A$) produce one empty exclusive set, evaluating to `between_strength = 0.0 < THETA_OB = 0.40` and failing closed.
+   For non-identical member sets ($\text{Members}(A) \ne \text{Members}(B)$), at least one exclusive set is non-empty ($E_A \ne \emptyset \lor E_B \ne \emptyset$).
+   - If **both** exclusive sets are non-empty ($E_A \ne \emptyset \land E_B \ne \emptyset$), compute the original mean reciprocal mutual support across all cross-pairs:
+     $$\text{BetweenStrength}(A, B) = \frac{1}{|E_A| \cdot |E_B|} \sum_{i \in E_A} \sum_{j \in E_B} R_{ij}^B(W)$$
+     The mutual-support gate is satisfied if and only if $\text{BetweenStrength}(A, B) \ge \Theta_{\text{ob}} = 0.40$.
+   - If **exactly one** exclusive set is empty (proper subsets or proper supersets, e.g., $A \subset B$ or $B \subset A$), assign:
+     $$\text{between\_strength} = 0.0$$
+     and reject consolidation under $\Theta_{\text{ob}} = 0.40$ (`between_strength_passed = False`).
 
 ### Consolidation Lifecycle & Invariant Guarantees:
 - **Lower-ID Survivor:** Assembly $A$ ($A.\text{id} < B.\text{id}$) survives (`LIVE`); Assembly $B$ is archived (`ARCHIVED`).
@@ -261,19 +270,17 @@ In the event that post-promotion anomalies emerge, the rollback procedure is str
    Revert the merge commit targeting the primary `main` parent:
    ```powershell
    git checkout main
-   git revert -m 1 <merge_commit_sha> -m "revert: rollback exact-duplicate merge amendment"
+   git revert -m 1 --no-edit <merge_commit_sha>
    ```
-3. **Atomically Restored State:**
-   This clean first-parent revert atomically:
-   - Restores [`src/dgca/core/assembly.py`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/assembly.py) to frozen baseline `faf361b`.
-   - Restores legacy tests [`tests/forensics/test_f01_cold_start_and_persistence.py`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/forensics/test_f01_cold_start_and_persistence.py) and [`tests/test_r2_a01_patch2_acceptance.py`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_a01_patch2_acceptance.py) to their unamended expectations.
-   - Removes new acceptance tests and fixture files from `main`.
-4. **Normative Specification Governance:**
-   - Mark `DGCA_CORE_AMENDMENT_R2_B02_EXACT_DUPLICATE_MERGE.md` with status `SUPERSEDED / REVOKED`.
-   - Never delete forensic reports or git commit history, ensuring complete audit provenance.
-5. **No Test Suppression:**
-   Rollback governance strictly forbids using `@pytest.mark.xfail` or skipping tests to mask failures. The baseline regression suite must pass in the restored context.
-6. **Governance Boundary:**
+3. **Rollback Mechanics & Operational Constraints:**
+   - **Parent Identification:** The flag `-m 1` identifies the first parent (the authoritative `main` line) of the promotion merge commit.
+   - **Verified Merge Topology:** The operation strictly requires a verified merge topology (the commit must be a merge commit with $\ge 2$ parents).
+   - **Tree State Restoration:** Reverting the merge restores the previous repository tree state of `main`, subject to any subsequent commits and potential merge conflicts.
+   - **Historical Audit Preservation:** Historical audit evidence and forensic commits remain permanently available in Git history.
+   - **Amendment Document Visibility:** The amendment document may disappear from the current tree after a complete revert.
+   - **Formal Revocation Governance:** Any formal revocation notice must be recorded as a separate governance record in repository tracking.
+   - **No Test Suppression:** Rollback governance strictly forbids using `@pytest.mark.xfail` or skipping tests to mask failures. The restored baseline regression suite must pass natively with 0 failures and 0 skips.
+4. **Governance Boundary:**
    No rollback is executed during this task. No promotion into `main` has occurred.
 
 ---
