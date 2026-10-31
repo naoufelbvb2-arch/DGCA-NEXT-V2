@@ -1,25 +1,30 @@
-"""Scientific Acceptance and Legacy Regression Reconciliation Test Suite for R2-B03-C01.
+"""Scientific Acceptance and Legacy Regression Reconciliation Test Suite for R2-B03-C01/C02.
 
 Covers:
 - C01-S01: Automated Eagle Generation Proof (1-event & 2-event prompts, exact winner, generation, scores, margin, EOS).
 - C01-S02: Real Post-Merge Attestation Proof (Ledger candidate rows for Asm 5 at Gen 8, confirmed roots [11..56], no leak from 6).
-- C01-S03: Read-Only Generation Integrity (Snapshot preservation of W, H_slow, R, Ledger across Cat, Eagle, and RETRIEVE).
-- C01-S04: Post-Assembly Pre-Publication Fault (FP_02 shadow consolidation verified via hook, zero publication leak; FP_03 coverage).
-- C01-S05: Non-Identical MERGE Differential (Frozen baseline vs patched implementation across 8 non-identical cases + exact duplicate).
-- C01-S07: Full State Determinism (Dual independent cold-start curriculum replays, 100% cryptographic digest match).
+- C01-S03: Read-Only Generation & Retrieval Integrity (Full snapshot preservation of W, H_slow, R, Ledger, PublicationView).
+- C01-S04: Post-Assembly Pre-Publication Fault (FP_02 shadow consolidation verified via hook, zero publication leak).
+- C02-S02: Non-Empty FP_03 Outbox Test (Real deferred batch, idempotent reconciliation, non-mutating WState).
+- C02-S05: Non-Identical MERGE Differential (Frozen baseline compiled directly from git faf361b vs patched code, full snapshot_w parity).
+- C02-S03: Complete Transaction Publication Snapshot & Full State Determinism (Dual independent runs, 100% digest match across all partitions).
 """
 
 from __future__ import annotations
 
 import dataclasses
 import hashlib
+import subprocess
+import types
 from typing import Any
 import pytest
 
 from dgca.common.errors import StatusCode
 from dgca.common.hashing import Region
 from dgca.core.anatomy import Synapse, SynapseKey, SynapseScope, SynapseState
+import dgca.core.assembly as asm_module
 from dgca.core.assembly import (
+    AssemblyEndReport,
     K_MAX,
     M_MAX,
     THETA_A,
@@ -34,6 +39,7 @@ from dgca.core.assembly import (
     _rebuild_assemblies_by_member,
 )
 from dgca.core.generator import generate_episode
+from dgca.core.readout import M_READ
 from dgca.core.state import (
     Assembly,
     AssemblyStatus,
@@ -49,11 +55,13 @@ from dgca.encoder.envelope import (
     encode_exposure,
 )
 from dgca.lifecycle.exposure_tx import (
+    EndExposureReport,
     ExposureStatus,
     ExposureTransactionManager,
+    TransactionPublicationView,
     run_read_only_episode,
 )
-from dgca.core.readout import M_READ
+from dgca.peripheral.outbox import OutboxNotificationV1
 from dgca.peripheral.readout_ledger import (
     LedgerCandidateRow,
     SurfaceReadoutLedgerV1,
@@ -68,6 +76,97 @@ from tests.test_r2_a01_patch2_acceptance import (
     hash_state_snapshot,
 )
 
+
+# ---------------------------------------------------------------------------
+# Dynamic compilation of frozen baseline _try_merge_pair from git tree
+# ---------------------------------------------------------------------------
+_FROZEN_GIT_COMMIT = "faf361b6b95de6287b466eb1dc524ea49c732635"
+
+def _load_frozen_baseline_try_merge() -> Any:
+    """Retrieve and compile _try_merge_pair directly from the frozen production baseline commit."""
+    frozen_src = subprocess.check_output(
+        ["git", "show", f"{_FROZEN_GIT_COMMIT}:src/dgca/core/assembly.py"],
+        text=True,
+        encoding="utf-8",
+    )
+    frozen_mod = types.ModuleType("frozen_assembly_baseline")
+    frozen_mod.__dict__.update(asm_module.__dict__)
+    exec(compile(frozen_src, f"<git_show_{_FROZEN_GIT_COMMIT}>", "exec"), frozen_mod.__dict__)
+    return frozen_mod._try_merge_pair
+
+_baseline_try_merge_pair = _load_frozen_baseline_try_merge()
+
+
+# ---------------------------------------------------------------------------
+# Comprehensive TransactionPublicationView Snapshot Serializer (C02-S03)
+# ---------------------------------------------------------------------------
+
+def _snapshot_outbox_notification(n: OutboxNotificationV1) -> dict[str, Any]:
+    """Capture authoritative stored fields of an OutboxNotificationV1."""
+    return {
+        "root_id": n.root_id,
+        "event_order": n.event_order,
+        "assembly_id": n.assembly_id,
+        "structural_generation": n.structural_generation,
+        "surface_sha256": n.surface_sha256,
+        "feature_bundle_digest": n.feature_bundle_digest,
+        "marker": n.marker,
+        "raw_surface": n.envelope.raw_surface_nfc_utf8 if n.envelope else None,
+    }
+
+
+def _snapshot_assembly_report(r: AssemblyEndReport | None) -> dict[str, Any] | None:
+    """Capture authoritative stored fields of an AssemblyEndReport."""
+    if r is None:
+        return None
+    return {
+        "maintained_ids": tuple(r.maintained_ids),
+        "archived_by_maintain_ids": tuple(r.archived_by_maintain_ids),
+        "grown_ids": tuple(r.grown_ids),
+        "formed_ids": tuple(r.formed_ids),
+        "merged_pairs": tuple(r.merged_pairs),
+        "split_pairs": tuple(r.split_pairs),
+        "diagnostics": tuple(r.diagnostics),
+    }
+
+
+def _snapshot_end_exposure_report(rep: EndExposureReport) -> dict[str, Any]:
+    """Capture 100% of declared fields of an EndExposureReport."""
+    return {
+        "exposure_id": rep.exposure_id,
+        "status": rep.status,
+        "events_processed": rep.events_processed,
+        "proposal_outcomes_count": len(rep.proposal_outcomes),
+        "pruned_synapses": tuple(sorted(rep.pruned_synapses)),
+        "last_event_remaining_k_r": rep.last_event_remaining_k_r,
+        "diagnostics": tuple(rep.diagnostics),
+        "candidate_settlements_count": len(rep.candidate_settlements),
+        "recruitments_count": len(rep.recruitments),
+        "assembly_report": _snapshot_assembly_report(rep.assembly_report),
+        "outbox_notifications": tuple(_snapshot_outbox_notification(n) for n in rep.outbox_notifications),
+    }
+
+
+def snapshot_publication_view(pv: TransactionPublicationView) -> dict[str, Any]:
+    """Capture comprehensive snapshot of TransactionPublicationView."""
+    return {
+        "w_snapshot": snapshot_w(pv.W),
+        "completed_roots": {
+            rid: _snapshot_end_exposure_report(rep)
+            for rid, rep in sorted(pv.completed_roots.items())
+        },
+        "pending_outbox_by_root": {
+            rid: tuple(_snapshot_outbox_notification(n) for n in notifs)
+            for rid, notifs in sorted(pv.pending_outbox_by_root.items())
+        },
+        "completed_roots_high_watermark": pv.completed_roots_high_watermark,
+        "active_exposure_id": pv.active_exposure_id,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Training and Test Helpers
+# ---------------------------------------------------------------------------
 
 def _train_56_root_curriculum(
     tx: ExposureTransactionManager,
@@ -131,70 +230,6 @@ def _wire_reciprocal_pair(
             confirmed_roots=(1, 2, 3),
         )
         state.W.add_or_replace_synapse(syn)
-
-
-def _baseline_try_merge_pair(
-    a_id: int,
-    b_id: int,
-    w: WState,
-    n_rec_cache: dict[int, dict[int, float]],
-) -> bool:
-    """Exact frozen baseline implementation of _try_merge_pair from origin/main:faf361b6b95de6287b466eb1dc524ea49c732635."""
-    if a_id not in w.assemblies or b_id not in w.assemblies:
-        return False
-    asm_a = w.assemblies[a_id]
-    asm_b = w.assemblies[b_id]
-    if asm_a.status != AssemblyStatus.LIVE or asm_b.status != AssemblyStatus.LIVE:
-        return False
-    if _is_in_merge_split_cooldown(asm_a, w) or _is_in_merge_split_cooldown(asm_b, w):
-        return False
-
-    set_a = set(asm_a.member_cell_ids)
-    set_b = set(asm_b.member_cell_ids)
-    union_set = set_a | set_b
-    if len(union_set) > K_MAX or not union_set:
-        return False
-
-    inter_set = set_a & set_b
-    jaccard = float(len(inter_set)) / float(len(union_set))
-    if jaccard < THETA_MERGE:
-        return False
-
-    excl_a = sorted(set_a - set_b)
-    excl_b = sorted(set_b - set_a)
-    if not excl_a or not excl_b:
-        between_strength = 0.0
-    else:
-        cross_vals = [
-            compute_mutual_support_r_b(i, j, w)
-            for i in excl_a
-            for j in excl_b
-        ]
-        between_strength = sum(cross_vals) / float(len(cross_vals))
-
-    if between_strength < THETA_OB:
-        return False
-
-    union_tuple = tuple(sorted(union_set))
-    for x in union_tuple:
-        live_after = (_live_assembly_ids_for_cell(x, w) - {b_id}) | {a_id}
-        if len(live_after) > M_MAX:
-            return False
-        if not check_maintain_keep_guards(x, union_tuple, w, n_rec_cache):
-            return False
-
-    asm_a.member_cell_ids = union_tuple
-    asm_a.structural_generation += 1
-    asm_a.last_mutation_close_serial = w.close_serial
-    asm_a.last_merge_split_close_serial = w.completed_external_events_count
-
-    asm_b.status = AssemblyStatus.ARCHIVED
-    asm_b.structural_generation += 1
-    asm_b.last_mutation_close_serial = w.close_serial
-    asm_b.last_merge_split_close_serial = w.completed_external_events_count
-
-    _rebuild_assemblies_by_member(w)
-    return True
 
 
 # ==============================================================================
@@ -312,11 +347,11 @@ def test_c01_s02_real_post_merge_attestation_proof() -> None:
 
 
 # ==============================================================================
-# C01-S03: Read-Only Generation Integrity
+# C01-S03 & C02-S04: Read-Only Generation & Retrieval Integrity
 # ==============================================================================
 
 def test_c01_s03_read_only_generation_integrity() -> None:
-    """C01-S03: Snapshot verification of complete state immutability during generation & retrieval."""
+    """C01-S03 & C02-S04: Snapshot verification of complete state immutability during generation & retrieval."""
     state = MachineState()
     ledger = SurfaceReadoutLedgerV1()
     tx = ExposureTransactionManager(
@@ -333,11 +368,13 @@ def test_c01_s03_read_only_generation_integrity() -> None:
     h_snap_pre_cat = snapshot_h_slow(state.H_slow)
     r_snap_pre_cat = snapshot_r(state.R)
     ledger_snap_pre_cat = snapshot_ledger(ledger)
+    pv_snap_pre = snapshot_publication_view(tx._publication_view)
 
     hash_w_pre_cat = hash_state_snapshot(w_snap_pre_cat)
     hash_h_pre_cat = hash_state_snapshot(h_snap_pre_cat)
     hash_r_pre_cat = hash_state_snapshot(r_snap_pre_cat)
     hash_l_pre_cat = hash_state_snapshot(ledger_snap_pre_cat)
+    hash_pv_pre = hash_state_snapshot(pv_snap_pre)
 
     # 1. Cat rollout
     prompt_cat = [branch_cat[0].core_event]
@@ -380,19 +417,37 @@ def test_c01_s03_read_only_generation_integrity() -> None:
     assert hash_state_snapshot(snapshot_r(state.R)) == hash_r_pre_eagle
     assert hash_state_snapshot(snapshot_ledger(ledger)) == hash_l_pre_eagle
 
-    # 3. Read-only retrieval
+    # 3. Read-only retrieval (C02-S04)
     w_snap_pre_ro = snapshot_w(state.W)
+    h_snap_pre_ro = snapshot_h_slow(state.H_slow)
+    r_snap_pre_ro = snapshot_r(state.R)
+    l_snap_pre_ro = snapshot_ledger(ledger)
+    pv_snap_pre_ro = snapshot_publication_view(tx._publication_view)
+
     hash_w_pre_ro = hash_state_snapshot(w_snap_pre_ro)
+    hash_h_pre_ro = hash_state_snapshot(h_snap_pre_ro)
+    hash_r_pre_ro = hash_state_snapshot(r_snap_pre_ro)
+    hash_l_pre_ro = hash_state_snapshot(l_snap_pre_ro)
+    hash_pv_pre_ro = hash_state_snapshot(pv_snap_pre_ro)
 
     ro_summary = run_read_only_episode(state, [branch_cat[0].core_event, branch_cat[1].core_event])
     assert len(ro_summary.event_results) == 2
 
     assert snapshot_w(state.W) == w_snap_pre_ro, "WState mutated during RETRIEVE!"
+    assert snapshot_h_slow(state.H_slow) == h_snap_pre_ro, "HSlowState mutated during RETRIEVE!"
+    assert snapshot_r(state.R) == r_snap_pre_ro, "Caller RState mutated during RETRIEVE!"
+    assert snapshot_ledger(ledger) == l_snap_pre_ro, "Ledger mutated during RETRIEVE!"
+    assert snapshot_publication_view(tx._publication_view) == pv_snap_pre_ro, "PublicationView mutated during RETRIEVE!"
+
     assert hash_state_snapshot(snapshot_w(state.W)) == hash_w_pre_ro
+    assert hash_state_snapshot(snapshot_h_slow(state.H_slow)) == hash_h_pre_ro
+    assert hash_state_snapshot(snapshot_r(state.R)) == hash_r_pre_ro
+    assert hash_state_snapshot(snapshot_ledger(ledger)) == hash_l_pre_ro
+    assert hash_state_snapshot(snapshot_publication_view(tx._publication_view)) == hash_pv_pre_ro
 
 
 # ==============================================================================
-# C01-S04: Post-Assembly Pre-Publication Fault (FP_02 & FP_03)
+# C01-S04 & C02-S02: Post-Assembly Pre-Publication Fault & Non-Empty FP_03
 # ==============================================================================
 
 def test_c01_s04_post_assembly_pre_publication_fault_fp02() -> None:
@@ -470,8 +525,8 @@ def test_c01_s04_post_assembly_pre_publication_fault_fp02() -> None:
     assert state.W.completed_roots_high_watermark == 8
 
 
-def test_c01_s04_post_commit_dispatch_fault_fp03() -> None:
-    """C01-S04: Verify FP_03 post-commit dispatch failure leaves outbox pending safely."""
+def test_c02_s02_non_empty_fp03_outbox_delivery() -> None:
+    """C02-S02: Non-empty FP_03 outbox delivery, deferred batch staging, and idempotent reconciliation."""
     state = MachineState()
     ledger = SurfaceReadoutLedgerV1()
     tx = ExposureTransactionManager(
@@ -482,32 +537,88 @@ def test_c01_s04_post_commit_dispatch_fault_fp03() -> None:
     )
 
     branch_cat = encode_exposure("القط يشرب حليب", append_eos=True)
-    tx.begin_exposure(1)
+    branch_eagle = encode_exposure("النسر يشرب ماء", append_eos=True)
+
+    # Train roots 1-10 normally so pre-existing LIVE assemblies exist with stable generations
+    for r in range(1, 11):
+        b = branch_cat if (r % 2 == 1) else branch_eagle
+        tx.begin_exposure(r)
+        for env in b:
+            core_ev = dataclasses.replace(env.core_event, exposure_id=r)
+            tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
+        tx.end_exposure(r)
+
+    # Pre-checks before Root 11: Assembly 5 is LIVE at Gen 8, has 0 ledger candidate rows
+    assert state.W.assemblies[5].status == AssemblyStatus.LIVE
+    assert state.W.assemblies[5].structural_generation == 8
+    assert len(ledger.get_candidate_rows(5, 8)) == 0
+
+    # Begin Root 11 (Cat: exposes <EOS>)
+    tx.begin_exposure(11)
     for env in branch_cat:
-        core_ev = dataclasses.replace(env.core_event, exposure_id=1)
+        core_ev = dataclasses.replace(env.core_event, exposure_id=11)
         tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
 
+    # Inject FP_03: post-commit peripheral dispatch deferred
     tx._fault_injection_point = "FP_03"
-    # Commit succeeds despite post-commit dispatch deferred
-    report = tx.end_exposure(1)
+    report = tx.end_exposure(11)
+
+    # 1. Atomic END_EXPOSURE commit succeeds
     assert report.status == ExposureStatus.COMPLETED
-    assert 1 in tx.completed_roots
-    assert tx.state.W.completed_roots_high_watermark == 1
+
+    # 2. Completed root is durable
+    assert 11 in tx.completed_roots
+    assert 11 in tx._publication_view.completed_roots
+
+    # 3. Publication watermark advances
+    assert tx._publication_view.completed_roots_high_watermark == 11
+    assert tx.state.W.completed_roots_high_watermark == 11
+
+    # 4. Pending Outbox contains a NON-EMPTY batch (must fail if empty)
+    pending_batch = tx._publication_view.pending_outbox_by_root.get(11)
+    assert pending_batch is not None, "Pending outbox missing root 11!"
+    assert len(pending_batch) > 0, "Pending outbox batch for root 11 is empty!"
+    assert len(pending_batch) == 5, f"Expected 5 notifications, got {len(pending_batch)}"
+
+    # 5. Deferred batch is NOT consumed prematurely by ledger
+    assert len(ledger.get_candidate_rows(5, 8)) == 0, "Ledger consumed deferred batch prematurely!"
+
+    # Snapshot WState before reconcile to verify immutability
+    w_snap_pre_reconcile = snapshot_w(state.W)
+
+    # 6. reconcile_outbox() delivers the genuine batch
+    reconciled_count = tx.reconcile_outbox()
+    assert reconciled_count == 5, f"Expected 5 reconciled notifications, got {reconciled_count}"
+
+    # 7. Pending entries are cleared only after acknowledgement
+    assert 11 not in tx._publication_view.pending_outbox_by_root
+
+    # 8. Repeated reconciliation is idempotent
+    reconciled_again = tx.reconcile_outbox()
+    assert reconciled_again == 0, f"Expected 0 on idempotent retry, got {reconciled_again}"
+
+    # 9. No duplicate Ledger confirmations appear
+    rows_after = ledger.get_candidate_rows(5, 8)
+    assert len(rows_after) == 1, f"Expected 1 candidate row, got {len(rows_after)}"
+    assert rows_after[0].confirmed_roots == {11}
+
+    # 10. WState remains unchanged during peripheral reconciliation
+    w_snap_post_reconcile = snapshot_w(state.W)
+    assert w_snap_post_reconcile == w_snap_pre_reconcile, "WState mutated during outbox reconciliation!"
 
 
 # ==============================================================================
-# C01-S05: Non-Identical MERGE Differential
+# C01-S05 & C02-S05: Non-Identical MERGE Differential
 # ==============================================================================
 
 def test_c01_s05_non_identical_merge_differential() -> None:
-    """C01-S05: Differential execution of baseline vs patched MERGE on 8 non-identical scenarios."""
+    """C01-S05 & C02-S05: Differential execution of frozen baseline vs patched MERGE across all 8 non-identical cases."""
 
     def _run_differential_case(
         setup_fn,
         case_name: str,
         expected_decision: bool,
     ) -> None:
-        # Build identical baseline state and patched state
         state_base = MachineState()
         setup_fn(state_base)
         state_patch = MachineState()
@@ -532,14 +643,26 @@ def test_c01_s05_non_identical_merge_differential() -> None:
         assert asm_a_base.status == asm_a_patch.status
         assert asm_a_base.structural_generation == asm_a_patch.structural_generation
         assert asm_a_base.member_cell_ids == asm_a_patch.member_cell_ids
+        assert asm_a_base.last_mutation_close_serial == asm_a_patch.last_mutation_close_serial
+        assert asm_a_base.last_merge_split_close_serial == asm_a_patch.last_merge_split_close_serial
+
         assert asm_b_base.status == asm_b_patch.status
         assert asm_b_base.structural_generation == asm_b_patch.structural_generation
         assert asm_b_base.member_cell_ids == asm_b_patch.member_cell_ids
+        assert asm_b_base.last_mutation_close_serial == asm_b_patch.last_mutation_close_serial
+        assert asm_b_base.last_merge_split_close_serial == asm_b_patch.last_merge_split_close_serial
+
         assert state_base.W.assemblies_by_member == state_patch.W.assemblies_by_member
+
+        # Complete WState snapshot and cryptographic digest equality
+        snap_base = snapshot_w(state_base.W)
+        snap_patch = snapshot_w(state_patch.W)
+        assert snap_base == snap_patch, f"[{case_name}] WState deep snapshot mismatch!"
+        assert hash_state_snapshot(snap_base) == hash_state_snapshot(snap_patch)
 
     # 1. Eligible partial-overlap merge (J = 8/10 = 0.80 >= 0.70, mutual link between c8 and c9)
     def _case_1_eligible_partial(state: MachineState) -> None:
-        c = tuple(range(8200, 8280, 8))[:10]  # c0..c9
+        c = tuple(range(8200, 8280, 8))[:10]
         shared = c[:8]
         c8, c9 = c[8], c[9]
         for u in shared:
@@ -571,7 +694,6 @@ def test_c01_s05_non_identical_merge_differential() -> None:
             _wire_reciprocal_pair(state, c8, m, s_val=0.85, e_ext=6.0)
         for m in c[3:6]:
             _wire_reciprocal_pair(state, c9, m, s_val=0.85, e_ext=6.0)
-        # Weak link: S=0.20 < 0.60 (fails is_legal_consolidated_synapse)
         _wire_reciprocal_pair(state, c8, c9, s_val=0.20, e_ext=1.0)
 
         state.W.assemblies[1] = Assembly(assembly_id=1, region=Region.LANGUAGE, member_cell_ids=(*shared, c8), status=AssemblyStatus.LIVE, structural_generation=1)
@@ -639,15 +761,8 @@ def test_c01_s05_non_identical_merge_differential() -> None:
             _wire_reciprocal_pair(state, c9, m, s_val=0.85, e_ext=6.0)
         _wire_reciprocal_pair(state, c8, c9, s_val=0.85, e_ext=6.0)
 
-        # Wire dummy assemblies 10..23 covering cell c0 so len(live_after) > 12
         for aid in range(10, 24):
-            state.W.assemblies[aid] = Assembly(
-                assembly_id=aid,
-                region=Region.LANGUAGE,
-                member_cell_ids=(c[0], 8300, 8400),
-                status=AssemblyStatus.LIVE,
-                structural_generation=1,
-            )
+            state.W.assemblies[aid] = Assembly(assembly_id=aid, region=Region.LANGUAGE, member_cell_ids=(c[0], 8300, 8400), status=AssemblyStatus.LIVE)
 
         state.W.assemblies[1] = Assembly(assembly_id=1, region=Region.LANGUAGE, member_cell_ids=(*shared, c8), status=AssemblyStatus.LIVE, structural_generation=1)
         state.W.assemblies[2] = Assembly(assembly_id=2, region=Region.LANGUAGE, member_cell_ids=(*shared, c9), status=AssemblyStatus.LIVE, structural_generation=1)
@@ -655,14 +770,13 @@ def test_c01_s05_non_identical_merge_differential() -> None:
 
     _run_differential_case(_case_7_capacity, "Case 7: Capacity Exceeded", expected_decision=False)
 
-    # 8. Keep-guard rejection (union cell has degree < 2)
+    # 8. Keep-guard rejection (exclusive cells have 0 reciprocal connections to other members)
     def _case_8_keep_guard(state: MachineState) -> None:
         c = tuple(range(8200, 8280, 8))[:10]
         shared = c[:8]
         c8, c9 = c[8], c[9]
         for cid in c:
             state.W.commit_cell(cid, 0)
-        # c8 and c9 have 0 synapses to the other members
         state.W.assemblies[1] = Assembly(assembly_id=1, region=Region.LANGUAGE, member_cell_ids=(*shared, c8), status=AssemblyStatus.LIVE, structural_generation=1)
         state.W.assemblies[2] = Assembly(assembly_id=2, region=Region.LANGUAGE, member_cell_ids=(*shared, c9), status=AssemblyStatus.LIVE, structural_generation=1)
         _rebuild_assemblies_by_member(state.W)
@@ -690,11 +804,11 @@ def test_c01_s05_non_identical_merge_differential() -> None:
 
 
 # ==============================================================================
-# C01-S07: Full State Determinism
+# C01-S07 & C02-S03: Full State Determinism
 # ==============================================================================
 
 def test_c01_s07_full_state_determinism() -> None:
-    """C01-S07: Dual independent cold-start curriculum executions yield identical canonical digests."""
+    """C01-S07 & C02-S03: Dual independent cold-start curriculum executions yield identical canonical digests."""
 
     def _execute_curriculum():
         state = MachineState()
@@ -731,7 +845,15 @@ def test_c01_s07_full_state_determinism() -> None:
     hash_l2 = hash_state_snapshot(snapshot_ledger(l2))
     assert hash_l1 == hash_l2, f"Ledger digest mismatch:\n  Run 1: {hash_l1}\n  Run 2: {hash_l2}"
 
-    # 5. Publication View state
+    # 5. TransactionPublicationView comprehensive cryptographic digest (C02-S03)
+    snap_pv1 = snapshot_publication_view(tx1._publication_view)
+    snap_pv2 = snapshot_publication_view(tx2._publication_view)
+    assert snap_pv1 == snap_pv2, "PublicationView deep snapshot mismatch!"
+    hash_pv1 = hash_state_snapshot(snap_pv1)
+    hash_pv2 = hash_state_snapshot(snap_pv2)
+    assert hash_pv1 == hash_pv2, f"PublicationView digest mismatch:\n  Run 1: {hash_pv1}\n  Run 2: {hash_pv2}"
+
+    # 6. Specific publication metadata checks
     pv1 = tx1._publication_view
     pv2 = tx2._publication_view
     assert pv1.completed_roots_high_watermark == pv2.completed_roots_high_watermark == 56

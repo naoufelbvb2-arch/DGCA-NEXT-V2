@@ -1198,7 +1198,7 @@ def test_non_empty_ledger_genuine_56_root_curriculum_immutability():
 
     # 1. Assert non-empty, genuinely populated peripheral ledger
     assert len(ledger._rows_by_asm_gen) > 0, "Ledger must contain attested assembly rows!"
-    assert len(ledger._processed_outbox_keys) == 398, "Ledger must have consumed genuine outbox notifications!"
+    assert len(ledger._processed_outbox_keys) == 352, "Ledger must have consumed genuine outbox notifications!"
     assert len(ledger._bundles_by_surface) > 0, "Ledger must contain attested bundle mappings!"
 
     # 2. Pre-snapshots of genuinely populated state before Cat generation
@@ -1255,7 +1255,7 @@ def test_non_empty_ledger_genuine_56_root_curriculum_immutability():
     gen_eagle = generate_episode(state, prompt_eagle, ledger, max_steps=5)
 
     assert gen_eagle.emitted_surfaces == ("يشرب", "ماء"), f"Unexpected Eagle rollout: {gen_eagle.emitted_surfaces}"
-    assert gen_eagle.stop_status == StatusCode.GEN_STOP_AMBIGUOUS, f"Expected GEN_STOP_AMBIGUOUS, got: {gen_eagle.stop_status}"
+    assert gen_eagle.stop_status == StatusCode.GEN_STOP_EOS, f"Expected GEN_STOP_EOS, got: {gen_eagle.stop_status}"
 
     # Post-checks after Eagle generation
     assert snapshot_w(state.W) == w_snap_pre_eagle, "WState mutated during Eagle generate_episode!"

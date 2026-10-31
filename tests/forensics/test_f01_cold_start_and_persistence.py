@@ -172,8 +172,8 @@ def test_f01_task6_canonical_eos_learning_and_multistep_rollout() -> None:
     - Complete causal chain (observations, commitment, local synapses, birth, attestations).
     - Prompt ['القط'] -> ('يشرب', 'حليب') -> GEN_STOP_EOS via neural selection of Asm 2.
     - Prompt ['القط', 'يشرب'] -> ('حليب',) -> GEN_STOP_EOS via neural selection of Asm 2.
-    - Prompt ['النسر'] -> ('يشرب', 'ماء') -> GEN_STOP_AMBIGUOUS (blocked by duplicate Asm 5 & 6 collision).
-    - Prompt ['النسر', 'يشرب'] -> ('ماء',) -> GEN_STOP_AMBIGUOUS (same duplicate collision).
+    - Prompt ['النسر'] -> ('يشرب', 'ماء') -> GEN_STOP_EOS (resolved via consolidated Asm 5).
+    - Prompt ['النسر', 'يشرب'] -> ('ماء',) -> GEN_STOP_EOS (resolved via consolidated Asm 5).
     """
     state = MachineState()
     ledger = SurfaceReadoutLedgerV1()
@@ -206,8 +206,8 @@ def test_f01_task6_canonical_eos_learning_and_multistep_rollout() -> None:
         marker = getattr(res_r.envelope, "marker", None)
         if marker and marker == Marker.EOS:
             eos_asms.append(asm_id)
-    # Assemblies 2, 5, 6 are canonical EOS assemblies
-    assert set(eos_asms) == {2, 5, 6}
+    # Assemblies 2, 5 are canonical EOS assemblies (Asm 6 consolidated into 5)
+    assert set(eos_asms) == {2, 5}
 
     # 2. Test prompt ['القط'] -> generates ('يشرب', 'حليب') and cleanly halts at <EOS>
     prompt_cat = [branch_ab[0].core_event]
@@ -228,14 +228,14 @@ def test_f01_task6_canonical_eos_learning_and_multistep_rollout() -> None:
     prompt_eagle = [branch_db[0].core_event]
     gen_eagle = generate_episode(state, prompt_eagle, ledger, max_steps=5)
     assert gen_eagle.emitted_surfaces == ("يشرب", "ماء")
-    # Exact tie between Asm 5 & 6 (both score 0.206944) causes margin 0.0000 < 0.02 -> GEN_STOP_AMBIGUOUS
-    assert gen_eagle.stop_status == StatusCode.GEN_STOP_AMBIGUOUS
+    # Post-remediation: Asm 5 wins with margin > M_READ -> GEN_STOP_EOS
+    assert gen_eagle.stop_status == StatusCode.GEN_STOP_EOS
 
     # 5. Test prompt ['النسر', 'يشرب'] -> generates ('ماء',) then hits same collision
     prompt_eagle_drink = [branch_db[0].core_event, branch_db[1].core_event]
     gen_eagle_drink = generate_episode(state, prompt_eagle_drink, ledger, max_steps=5)
     assert gen_eagle_drink.emitted_surfaces == ("ماء",)
-    assert gen_eagle_drink.stop_status == StatusCode.GEN_STOP_AMBIGUOUS
+    assert gen_eagle_drink.stop_status == StatusCode.GEN_STOP_EOS
 
 
 def test_f01_persistence_not_implemented() -> None:
