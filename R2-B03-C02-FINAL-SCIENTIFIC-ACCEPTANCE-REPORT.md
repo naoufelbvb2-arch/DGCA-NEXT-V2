@@ -94,8 +94,8 @@ Per directive C02-S06, exactly five obsolete assertions encoding the pre-remedia
 
 In [`tests/test_r2_b03_c01_acceptance.py::test_c02_s02_non_empty_fp03_outbox_delivery`](file:///C:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tests/test_r2_b03_c01_acceptance.py), the vacuous Root 1 cold-start test was replaced with a genuine Root 11 scenario (post-Root 10 where Assembly 5 is pre-existing `LIVE` at Generation 8):
 
-1. **Pre-Exposure Live Assembly:** Prior to Root 11, Assembly 5 was `LIVE` at Generation 8 with members `(8834, 9209, 10570, 12117)`.
-2. **Fault Injection at `FP_03`:** Injected `RuntimeError("Injected fault at FP-03: post-commit peripheral dispatch failure")` immediately following `self.state.W = new_view.W` at line 1115 of `exposure_tx.py`.
+1. **Pre-Exposure Live Assembly:** Prior to Root 11, Assembly 5 was `LIVE` at Generation 8 with full nine-member structure `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)`.
+2. **Fault Injection at `FP_03`:** Configured `tx._fault_injection_point = "FP_03"`. In `exposure_tx.py:1117-1121`, the runtime logs a warning and safely defers post-commit peripheral dispatch, preserving staged notifications in `pending_outbox_by_root[11]` without raising an unhandled exception or corrupting durable state.
 3. **Atomic Commit Durability:** Commit succeeded, high watermark advanced: `state.completed_roots_high_watermark == 11`.
 4. **Non-Empty Pending Outbox Batch:** Exactly 5 genuine notifications were staged in `tx._publication_view.pending_outbox_by_root[11]`.
 5. **No Premature Ledger Ingestion:** Ledger contained 0 candidate rows prior to reconciliation (`len(ledger._rows_by_asm_gen) == 0`).
@@ -137,6 +137,8 @@ Processed Outbox Key352                                               352       
 ```
 
 *Scientific Finding:* The complete runtime state across all five subsystems, including full transaction publication history, is **100% bit-exact deterministic**.
+
+*(Audit Provenance Note on Publication Coverage):* Under the initial C02 test harness, nested lists in `EndExposureReport` (`proposal_outcomes`, `candidate_settlements`, `recruitments`) were summarized by count, producing digest `fc09e81e8ec8...`. Under R2-B04-S01, 100% recursive dataclass field coverage is verified across all nested structures (including full `LinkProposal`, `CandidateSettlementResult`, `GraduationEvaluationResult`, `DurablePathReport`, `RecruitmentResult`, and `PeripheralSurfaceEnvelopeV1` fields) with dynamic dataclass audit assertions, yielding authoritative digest `d9875246e41c...` with exact dual-run determinism.
 
 ---
 

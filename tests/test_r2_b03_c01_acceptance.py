@@ -67,6 +67,17 @@ from dgca.peripheral.readout_ledger import (
     SurfaceReadoutLedgerV1,
 )
 
+from dgca.lla.synapse_ledger import ProposalApplicationOutcome, LinkProposal
+from dgca.lla.candidate_fsm import CandidateSettlementResult, GraduationEvaluationResult
+from dgca.lla.graduation_c04 import DurablePathReport
+from dgca.lla.recruitment import RecruitmentResult, RecruitmentGateCounts
+from tests.fixtures.frozen_baseline_assembly import (
+    FROZEN_BASELINE_COMMIT_SHA,
+    FROZEN_BASELINE_BLOB_SHA,
+    _baseline_try_merge_pair,
+    verify_fixture_provenance_against_git,
+)
+
 # Reuse authoritative snapshot utilities from acceptance baseline
 from tests.test_r2_a01_patch2_acceptance import (
     snapshot_w,
@@ -74,36 +85,163 @@ from tests.test_r2_a01_patch2_acceptance import (
     snapshot_r,
     snapshot_ledger,
     hash_state_snapshot,
+    _snapshot_binding,
+    _snapshot_candidate,
+    _snapshot_owner_profile,
 )
 
 
 # ---------------------------------------------------------------------------
-# Dynamic compilation of frozen baseline _try_merge_pair from git tree
+# Comprehensive TransactionPublicationView Snapshot Serializer (R2-B04-S01)
 # ---------------------------------------------------------------------------
-_FROZEN_GIT_COMMIT = "faf361b6b95de6287b466eb1dc524ea49c732635"
 
-def _load_frozen_baseline_try_merge() -> Any:
-    """Retrieve and compile _try_merge_pair directly from the frozen production baseline commit."""
-    frozen_src = subprocess.check_output(
-        ["git", "show", f"{_FROZEN_GIT_COMMIT}:src/dgca/core/assembly.py"],
-        text=True,
-        encoding="utf-8",
-    )
-    frozen_mod = types.ModuleType("frozen_assembly_baseline")
-    frozen_mod.__dict__.update(asm_module.__dict__)
-    exec(compile(frozen_src, f"<git_show_{_FROZEN_GIT_COMMIT}>", "exec"), frozen_mod.__dict__)
-    return frozen_mod._try_merge_pair
+def _snapshot_link_proposal(p: LinkProposal) -> dict[str, Any]:
+    """Capture all declared fields of LinkProposal with dynamic dataclass audit."""
+    snap = {
+        "link_key": p.link_key,
+        "exposure_id": p.exposure_id,
+        "event_order": p.event_order,
+        "source_event_order": p.source_event_order,
+        "a_source": p.a_source,
+        "a_target": p.a_target,
+        "create_coactivity": p.create_coactivity,
+        "q_raw": p.q_raw,
+        "y_positive": p.y_positive,
+        "d_event": p.d_event,
+        "v_ext": p.v_ext,
+        "priority_class": p.priority_class,
+        "proposal_ordinal": p.proposal_ordinal,
+    }
+    missing = {f.name for f in dataclasses.fields(LinkProposal)} - set(snap.keys())
+    assert not missing, f"Missing LinkProposal fields: {missing}"
+    return snap
 
-_baseline_try_merge_pair = _load_frozen_baseline_try_merge()
+
+def _snapshot_proposal_outcome(out: ProposalApplicationOutcome) -> dict[str, Any]:
+    """Capture all declared fields of ProposalApplicationOutcome with dynamic audit."""
+    snap = {
+        "proposal": _snapshot_link_proposal(out.proposal),
+        "status": out.status,
+        "created_new": out.created_new,
+        "consolidated_now": out.consolidated_now,
+    }
+    missing = {f.name for f in dataclasses.fields(ProposalApplicationOutcome)} - set(snap.keys())
+    assert not missing, f"Missing ProposalApplicationOutcome fields: {missing}"
+    return snap
 
 
-# ---------------------------------------------------------------------------
-# Comprehensive TransactionPublicationView Snapshot Serializer (C02-S03)
-# ---------------------------------------------------------------------------
+def _snapshot_durable_path_report(r: DurablePathReport) -> dict[str, Any]:
+    """Capture all declared fields of DurablePathReport with dynamic audit."""
+    snap = {
+        "p0_key": r.p0_key,
+        "p1_key": r.p1_key,
+        "p0_consolidated": r.p0_consolidated,
+        "p1_consolidated": r.p1_consolidated,
+        "p2_durable": r.p2_durable,
+        "consolidated_c_keys": r.consolidated_c_keys,
+        "c_durable": r.c_durable,
+        "consolidated_y_keys": r.consolidated_y_keys,
+        "y_durable": r.y_durable,
+        "same_owned_branch": r.same_owned_branch,
+        "is_durable": r.is_durable,
+        "status": r.status,
+    }
+    missing = {f.name for f in dataclasses.fields(DurablePathReport)} - set(snap.keys())
+    assert not missing, f"Missing DurablePathReport fields: {missing}"
+    return snap
+
+
+def _snapshot_graduation_evaluation_result(r: GraduationEvaluationResult | None) -> dict[str, Any] | None:
+    """Capture all declared fields of GraduationEvaluationResult with dynamic audit."""
+    if r is None:
+        return None
+    snap = {
+        "passed": r.passed,
+        "status": r.status,
+        "durable_report": _snapshot_durable_path_report(r.durable_report),
+        "stable_binding": _snapshot_binding(r.stable_binding) if r.stable_binding is not None else None,
+        "normal_owned_az": r.normal_owned_az,
+        "consolidated_owned_az": r.consolidated_owned_az,
+        "normal_pred_margin": r.normal_pred_margin,
+        "consolidated_pred_margin": r.consolidated_pred_margin,
+        "diagnostic_detail": r.diagnostic_detail,
+    }
+    missing = {f.name for f in dataclasses.fields(GraduationEvaluationResult)} - set(snap.keys())
+    assert not missing, f"Missing GraduationEvaluationResult fields: {missing}"
+    return snap
+
+
+def _snapshot_candidate_settlement_result(s: CandidateSettlementResult) -> dict[str, Any]:
+    """Capture all declared fields of CandidateSettlementResult with dynamic audit."""
+    snap = {
+        "z_cell_id": s.z_cell_id,
+        "owner_id": s.owner_id,
+        "initial_phase": s.initial_phase,
+        "final_phase": s.final_phase,
+        "transitions": s.transitions,
+        "probe_matches": s.probe_matches,
+        "consolidation_matches": s.consolidation_matches,
+        "age_events": s.age_events,
+        "status": s.status,
+        "graduation_result": _snapshot_graduation_evaluation_result(s.graduation_result),
+    }
+    missing = {f.name for f in dataclasses.fields(CandidateSettlementResult)} - set(snap.keys())
+    assert not missing, f"Missing CandidateSettlementResult fields: {missing}"
+    return snap
+
+
+def _snapshot_recruitment_gate_counts(g: RecruitmentGateCounts) -> dict[str, Any]:
+    """Capture all declared fields of RecruitmentGateCounts with dynamic audit."""
+    snap = {
+        "raw_p_count": g.raw_p_count,
+        "raw_c_count": g.raw_c_count,
+        "raw_y_count": g.raw_y_count,
+        "feasible_p_count": g.feasible_p_count,
+        "feasible_c_count": g.feasible_c_count,
+        "feasible_y_count": g.feasible_y_count,
+        "p_pairs_tested": g.p_pairs_tested,
+        "p_pairs_discriminative": g.p_pairs_discriminative,
+        "triples_tested": g.triples_tested,
+        "z_cells_in_frontier": g.z_cells_in_frontier,
+    }
+    missing = {f.name for f in dataclasses.fields(RecruitmentGateCounts)} - set(snap.keys())
+    assert not missing, f"Missing RecruitmentGateCounts fields: {missing}"
+    return snap
+
+
+def _snapshot_recruitment_result(r: RecruitmentResult) -> dict[str, Any]:
+    """Capture all declared fields of RecruitmentResult with dynamic audit."""
+    snap = {
+        "status": r.status,
+        "descriptor": _snapshot_candidate(r.descriptor) if r.descriptor is not None else None,
+        "owner_profile": _snapshot_owner_profile(r.owner_profile) if r.owner_profile is not None else None,
+        "gate_counts": _snapshot_recruitment_gate_counts(r.gate_counts),
+        "diagnostic_detail": r.diagnostic_detail,
+    }
+    missing = {f.name for f in dataclasses.fields(RecruitmentResult)} - set(snap.keys())
+    assert not missing, f"Missing RecruitmentResult fields: {missing}"
+    return snap
+
+
+def _snapshot_peripheral_surface_envelope(env: PeripheralSurfaceEnvelopeV1 | None) -> dict[str, Any] | None:
+    """Capture 100% of declared fields of PeripheralSurfaceEnvelopeV1."""
+    if env is None:
+        return None
+    snap = {
+        "raw_surface_nfc_utf8": env.raw_surface_nfc_utf8,
+        "surface_sha256": env.surface_sha256,
+        "feature_bundle_digest": env.feature_bundle_digest,
+        "canonical_features_copy": tuple(env.canonical_features_copy),
+        "marker": env.marker,
+    }
+    missing = {f.name for f in dataclasses.fields(PeripheralSurfaceEnvelopeV1)} - set(snap.keys())
+    assert not missing, f"Missing PeripheralSurfaceEnvelopeV1 fields: {missing}"
+    return snap
+
 
 def _snapshot_outbox_notification(n: OutboxNotificationV1) -> dict[str, Any]:
-    """Capture authoritative stored fields of an OutboxNotificationV1."""
-    return {
+    """Capture authoritative stored fields of an OutboxNotificationV1 with complete envelope."""
+    snap = {
         "root_id": n.root_id,
         "event_order": n.event_order,
         "assembly_id": n.assembly_id,
@@ -111,15 +249,18 @@ def _snapshot_outbox_notification(n: OutboxNotificationV1) -> dict[str, Any]:
         "surface_sha256": n.surface_sha256,
         "feature_bundle_digest": n.feature_bundle_digest,
         "marker": n.marker,
-        "raw_surface": n.envelope.raw_surface_nfc_utf8 if n.envelope else None,
+        "envelope": _snapshot_peripheral_surface_envelope(n.envelope),
     }
+    missing = {f.name for f in dataclasses.fields(OutboxNotificationV1)} - set(snap.keys())
+    assert not missing, f"Missing OutboxNotificationV1 fields: {missing}"
+    return snap
 
 
 def _snapshot_assembly_report(r: AssemblyEndReport | None) -> dict[str, Any] | None:
     """Capture authoritative stored fields of an AssemblyEndReport."""
     if r is None:
         return None
-    return {
+    snap = {
         "maintained_ids": tuple(r.maintained_ids),
         "archived_by_maintain_ids": tuple(r.archived_by_maintain_ids),
         "grown_ids": tuple(r.grown_ids),
@@ -128,28 +269,34 @@ def _snapshot_assembly_report(r: AssemblyEndReport | None) -> dict[str, Any] | N
         "split_pairs": tuple(r.split_pairs),
         "diagnostics": tuple(r.diagnostics),
     }
+    missing = {f.name for f in dataclasses.fields(AssemblyEndReport)} - set(snap.keys())
+    assert not missing, f"Missing AssemblyEndReport fields: {missing}"
+    return snap
 
 
 def _snapshot_end_exposure_report(rep: EndExposureReport) -> dict[str, Any]:
     """Capture 100% of declared fields of an EndExposureReport."""
-    return {
+    snap = {
         "exposure_id": rep.exposure_id,
         "status": rep.status,
         "events_processed": rep.events_processed,
-        "proposal_outcomes_count": len(rep.proposal_outcomes),
+        "proposal_outcomes": tuple(_snapshot_proposal_outcome(out) for out in rep.proposal_outcomes),
         "pruned_synapses": tuple(sorted(rep.pruned_synapses)),
         "last_event_remaining_k_r": rep.last_event_remaining_k_r,
         "diagnostics": tuple(rep.diagnostics),
-        "candidate_settlements_count": len(rep.candidate_settlements),
-        "recruitments_count": len(rep.recruitments),
+        "candidate_settlements": tuple(_snapshot_candidate_settlement_result(s) for s in rep.candidate_settlements),
+        "recruitments": tuple(_snapshot_recruitment_result(r) for r in rep.recruitments),
         "assembly_report": _snapshot_assembly_report(rep.assembly_report),
         "outbox_notifications": tuple(_snapshot_outbox_notification(n) for n in rep.outbox_notifications),
     }
+    missing = {f.name for f in dataclasses.fields(EndExposureReport)} - set(snap.keys())
+    assert not missing, f"Missing EndExposureReport fields: {missing}"
+    return snap
 
 
 def snapshot_publication_view(pv: TransactionPublicationView) -> dict[str, Any]:
     """Capture comprehensive snapshot of TransactionPublicationView."""
-    return {
+    snap = {
         "w_snapshot": snapshot_w(pv.W),
         "completed_roots": {
             rid: _snapshot_end_exposure_report(rep)
@@ -162,6 +309,9 @@ def snapshot_publication_view(pv: TransactionPublicationView) -> dict[str, Any]:
         "completed_roots_high_watermark": pv.completed_roots_high_watermark,
         "active_exposure_id": pv.active_exposure_id,
     }
+    missing = {f.name for f in dataclasses.fields(TransactionPublicationView)} - {"W"} - set(snap.keys() - {"w_snapshot"})
+    assert not missing, f"Missing TransactionPublicationView fields: {missing}"
+    return snap
 
 
 # ---------------------------------------------------------------------------
@@ -385,11 +535,13 @@ def test_c01_s03_read_only_generation_integrity() -> None:
     assert snapshot_h_slow(state.H_slow) == h_snap_pre_cat, "HSlowState mutated during Cat generate_episode!"
     assert snapshot_r(state.R) == r_snap_pre_cat, "Caller RState mutated during Cat generate_episode!"
     assert snapshot_ledger(ledger) == ledger_snap_pre_cat, "Ledger mutated during Cat generate_episode!"
+    assert snapshot_publication_view(tx._publication_view) == pv_snap_pre, "PublicationView mutated during Cat generate_episode!"
 
     assert hash_state_snapshot(snapshot_w(state.W)) == hash_w_pre_cat
     assert hash_state_snapshot(snapshot_h_slow(state.H_slow)) == hash_h_pre_cat
     assert hash_state_snapshot(snapshot_r(state.R)) == hash_r_pre_cat
     assert hash_state_snapshot(snapshot_ledger(ledger)) == hash_l_pre_cat
+    assert hash_state_snapshot(snapshot_publication_view(tx._publication_view)) == hash_pv_pre
     assert ledger._processed_outbox_keys == ledger_snap_pre_cat["_processed_outbox_keys"]
 
     # 2. Eagle rollout
@@ -397,11 +549,13 @@ def test_c01_s03_read_only_generation_integrity() -> None:
     h_snap_pre_eagle = snapshot_h_slow(state.H_slow)
     r_snap_pre_eagle = snapshot_r(state.R)
     ledger_snap_pre_eagle = snapshot_ledger(ledger)
+    pv_snap_pre_eagle = snapshot_publication_view(tx._publication_view)
 
     hash_w_pre_eagle = hash_state_snapshot(w_snap_pre_eagle)
     hash_h_pre_eagle = hash_state_snapshot(h_snap_pre_eagle)
     hash_r_pre_eagle = hash_state_snapshot(r_snap_pre_eagle)
     hash_l_pre_eagle = hash_state_snapshot(ledger_snap_pre_eagle)
+    hash_pv_pre_eagle = hash_state_snapshot(pv_snap_pre_eagle)
 
     prompt_eagle = [branch_eagle[0].core_event]
     gen_eagle = generate_episode(state, prompt_eagle, ledger, max_steps=5)
@@ -411,11 +565,13 @@ def test_c01_s03_read_only_generation_integrity() -> None:
     assert snapshot_h_slow(state.H_slow) == h_snap_pre_eagle, "HSlowState mutated during Eagle generate_episode!"
     assert snapshot_r(state.R) == r_snap_pre_eagle, "Caller RState mutated during Eagle generate_episode!"
     assert snapshot_ledger(ledger) == ledger_snap_pre_eagle, "Ledger mutated during Eagle generate_episode!"
+    assert snapshot_publication_view(tx._publication_view) == pv_snap_pre_eagle, "PublicationView mutated during Eagle generate_episode!"
 
     assert hash_state_snapshot(snapshot_w(state.W)) == hash_w_pre_eagle
     assert hash_state_snapshot(snapshot_h_slow(state.H_slow)) == hash_h_pre_eagle
     assert hash_state_snapshot(snapshot_r(state.R)) == hash_r_pre_eagle
     assert hash_state_snapshot(snapshot_ledger(ledger)) == hash_l_pre_eagle
+    assert hash_state_snapshot(snapshot_publication_view(tx._publication_view)) == hash_pv_pre_eagle
 
     # 3. Read-only retrieval (C02-S04)
     w_snap_pre_ro = snapshot_w(state.W)
@@ -548,9 +704,12 @@ def test_c02_s02_non_empty_fp03_outbox_delivery() -> None:
             tx.process_event(core_ev, peripheral_envelope=env.peripheral_surface)
         tx.end_exposure(r)
 
-    # Pre-checks before Root 11: Assembly 5 is LIVE at Gen 8, has 0 ledger candidate rows
-    assert state.W.assemblies[5].status == AssemblyStatus.LIVE
-    assert state.W.assemblies[5].structural_generation == 8
+    # Pre-checks before Root 11: Assembly 5 is LIVE at Gen 8, has full 9-member structure, has 0 ledger candidate rows
+    asm5 = state.W.assemblies[5]
+    assert asm5.status == AssemblyStatus.LIVE
+    assert asm5.structural_generation == 8
+    assert asm5.member_cell_ids == (8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)
+    assert len(asm5.member_cell_ids) == 9
     assert len(ledger.get_candidate_rows(5, 8)) == 0
 
     # Begin Root 11 (Cat: exposes <EOS>)
@@ -613,6 +772,8 @@ def test_c02_s02_non_empty_fp03_outbox_delivery() -> None:
 
 def test_c01_s05_non_identical_merge_differential() -> None:
     """C01-S05 & C02-S05: Differential execution of frozen baseline vs patched MERGE across all 8 non-identical cases."""
+    # Portable fixture provenance verification against git repository
+    assert verify_fixture_provenance_against_git() is True, "Frozen baseline fixture provenance mismatch!"
 
     def _run_differential_case(
         setup_fn,
