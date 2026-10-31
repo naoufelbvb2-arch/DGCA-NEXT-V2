@@ -45,8 +45,8 @@ An exhaustive audit of all stored runtime attributes across all 7 core DGCA stat
 
 | Attribute Name | Stored Type | Audit Classification | Documentation / Technical Justification |
 |:---|:---|:---:|:---|
-| `outgoing_budget_b_i` | `int` | `DIRECTLY_SERIALIZED` | Outgoing synapse capacity budget $B_i$ ($16$). |
-| `cross_outgoing_budget_b_i_x` | `int` | `DIRECTLY_SERIALIZED` | Cross-region outgoing budget $B_i^x$ ($8$). |
+| `outgoing_budget_b_i` | `int` | `DIRECTLY_SERIALIZED` | Outgoing synapse capacity budget $B_i$ ($64$). |
+| `cross_outgoing_budget_b_i_x` | `int` | `DIRECTLY_SERIALIZED` | Cross-region outgoing budget $B_i^x$ ($12$). |
 | `committed_cells` | `dict[int, int]` | `DIRECTLY_SERIALIZED` | Map of committed cell ID $\to$ commit event clock. |
 | `last_referenced_event` | `dict[int, int]` | `DIRECTLY_SERIALIZED` | Map of cell ID $\to$ last active event clock. |
 | `latent_table` | `LatentNeighborhoodTable` | `DEDICATED_COMPONENT` | Materialized 24-slot latent neighborhoods (`snapshot_latent`). |
