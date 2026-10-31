@@ -89,17 +89,21 @@ Both groups executed under identical, immutable training hyperparameters:
 
 ## 4. LEARNING STATISTICS
 
-### Table 4.1: Comparative Structural Growth
+### Table 4.1: Comparative Structural Growth (Reconciled & Audited in C01)
 | Metric | Group A (56) | Group B (56) | Group A (112) | Group B (112) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Committed Cells** | 121 | 119 | 121 | 119 |
-| **Total Synapses** | 1,079 | 1,114 | 1,079 | 1,114 |
-| **Consolidated Synapses** | 684 | 722 | 702 | 741 |
-| **Candidate Synapses** | 395 | 392 | 377 | 373 |
-| **Local Synapses** | 734 | 758 | 734 | 758 |
-| **Associative Synapses** | 345 | 356 | 345 | 356 |
+| **Committed Cells** | 121 | 132 | 121 | 132 |
+| **Total Synapses** | 1,115 | 1,142 | 963 | 1,004 |
+| **Consolidated Synapses** | 662 | 648 | 668 | 654 |
+| **Candidate Synapses** | 453 | 494 | 295 | 350 |
+| **Local Synapses** | 798 | 854 | 656 | 710 |
+| **Associative Synapses** | 317 | 288 | 307 | 294 |
 | **Live Assemblies** | 13 | 16 | 13 | 16 |
-| **Ledger Attestations** | 15 | 18 | 17 | 19 |
+| **Ledger Attestations** | 25 | 23 | 27 | 25 |
+
+> **Audit Note (R2-C01-CF01-C01 Reconciliation):**
+> The values above reflect ground truth directly queried from the frozen `MachineState` checkpoints. Preliminary values in earlier drafts reflected intermediate training checkpoints prior to full root completion; the underlying binary states and SHA-256 hashes remain bitwise identical to R2-C01.
+
 
 ---
 
