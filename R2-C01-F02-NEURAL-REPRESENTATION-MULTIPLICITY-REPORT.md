@@ -7,6 +7,7 @@
 - **Repository:** `naoufelbvb2-arch/DGCA-NEXT-V2`
 - **Investigation Branch:** `experiment/r2-c01-f02-representation-multiplicity`
 - **Investigation Base HEAD:** `c99588bf04c52255206c0708da08b40901e6e9b2` (R2-C01-CF01-C02 accepted evidence HEAD)
+- **Investigation Commit SHA:** `0d967eaf34a2503468da53cf108a09c8d0836ea4`
 - **Production main (Frozen):** `f044c20b532f89749675120ffb1d8ada997e3a5e`
 - **Authorized Verdict:** `R2-C01-F02 FORENSIC COMPLETE — REPRESENTATIONAL MECHANISMS CHARACTERIZED`
 
@@ -14,7 +15,7 @@
 
 ## 1. Executive Summary & Core Verdict
 
-The R2-C01-CF01 and CF01-C02 investigations revealed that during 112-root exposure of four overlapping sentences (Group B: S1 `النسر يأكل لحم`, S2 `النسر يشرب ماء`, S3 `الطفل يأكل تفاح`, S4 `الطفل يشرب ماء`), the cognitive architecture established multiple coexisting, structurally distinct assemblies that resolve to the identical peripheral surface token:
+The R2-C01-CF01 and CF01-C02 investigations revealed that during 112-root exposure of four overlapping sentences (Group B: S1 `القط يشرب حليب`, S2 `النسر يشرب ماء`, S3 `الطفل يأكل تفاح`, S4 `الطفل يشرب ماء`), the cognitive architecture established multiple coexisting, structurally distinct assemblies that resolve to the identical peripheral surface token:
 - **Case 1 (`ماء`):** Assembly 7 (generation 2, size 4) vs Assembly 9 (generation 5, size 7)
 - **Case 2 (`تفاح`):** Assembly 14 (generation 2, size 4) vs Assembly 17 (generation 5, size 7)
 
@@ -30,11 +31,11 @@ During generation probes from prefix contexts (e.g., P2 `النسر يشرب`, P
 3. **Hypothesis C (Fragmented Lexical Representations from Structural Recruitment) is CONFIRMED as Primary Mechanism:**
    - The sensory interface (SIC-V1) projects the lexical token `ماء` across **16 fixed sensory cells**.
    - The Core §2.0 assembly formation mechanism initiates assemblies from a 3-cell reciprocal seed triangle.
-   - At Root 14 (S2), Assembly 7 forms on 3 sensory cells and recruits 1 cell at Root 15, covering 4 of 16 sensory cells.
+   - At Root 14 (S2, 7th exposure of `ماء`, 4th exposure of S2), Assembly 7 forms on 3 sensory cells and recruits 1 cell at Root 15, covering 4 of 16 sensory cells.
    - The remaining 12 sensory cells continue receiving repeated sensory activations on subsequent presentations.
-   - At Root 16 (S4), a disjoint 3-cell reciprocal triangle forms among these uncovered sensory cells, forming Assembly 9. Assembly 9 recruits 4 additional uncovered sensory cells at Root 17, reaching 7 cells.
+   - At Root 16 (S4, 8th exposure of `ماء`, 4th exposure of S4), a disjoint 3-cell reciprocal triangle forms among these uncovered sensory cells, forming Assembly 9. Assembly 9 recruits 4 additional uncovered sensory cells at Root 17, reaching 7 cells.
    - Assembly 7 and Assembly 9 are **100% composed of sensory cells** and have **0% mutual cell overlap (Jaccard = 0.0)**.
-   - Because their overlap $R_B(A_7, A_9) = 0.0 < \Theta_{\text{MERGE}} = 0.50$, they never merge under R2-B03 assembly consolidation.
+   - Because their overlap $R_B(A_7, A_9) = 0.0 < \Theta_{\text{MERGE}} = 0.70$, they never merge under R2-B03 assembly consolidation.
 4. **Hypothesis D (Different Stages of Development) is CONFIRMED as Secondary Modulator:**
    - Assembly 9 reached generation 5 (7 cells) while Assembly 7 reached generation 2 (4 cells).
    - Because readout score normalizes causal gain by assembly size ($S(G) = \frac{1}{|G|}\sum \text{gain}_j$), size differences do not separate them; both have near-identical mean gain ($\sim 0.62-0.63$), forcing an ambiguous halt.
@@ -72,10 +73,19 @@ The dedicated diagnostic test suite [`tests/forensics/test_r2_c01_f02_multiplici
 | **14** | `تفاح` | Root 27 | S3 (`الطفل يأكل تفاح`) | `[9334, 9468, 10457]` | Root 28: +`[11289]` (gen 1 $\to$ 2) | 4 cells | Gen 2 |
 | **17** | `تفاح` | Root 31 | S3 (`الطفل يأكل تفاح`) | `[8513, 10363, 10616]` | Root 32: +`[8961, 10181, 10737, 11830]` (gen 1 $\to$ 5) | 7 cells | Gen 5 |
 
-Key Observations:
-- In both pairs, the first assembly forms during the second exposure of the word (Root 14 for `ماء`, Root 27 for `تفاح`).
-- The second assembly forms only 2 to 4 exposures later (Root 16 for `ماء`, Root 31 for `تفاح`).
-- Both second assemblies undergo massive single-exposure growth (+4 cells in 1 exposure), reaching generation 5 and 7 cells.
+Key Observations & Exposure Decomposition:
+- **Root Index ($R$) vs Sentence Exposures ($N_{\text{sent}}$) vs Surface Exposures ($N_{\text{surf}}$):**
+  - In a 4-sentence round-robin schedule (S1, S2, S3, S4):
+    - `ماء` appears in S2 and S4 (twice per 4-sentence cycle, so $N_{\text{surf}}(\text{ماء}) = 2 \times \lfloor (R-1)/4 \rfloor + [1 \text{ if } (R-1)\%4 \ge 1] + [1 \text{ if } (R-1)\%4 \ge 3]$).
+    - `تفاح` appears only in S3 (once per 4-sentence cycle, so $N_{\text{surf}}(\text{تفاح}) = \lfloor (R-1)/4 \rfloor + [1 \text{ if } (R-1)\%4 \ge 2]$).
+  - **Assembly 7 (`ماء`):** Formed at Root 14 (Cycle 4, S2 exposure 4, **7th total exposure of `ماء`**).
+  - **Assembly 9 (`ماء`):** Formed at Root 16 (Cycle 4, S4 exposure 4, **8th total exposure of `ماء`**).
+  - **Assembly 14 (`تفاح`):** Formed at Root 27 (Cycle 7, S3 exposure 7, **7th total exposure of `تفاح`**).
+  - **Assembly 17 (`تفاح`):** Formed at Root 31 (Cycle 8, S3 exposure 8, **8th total exposure of `تفاح`**).
+- **Exact Cross-Surface Structural Convergence:**
+  - In both independent lexical tokens (`ماء` and `تفاح`), the primary assembly forms precisely on the **7th total surface exposure** ($N_{\text{surf}} = 7$), recruiting 3 seed sensory cells.
+  - In both tokens, the secondary duplicate assembly forms precisely on the **8th total surface exposure** ($N_{\text{surf}} = 8$), recruiting 3 disjoint uncovered sensory cells from the remaining sensory footprint.
+  - This demonstrates an invariant deterministic structural recruitment dynamic governed by cumulative surface exposure count rather than raw root index.
 
 ---
 
