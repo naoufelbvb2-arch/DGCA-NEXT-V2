@@ -107,7 +107,7 @@ A single external exposure **cannot** attest an assembly generation. Attestation
 4. **Canonical Surface & Feature Bundle:** Matching `surface_utf8_nfc` and `feature_bundle_digest`.
 5. **Marker Consistency:** Matching `marker` (`Marker.EOS` when applicable).
 6. **No Unresolved Conflicts:** No conflicting candidate row for `(surface, marker)` with differing bundle digest (`LG-T08`).
-7. **Legal Event-Time Coverage & Freshness:** Event-time coverage $C_t \ge \rho_{\text{core}} = 0.70$ and freshness $M_{\text{fresh}} \ge \Theta_{\text{fresh}}$.
+7. **Legal Event-Time Coverage & Freshness:** Event-time coverage $C_t \ge \rho_{\text{core}} = 0.70$ and freshness $M_{\text{fresh}} \ge \Theta_{\text{fresh\_admit}} = 0.40$.
 8. **Pre-Existing Live State:** Assembly was already `LIVE` before the witnessed event (no post-close witness claims).
 9. **Generation Stability:** Unchanged generation across the entire root required for outbox notification.
 10. **Zero Retroactive Attestation:** No retroactive attestation after structural mutation (`MERGE` or `GROW`).
@@ -349,7 +349,9 @@ The proposed amendment introduces zero modifications to transactional architectu
 | **Case 2: Low-Jaccard Overlap** | $|A \cap B| = 6$, $|A \cup B| = 10$ | $J(A, B) = 0.60 < \Theta_{\text{merge}} = 0.70$. | **REJECTED** | Fails overlap threshold $\Theta_{\text{merge}}$ prior to support gate. |
 | **Case 3: Weak Exclusive Support** | $|A|=8, |B|=8$, $|A \cap B|=7$ | $|A \setminus B|=1, |B \setminus A|=1$, $R^B = 0.20 < \Theta_{\text{ob}} = 0.40$. | **REJECTED** | Evaluates under Branch 4b; fails mutual-support threshold. |
 | **Case 4: Cooldown Violation** | $A \equiv B$, but $A$ merged 50 events ago | $W.\text{completed\_events} - A.\text{last\_merge\_serial} = 50 < T_c = 200$. | **REJECTED** | Cooldown guard $\mathcal{G}_{\text{cooldown}}$ fails before predicate evaluation. |
-| **Case 5: Cell Membership Overflow** | $A \equiv B$, member $x$ in 12 live assemblies | Live count after archiving $B$: $12 - 1 = 11 \le 12$. If union adds any cell exceeding 12: | **REJECTED** | Capacity guard $\mathcal{G}_{\text{guards}}$ fails. |
+| **Case 5a: Exact Duplicate Membership Reduction** | $A \equiv B$, member $x$ in 12 live assemblies | Live count after archiving $B$: $(\text{live} \setminus \{B\}) \cup \{A\} = 12 - 1 = 11 \le 12$. | **PASS** | Capacity guard $\mathcal{G}_{\text{guards}}$ passes. Exact duplication reduces cell pressure; archiving duplicate $B$ frees 1 membership slot. |
+| **Case 5b: Non-Duplicate Membership Overflow** | $A \not\equiv B$, exclusive cell $x \in B \setminus A$ already at limit $M_{\text{live}}(x) = 12$. | Adding $x$ to $A$ would produce $12 + 1 = 13 > M_{\text{max}} = 12$. | **REJECTED** | Capacity guard $\mathcal{G}_{\text{guards}}$ fails under unchanged generic merge rules. |
+| **Case 5c: Pre-Existing Invariant Violation** | Cell $x$ already illegally exceeds $M_{\text{max}} = 12$ prior to merge. | Initial state already violates structural invariants. | **REJECTED** | Fails pre-condition validation. |
 
 ---
 

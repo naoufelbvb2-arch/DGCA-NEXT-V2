@@ -45,7 +45,7 @@ All structural, neural, and peripheral parameters are verified against `DGCA_COR
 | $\text{MIN\_ATTESTED\_EXTERNAL\_ROOTS}$ | `2` | `src/dgca/peripheral/readout_ledger.py` line 21 | Minimum distinct completed external roots for candidate attestation. |
 | $M_{\text{read}}$ | `0.04` | `src/dgca/core/generator.py` line 38 | Readout score ambiguity margin gate. |
 | $\rho_{\text{core}}$ | `0.70` | `src/dgca/core/assembly.py` line 40 | Minimum core event coverage threshold. |
-| $\Theta_{\text{fresh}}$ | `0.50` | `src/dgca/core/assembly.py` line 42 | Minimum fresh emitter overlap threshold. |
+| $\Theta_{\text{fresh\_admit}}$ | `0.40` | `src/dgca/core/assembly.py` line 51 | Minimum fresh emitter overlap threshold. |
 
 ---
 
@@ -95,7 +95,7 @@ Under the frozen Outbox contract (`src/dgca/peripheral/outbox.py`), an assembly 
 1. It existed `LIVE` before the witnessed external event.
 2. It remained `LIVE` after root close.
 3. Its `structural_generation` remained completely unchanged across the observation/publication boundary of the entire root.
-4. Event-time core coverage satisfies $C_t \ge \rho_{\text{core}} = 0.70$ and freshness satisfies $M_{\text{fresh}} \ge \Theta_{\text{fresh}} = 0.50$.
+4. Event-time core coverage satisfies $C_t \ge \rho_{\text{core}} = 0.70$ and freshness satisfies $M_{\text{fresh}} \ge \Theta_{\text{fresh\_admit}} = 0.40$.
 
 ### Provenance Audit Across Curriculum Roots
 - **Root 8:** Assemblies 5 & 6 were born during the Event 3 (`Marker.EOS`) pass at root close. They did not exist `LIVE` prior to Event 3.
