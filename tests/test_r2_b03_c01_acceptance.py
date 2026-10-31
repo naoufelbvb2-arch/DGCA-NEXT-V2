@@ -76,6 +76,7 @@ from tests.fixtures.frozen_baseline_assembly import (
     FROZEN_BASELINE_BLOB_SHA,
     _baseline_try_merge_pair,
     verify_fixture_provenance_against_git,
+    verify_fixture_self_integrity,
     ProvenanceStatus,
 )
 
@@ -773,15 +774,28 @@ def test_c02_s02_non_empty_fp03_outbox_delivery() -> None:
 
 def test_c01_s05_non_identical_merge_differential() -> None:
     """C01-S05 & C02-S05: Differential execution of frozen baseline vs patched MERGE across all 8 non-identical cases."""
-    # Portable fixture provenance verification against git repository (R2-B05-S04)
+    # Pinned AST self-integrity check remains mandatory in all environments (R2-B06)
+    assert verify_fixture_self_integrity() is True, "Frozen baseline fixture self-integrity failure!"
+
+    # Portable fixture provenance verification against git repository (R2-B05-S04 / R2-B06)
     prov_status = verify_fixture_provenance_against_git()
     assert prov_status != ProvenanceStatus.PROVENANCE_MISMATCH, "Frozen baseline fixture provenance mismatch!"
-    # When running in authoritative git environment, require PROVENANCE_VERIFIED
+
+    # Check whether the historical baseline blob is physically present in the local Git repository
     try:
-        git_check = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, check=True)
-        assert prov_status == ProvenanceStatus.PROVENANCE_VERIFIED, f"Expected PROVENANCE_VERIFIED in git workspace, got {prov_status}"
+        subprocess.run(
+            ["git", "cat-file", "-e", FROZEN_BASELINE_BLOB_SHA],
+            check=True,
+            capture_output=True,
+        )
+        has_baseline_blob = True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        assert prov_status == ProvenanceStatus.PROVENANCE_UNAVAILABLE
+        has_baseline_blob = False
+
+    if has_baseline_blob:
+        assert prov_status == ProvenanceStatus.PROVENANCE_VERIFIED, f"Expected PROVENANCE_VERIFIED when baseline blob exists in Git, got {prov_status}"
+    else:
+        assert prov_status == ProvenanceStatus.PROVENANCE_UNAVAILABLE, f"Expected PROVENANCE_UNAVAILABLE when baseline blob is absent, got {prov_status}"
 
     def _run_differential_case(
         setup_fn,
