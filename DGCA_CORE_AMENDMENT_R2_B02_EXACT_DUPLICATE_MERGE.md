@@ -47,8 +47,12 @@ In `DGCA_CORE_RC4_1.md` §2.0, Item 4 (`MERGE`), the evaluation of Assembly pair
 > A candidate pair $(A, B)$ is eligible for consolidation if and only if **all** of the following conditions are satisfied:
 > 
 > 1. **Live Status:** Both $A$ and $B$ have status `LIVE`.
-> 2. **Cooldown Guard:** Neither $A$ nor $B$ has been modified by `MERGE` or `SPLIT` within the last $T_c = 200$ completed external events:
->    $$\text{CompletedExternalEventsCount} - \text{last\_merge\_split\_close\_serial} \ge T_c = 200$$
+> 2. **Cooldown Guard:** Neither $A$ nor $B$ is in merge/split cooldown. Specifically, for each assembly $\text{asm} \in \{A, B\}$:
+>    - **Never Previously Merged or Split:** If $\text{asm}.\text{last\_merge\_split\_close\_serial}$ is `None`, the assembly is **not** blocked by cooldown (`_is_in_merge_split_cooldown` returns `False`).
+>    - **Previously Merged or Split:** If $\text{asm}.\text{last\_merge\_split\_close\_serial}$ is not `None`, the elapsed completed external events count must satisfy:
+>      $$\text{CompletedExternalEventsCount} - \text{asm}.\text{last\_merge\_split\_close\_serial} \ge T_c = 200$$
+>      If the elapsed count is $< T_c = 200$, the assembly is blocked and consolidation is rejected.
+>    - **Preservation of Cooldown:** Exact structural equality never bypasses the cooldown guard.
 > 3. **Jaccard Overlap:** The Jaccard similarity of member cell sets satisfies:
 >    $$J(A, B) = \frac{|A \cap B|}{|A \cup B|} \ge \Theta_{\text{merge}} = 0.70$$
 > 4. **Union Size Limit:** The prospective union size satisfies:
@@ -66,10 +70,11 @@ In `DGCA_CORE_RC4_1.md` §2.0, Item 4 (`MERGE`), the evaluation of Assembly pair
 >    - **Branch 4b — Partial Overlap:**
 >      If $E_A \ne \emptyset$ and $E_B \ne \emptyset$, the between-strength is computed as the mean reciprocal support across all cross-pairs:
 >      $$\text{BetweenStrength}(A, B) = \frac{1}{|E_A| \cdot |E_B|} \sum_{i \in E_A} \sum_{j \in E_B} R_{ij}^B(W)$$
+>      where $R_{ij}^B$ is computed via `compute_mutual_support_r_b(i, j, w)`.
 >      The mutual-support gate is satisfied if and only if:
 >      $$\text{BetweenStrength}(A, B) \ge \Theta_{\text{ob}} = 0.40$$
 >      
->      If either exclusive set is empty while the other is non-empty (proper subsets or proper supersets, e.g., $A \subset B$ or $B \subset A$), $\text{BetweenStrength}(A, B) = 0.0$, and the mutual-support gate fails.
+>      If either exclusive set is empty while the other is non-empty (proper subsets or proper supersets, e.g., $A \subset B$ or $B \subset A$), $\text{BetweenStrength}(A, B) = 0.0 < \Theta_{\text{ob}} = 0.40$, and the mutual-support gate fails closed.
 >      
 > 6. **Cell Membership Limits and Keep Guards:**
 >    For every cell $x \in A \cup B$:
@@ -77,16 +82,18 @@ In `DGCA_CORE_RC4_1.md` §2.0, Item 4 (`MERGE`), the evaluation of Assembly pair
 >      $$|\{ \text{aid} \in \text{LiveAssemblies}(x) \setminus \{B.\text{id}\} \} \cup \{A.\text{id}\}| \le M_{\text{max}} = 12$$
 >    - **MAINTAIN Keep Guards:** Cell $x$ must satisfy all maintain keep guards within the prospective union tuple:
 >      $$\text{check\_maintain\_keep\_guards}(x, \text{tuple}(\text{sorted}(A \cup B)), W, n\_rec\_cache) = \text{True}$$
+>      requiring $d(x, \text{union}) \ge D_{\text{min}} = 2$, $D(x, \text{union}) \ge \rho_{\text{keep}} = 0.35$, and $\text{Spec}(x, \text{union}) \ge \sigma_{\text{keep}} = 0.20$.
 > 
 > ### Consolidation Lifecycle Execution
 > When all six conditions pass:
-> 1. **Lower-ID Survivor:** Assembly $A$ (the lower ID) is retained as the survivor (`LIVE`). Its member set becomes $\text{tuple}(\text{sorted}(A \cup B))$.
+> 1. **Lower-ID Survivor:** Assembly $A$ (the lower ID, since $A.\text{id} < B.\text{id}$) is retained as the survivor (`LIVE`). Its member set becomes $\text{tuple}(\text{sorted}(A \cup B))$.
 > 2. **Higher-ID Archival:** Assembly $B$ (the higher ID) transitions to `ARCHIVED`. Its member set is preserved for audit.
-> 3. **Generation Increment:** Both $A$ and $B$ increment their `structural_generation` by 1 ($g \to g + 1$).
+> 3. **Generation Increment:** Both $A$ and $B$ increment their structural generation by 1:
+>    $$\text{asm\_a}.\text{structural\_generation} \mathrel{+}= 1, \quad \text{asm\_b}.\text{structural\_generation} \mathrel{+}= 1$$
 > 4. **Clocks Updated:** For both $A$ and $B$:
 >    - `last_mutation_close_serial` is set to shadow $W^*.close\_serial$.
 >    - `last_merge_split_close_serial` is set to shadow $W^*.completed\_external\_events\_count$.
-> 5. **Reverse Index Rebuilding:** The reverse lookup table `assemblies_by_member` is rebuilt atomically on shadow $W^*$.
+> 5. **Reverse Index Rebuilding:** The reverse lookup table `assemblies_by_member` is rebuilt atomically on shadow $W^*$ (`_rebuild_assemblies_by_member(W)`).
 > 6. **Single-Pass Evaluation:** The initial pair list is recomputed at most once from the new shadow state; initial pairs are processed at most once.
 
 ---
@@ -99,13 +106,14 @@ In `DGCA_CORE_RC4_1.md` §2.0, Item 4 (`MERGE`), the evaluation of Assembly pair
 - **Reverse Index Integrity:** Rebuilding `assemblies_by_member` ensures that cell queries never return archived assembly IDs.
 
 ### 4.2 Consistency with Attestation & Readout Laws (Core §9.4 & §9.4.1)
-- **Zero Cross-Generation Transfer:** Advancing structural generation on survivor $A$ ($g \to g+1$) invalidates previous generation readout envelopes in the peripheral ledger. Old candidate rows are not carried forward.
-- **Re-Attestation Window:** Survivor $A$ at generation $g+1$ requires $\ge 2$ subsequent completed exposures witnessing its unmutated generation before peripheral readout resolution succeeds ($K_{\text{attest}} \ge 2$). During this window, autonomous generation halts safely via fail-closed `READOUT_UNKNOWN`.
-- **Zero Evidence Leakage from Archived ID:** Archived assembly $B$ emits no outbox notifications post-archival. Zero candidate rows are registered under $B$'s ID in the ledger.
+- **Structural Generation Invalidation:** Advancing structural generation on survivor $A$ ($g_A \to g_A + 1$) strictly requires new qualifying attestation for generation $g_A + 1$ before peripheral readout resolution can resolve to survivor $A$.
+- **Historical Ledger Preservation:** Historical Ledger rows previously recorded for prior generations or archived IDs are not automatically deleted upon merge. However, because readout lookup is strictly keyed by `(assembly_id, structural_generation)`, historical rows at generation $g_A$ cannot satisfy queries for generation $g_A + 1$.
+- **Archival Evidence Boundary:** An archived assembly $B$ cannot produce new qualifying outbox evidence after archival. (This does not imply that archived identities can never possess historical candidate rows recorded prior to archival; rather, post-archival, zero new qualifying outbox notifications are emitted under $B$'s ID).
+- **Generation Halting Dynamics:** Autonomous generation stop status is governed deterministically by the neural winner and Ledger resolution conditions. A specific stop status (such as `GEN_STOP_EOS` or `READOUT_UNKNOWN`) is not unconditionally guaranteed unless those neural selection and ledger resolution conditions are established.
 
 ### 4.3 Consistency with Transaction Isolation (Core §10 & LLA §7)
 - Consolidation executes entirely on an isolated shadow machine state $W^*$.
-- Faults prior to atomic swap (`FP_01`, `FP_02`) completely discard shadow mutations, leaving active $W$ in its pre-exposure state.
+- Pre-publication rollback (transaction abort on `FP_01`, `FP_02`) completely discards shadow state changes while preserving lawful sensory commitments made during OPEN (committed cell addresses).
 - Post-commit peripheral dispatch faults (`FP_03`) defer outbox delivery to idempotent retry without rolling back durable state.
 
 ---
