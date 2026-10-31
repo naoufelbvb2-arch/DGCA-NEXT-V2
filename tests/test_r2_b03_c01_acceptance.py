@@ -76,6 +76,7 @@ from tests.fixtures.frozen_baseline_assembly import (
     FROZEN_BASELINE_BLOB_SHA,
     _baseline_try_merge_pair,
     verify_fixture_provenance_against_git,
+    ProvenanceStatus,
 )
 
 # Reuse authoritative snapshot utilities from acceptance baseline
@@ -772,8 +773,15 @@ def test_c02_s02_non_empty_fp03_outbox_delivery() -> None:
 
 def test_c01_s05_non_identical_merge_differential() -> None:
     """C01-S05 & C02-S05: Differential execution of frozen baseline vs patched MERGE across all 8 non-identical cases."""
-    # Portable fixture provenance verification against git repository
-    assert verify_fixture_provenance_against_git() is True, "Frozen baseline fixture provenance mismatch!"
+    # Portable fixture provenance verification against git repository (R2-B05-S04)
+    prov_status = verify_fixture_provenance_against_git()
+    assert prov_status != ProvenanceStatus.PROVENANCE_MISMATCH, "Frozen baseline fixture provenance mismatch!"
+    # When running in authoritative git environment, require PROVENANCE_VERIFIED
+    try:
+        git_check = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, check=True)
+        assert prov_status == ProvenanceStatus.PROVENANCE_VERIFIED, f"Expected PROVENANCE_VERIFIED in git workspace, got {prov_status}"
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        assert prov_status == ProvenanceStatus.PROVENANCE_UNAVAILABLE
 
     def _run_differential_case(
         setup_fn,

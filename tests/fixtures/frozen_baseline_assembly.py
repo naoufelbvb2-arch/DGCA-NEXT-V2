@@ -5,11 +5,14 @@ Authoritative Source Provenance:
 - Blob SHA:   ed0a0e4b12191d119ea687b4c7d8b6970cfc9be9
 - Source Path: src/dgca/core/assembly.py
 - Symbol:     _try_merge_pair
+- AST Digest: e9cb637e0e1675059f1ae682cdc9be455d1f754bb0e8e1f83f72c6f3406ee8d7
 """
 
 from __future__ import annotations
 
 import ast
+import enum
+import hashlib
 import inspect
 import subprocess
 from typing import Any
@@ -34,6 +37,14 @@ FROZEN_BASELINE_COMMIT_SHA: str = "faf361b6b95de6287b466eb1dc524ea49c732635"
 FROZEN_BASELINE_BLOB_SHA: str = "ed0a0e4b12191d119ea687b4c7d8b6970cfc9be9"
 FROZEN_BASELINE_PATH: str = "src/dgca/core/assembly.py"
 FROZEN_BASELINE_SYMBOL: str = "_try_merge_pair"
+FROZEN_BASELINE_AST_SHA256: str = "e9cb637e0e1675059f1ae682cdc9be455d1f754bb0e8e1f83f72c6f3406ee8d7"
+
+
+class ProvenanceStatus(str, enum.Enum):
+    """Authoritative fixture provenance verification outcome (R2-B05-S04)."""
+    PROVENANCE_VERIFIED = "PROVENANCE_VERIFIED"
+    PROVENANCE_UNAVAILABLE = "PROVENANCE_UNAVAILABLE"
+    PROVENANCE_MISMATCH = "PROVENANCE_MISMATCH"
 
 
 def _baseline_try_merge_pair(
@@ -106,8 +117,32 @@ def _baseline_try_merge_pair(
     return True
 
 
-def verify_fixture_provenance_against_git() -> bool:
-    """Verify that this fixture AST matches the frozen repository blob if git is available."""
+def verify_fixture_self_integrity() -> bool:
+    """Verify internal cryptographic content digest of the portable fixture AST."""
+    local_tree = ast.parse(inspect.getsource(_baseline_try_merge_pair))
+    local_func = local_tree.body[0]
+    local_func.name = "canonical_merge"
+    local_func.body = [
+        s for s in local_func.body
+        if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
+    ]
+    digest = hashlib.sha256(ast.dump(local_func).encode("utf-8")).hexdigest()
+    return digest == FROZEN_BASELINE_AST_SHA256
+
+
+def verify_fixture_provenance_against_git() -> ProvenanceStatus:
+    """Verify that this fixture AST matches the frozen repository blob if git is available.
+
+    Returns:
+    - PROVENANCE_VERIFIED: Git evidence is present and blob AST matches fixture AST exactly.
+    - PROVENANCE_UNAVAILABLE: Git is unavailable or running in a shallow/isolated archive.
+    - PROVENANCE_MISMATCH: Internal self-integrity failed or Git blob does not match fixture.
+    """
+    # 1. First assert self-integrity against pinned cryptographic digest (fails closed)
+    if not verify_fixture_self_integrity():
+        return ProvenanceStatus.PROVENANCE_MISMATCH
+
+    # 2. Attempt to inspect authentic git blob from repository history
     try:
         raw_blob = subprocess.check_output(
             ["git", "cat-file", "-p", FROZEN_BASELINE_BLOB_SHA],
@@ -116,26 +151,29 @@ def verify_fixture_provenance_against_git() -> bool:
             stderr=subprocess.DEVNULL,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        # Git is unavailable or running in a shallow/isolated archive; fallback to pinned bytecode
-        return True
+        return ProvenanceStatus.PROVENANCE_UNAVAILABLE
 
-    tree = ast.parse(raw_blob)
-    git_func = None
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == FROZEN_BASELINE_SYMBOL:
-            git_func = node
-            break
+    try:
+        tree = ast.parse(raw_blob)
+        git_func = None
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef) and node.name == FROZEN_BASELINE_SYMBOL:
+                git_func = node
+                break
 
-    if git_func is None:
-        return False
+        if git_func is None:
+            return ProvenanceStatus.PROVENANCE_MISMATCH
 
-    local_tree = ast.parse(inspect.getsource(_baseline_try_merge_pair))
-    local_func = local_tree.body[0]
+        git_func.name = "canonical_merge"
+        git_func.body = [
+            s for s in git_func.body
+            if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
+        ]
+        git_digest = hashlib.sha256(ast.dump(git_func).encode("utf-8")).hexdigest()
 
-    # Normalize name and remove docstrings for syntactic comparison
-    git_func.name = "canonical_merge"
-    git_func.body = [s for s in git_func.body if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))]
-    local_func.name = "canonical_merge"
-    local_func.body = [s for s in local_func.body if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))]
-
-    return ast.dump(git_func) == ast.dump(local_func)
+        if git_digest == FROZEN_BASELINE_AST_SHA256:
+            return ProvenanceStatus.PROVENANCE_VERIFIED
+        else:
+            return ProvenanceStatus.PROVENANCE_MISMATCH
+    except Exception:
+        return ProvenanceStatus.PROVENANCE_MISMATCH
