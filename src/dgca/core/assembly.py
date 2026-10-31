@@ -537,17 +537,23 @@ def _try_merge_pair(
 
     excl_a = sorted(set_a - set_b)
     excl_b = sorted(set_b - set_a)
-    if not excl_a or not excl_b:
-        between_strength = 0.0
+    if not excl_a and not excl_b:
+        # Branch 4a: Exact Structural Duplicate consolidation (Core §2.0 Operator 4)
+        between_strength_passed = True
     else:
-        cross_vals = [
-            compute_mutual_support_r_b(i, j, w)
-            for i in excl_a
-            for j in excl_b
-        ]
-        between_strength = sum(cross_vals) / float(len(cross_vals))
+        # Branch 4b: Partial Overlap cross-support evaluation
+        if not excl_a or not excl_b:
+            between_strength = 0.0
+        else:
+            cross_vals = [
+                compute_mutual_support_r_b(i, j, w)
+                for i in excl_a
+                for j in excl_b
+            ]
+            between_strength = sum(cross_vals) / float(len(cross_vals))
+        between_strength_passed = (between_strength >= THETA_OB)
 
-    if between_strength < THETA_OB:
+    if not between_strength_passed:
         return False
 
     union_tuple = tuple(sorted(union_set))
