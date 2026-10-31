@@ -1,33 +1,48 @@
 # DGCA NEXT V2 — R2-B02 DESIGN CONTRACT
 
 ## Exact-Duplicate Assembly Consolidation — Formal Design Contract
-### Normatively Reconciled Baseline under R2-B02-C01
+### Scientific Baseline Integrity Reconciled under R2-B02-C02
 
 | Parameter | Specification |
 | :--- | :--- |
-| **Document Version** | `2.0.0-normative-reconciled` |
+| **Document Version** | `2.1.0-scientific-baseline-reconciled` |
 | **Authoritative Baseline** | `faf361b6b95de6287b466eb1dc524ea49c732635` (`main`) |
 | **Investigation Branch** | `investigation/r2-b01-assembly-forensics` |
-| **Starting HEAD** | `2ea323f3afbf110028641dcd5349e61629ee9183` |
+| **Starting HEAD** | `cb8f3cc9689d6afb813f8a6767e80d4faf7ca87d` |
 | **Accepted Forensic Baseline** | `205efa0e664dc26f31f131d5efc19ac37b3eb95d` (R2-B01 Closeout) |
 | **Target Operators** | Core §2.0 Operator 4 (`MERGE`), Core §9.4 (`SurfaceReadoutLedgerV1`), `src/dgca/core/assembly.py` |
-| **Status** | **NORMATIVELY RECONCILED — AWAITING FINAL DESIGN FREEZE** |
+| **Status** | **SCIENTIFIC BASELINE VERIFIED — READY FOR FINAL DESIGN FREEZE** |
 
 ---
 
 ## 1. Scientific Problem Statement
 
-The R2-B01 forensic investigation established the causal chain leading to catastrophic readout collisions in DGCA:
-1. Disjoint neural assemblies ($A_5$ seeded by root `عطش` and $A_6$ seeded by root `شرب`) independently underwent synaptic growth (`GROW`) during Root 9 (`النسر يشرب ماء`).
-2. Both assemblies recruited the exact same five committed language cells (`10646, 10915, 11153, 11583, 12116`), converging to an identical 8-cell structural composition:
-   $$\text{Members}(A_5) \equiv \text{Members}(A_6) = \{10646, 10915, 11153, 11583, 12053, 12061, 12116, 12118\}$$
+The R2-B01 forensic investigation established the exact physical sequence leading to catastrophic readout collisions in DGCA:
+1. During **Root 8** (`النسر يشرب ماء <EOS>`, Eagle DB), during the **Event 3** (`<EOS>`, `Marker.EOS`) pass of Stage 3 (`FORM`), an unassigned fresh language emitter pool of 8 cells:
+   $$U_t = [8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116]$$
+   formed two legally disjoint 3-cell seed triangles under Core §2.0 Operator 3 (`FORM`):
+   - **Assembly 5:** `(8834, 9209, 10570)` (Gen 1)
+   - **Assembly 6:** `(10646, 10915, 11153)` (Gen 1)
+   Both assemblies were completely disjoint at birth: $\text{Members}(A_5) \cap \text{Members}(A_6) = \emptyset, J(A_5, A_6) = 0.0000$.
+2. During the root close of **Root 9** (`القط يشرب حليب <EOS>`, Cat DB), both assemblies independently underwent Stage 2 synaptic growth (`GROW`):
+   - Assembly 5 recruited committed cells `[10646, 10915, 11153, 11583, 12116]`.
+   - Assembly 6 recruited committed cells `[8834, 9209, 10570, 11583, 12116]`.
+   - Both converged to the exact same 8-cell structural composition:
+     $$\text{Members}(A_5) \equiv \text{Members}(A_6) = (8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116)$$
+   - Each cell addition incremented `structural_generation` by 1, advancing both assemblies from Gen 1 to Gen 6 ($1 + 5 = 6$).
 3. At the close of Root 9, the structural `MERGE` operator evaluated pair $(A_5, A_6)$. Under the frozen Core §2.0 specification:
    - Exclusive member sets are empty: $\text{Excl}(A_5) = \emptyset$, $\text{Excl}(A_6) = \emptyset$.
    - The mutual support between exclusive sets evaluates over an empty Cartesian product $\emptyset \times \emptyset$.
    - The frozen implementation defaults this undefined quantity to $0.0$.
-   - Because $0.0 < \Theta_{\text{ob}} = 0.35$, the merge operation was **rejected**.
-4. Both assemblies remained active (`LIVE`), resulting in dual structural identical attractors.
-5. In subsequent exposure and readout, both assemblies produced identical continuous activation scores ($S_5 \equiv S_6$), triggering a collision failure in candidate resolution (`StatusCode.READOUT_AMBIGUOUS`).
+   - Because $0.0 < \Theta_{\text{ob}} = 0.40$, the merge operation was **rejected**.
+4. Both assemblies remained active (`LIVE`), resulting in dual structurally identical attractors.
+5. In subsequent exposure and readout at Root 56 (Prompt `['النسر']`, Step 2: `ماء` $\to$ `<EOS>`), both assemblies produced identical continuous activation scores:
+   $$S_5 = S_6 = 0.2069442431, \quad \text{Q6} = 206944, \quad \text{elig } 3/9$$
+   Yielding an exact zero score margin:
+   $$\text{Margin } (0.0000000000) < M_{\text{read}} (0.04) \implies \mathbf{True}$$
+   This triggered an ambiguity safe-halt during **neural assembly candidate ranking** in the core generator:
+   $$\text{ReadoutEvaluationResult.status} = \text{StatusCode.AMBIGUOUS}$$
+   $$\text{GenerateEpisodeResult.stop_status} = \text{StatusCode.GEN_STOP_AMBIGUOUS}$$
 
 ### Separation of Scientific Gates
 To prevent normative ambiguity, the architecture differentiates four distinct scientific gates:
@@ -36,7 +51,7 @@ To prevent normative ambiguity, the architecture differentiates four distinct sc
 3. **Neural Winner Selection:** Core dynamics selection of the winning assembly based solely on neural activation overlap; zero consultation of peripheral ledger.
 4. **Language Generation Success:** Peripheral emission of grounded surface tokens upon successful attestation resolution.
 
-Solving Gate 1 (structural duplicate elimination) is necessary for Gate 4, but does not instantly satisfy Gate 2 or Gate 4 without subsequent qualifying external grounding.
+Solving Gate 1 (structural duplicate elimination) is necessary for Gate 4, but does not instantly satisfy Gate 2, Gate 3, or Gate 4 without subsequent qualifying external grounding.
 
 ---
 
@@ -46,19 +61,19 @@ Solving Gate 1 (structural duplicate elimination) is necessary for Gate 4, but d
 In `DGCA_CORE_RC4_1.md` §2.0 (Operator 4, `MERGE`), the merge condition between assemblies $A$ and $B$ requires satisfying three sequential structural predicates:
 
 1. **Jaccard Overlap:**
-   $$J(A, B) = \frac{|A \cap B|}{|A \cup B|} \ge \Theta_{\text{merge}} \quad (\Theta_{\text{merge}} = 0.80)$$
+   $$J(A, B) = \frac{|A \cap B|}{|A \cup B|} \ge \Theta_{\text{merge}} \quad (\Theta_{\text{merge}} = 0.70)$$
 2. **Capacity Bounds:**
    $$|A \cup B| \le K_{\text{max}} \quad (K_{\text{max}} = 16)$$
 3. **Exclusive-Set Mutual Support:**
-   $$\text{BetweenStrength}(A, B) = \frac{1}{|A \setminus B| \cdot |B \setminus A|} \sum_{i \in A \setminus B} \sum_{j \in B \setminus A} R^B_{i, j}(W) \ge \Theta_{\text{ob}} \quad (\Theta_{\text{ob}} = 0.35)$$
+   $$\text{BetweenStrength}(A, B) = \frac{1}{|A \setminus B| \cdot |B \setminus A|} \sum_{i \in A \setminus B} \sum_{j \in B \setminus A} R^B_{i, j}(W) \ge \Theta_{\text{ob}} \quad (\Theta_{\text{ob}} = 0.40)$$
 
 ### Why the Boundary Condition Exists
-The between-strength predicate $\text{BetweenStrength}(A, B) \ge \Theta_{\text{ob}}$ was designed to ensure that the unshared (exclusive) cells of two assemblies exhibit strong reciprocal synaptic support before fusing them into a single attractor. If two assemblies share 80% of their cells, they should only merge if their distinct 20% peripheral cells are mutually bonded.
+The between-strength predicate $\text{BetweenStrength}(A, B) \ge \Theta_{\text{ob}}$ was designed to ensure that the unshared (exclusive) cells of two assemblies exhibit strong reciprocal synaptic support before fusing them into a single attractor. If two assemblies share 70% of their cells, they should only merge if their distinct 30% peripheral cells are mutually bonded.
 
 ### Where the Boundary Condition Fails
 When two assemblies converge to identical membership sets ($A = B$):
-- Shared overlap is 100%: $J(A, B) = 1.0 \ge \Theta_{\text{merge}}$.
-- Size bound is satisfied: $|A \cup B| = |A| \le K_{\text{max}}$.
+- Shared overlap is 100%: $J(A, B) = 1.0 \ge \Theta_{\text{merge}} = 0.70$.
+- Size bound is satisfied: $|A \cup B| = |A| \le K_{\text{max}} = 16$.
 - Exclusive sets are empty: $A \setminus B = \emptyset$ and $B \setminus A = \emptyset$.
 - The denominator $|A \setminus B| \cdot |B \setminus A| = 0 \times 0 = 0$.
 
@@ -79,7 +94,7 @@ else:
 if between_strength < THETA_OB:
     return False
 ```
-Because `excl_a` and `excl_b` are empty, `between_strength` is assigned `0.0`. Consequently, `0.0 < THETA_OB` triggers an immediate merge rejection.
+Because `excl_a` and `excl_b` are empty, `between_strength` is assigned `0.0`. Consequently, `0.0 < THETA_OB` ($0.40$) triggers an immediate merge rejection.
 
 ### The Attestation Law (Core §9.4)
 Under Core §9.4 and [src/dgca/peripheral/readout_ledger.py](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/peripheral/readout_ledger.py#L20-L22):
@@ -134,12 +149,12 @@ In `DGCA_CORE_RC4_1.md` §2.0, Item 4 (`MERGE`), replace the between-strength ev
 > 
 > A pair $(A, B)$ is eligible for consolidation if and only if:
 > 1. Both $A$ and $B$ are `LIVE` and neither is in merge/split cooldown ($T_c = 200$ completed external events).
-> 2. Jaccard overlap satisfies $J(A, B) = \frac{|A \cap B|}{|A \cup B|} \ge \Theta_{\text{merge}} = 0.80$.
+> 2. Jaccard overlap satisfies $J(A, B) = \frac{|A \cap B|}{|A \cup B|} \ge \Theta_{\text{merge}} = 0.70$.
 > 3. Union size satisfies $|A \cup B| \le K_{\text{max}} = 16$.
 > 4. **Consolidation Support Gate:**
 >    - **Branch 4a (Exact Structural Duplicate):** If $\text{Members}(A) \equiv \text{Members}(B)$ (i.e. $A \setminus B = \emptyset$ and $B \setminus A = \emptyset$), the pair is immediately eligible for consolidation; the mutual-support gate is satisfied.
 >    - **Branch 4b (Partial Overlap):** If $A \setminus B \ne \emptyset$ and $B \setminus A \ne \emptyset$, the between-strength must satisfy:
->      $$\text{BetweenStrength}(A, B) = \frac{1}{|A \setminus B| \cdot |B \setminus A|} \sum_{i \in A \setminus B} \sum_{j \in B \setminus A} R^B_{i, j}(W) \ge \Theta_{\text{ob}} = 0.35$$
+>      $$\text{BetweenStrength}(A, B) = \frac{1}{|A \setminus B| \cdot |B \setminus A|} \sum_{i \in A \setminus B} \sum_{j \in B \setminus A} R^B_{i, j}(W) \ge \Theta_{\text{ob}} = 0.40$$
 > 5. **Cell Membership & Keep Guards:** For every cell $x \in A \cup B$, the live assembly count after archiving $B$ does not exceed $M_{\text{max}} = 12$, and keep guards $\text{check\_maintain\_keep\_guards}(x, A \cup B)$ pass.
 
 ### Mathematical Formulation of the Predicate
@@ -149,15 +164,15 @@ $$\mathcal{P}_{\text{merge}}(A, B) = \mathcal{G}_{\text{status}}(A, B) \land \ma
 Where:
 $$\mathcal{G}_{\text{status}}(A, B) = [A.\text{status} = \text{LIVE} \land B.\text{status} = \text{LIVE}]$$
 $$\mathcal{G}_{\text{cooldown}}(A, B) = [\neg \text{InCooldown}(A) \land \neg \text{InCooldown}(B)]$$
-$$\mathcal{G}_{\text{cap}}(A, B) = [|A \cup B| \le K_{\text{max}}]$$
-$$\mathcal{G}_{\text{overlap}}(A, B) = [J(A, B) \ge \Theta_{\text{merge}}]$$
+$$\mathcal{G}_{\text{cap}}(A, B) = [|A \cup B| \le K_{\text{max}} = 16]$$
+$$\mathcal{G}_{\text{overlap}}(A, B) = [J(A, B) \ge \Theta_{\text{merge}} = 0.70]$$
 $$\mathcal{G}_{\text{support}}(A, B) = 
 \begin{cases} 
 \text{True} & \text{if } A \setminus B = \emptyset \land B \setminus A = \emptyset \quad \text{(Branch 4a: Exact Duplicate)} \\
-\text{BetweenStrength}(A, B) \ge \Theta_{\text{ob}} & \text{if } A \setminus B \ne \emptyset \land B \setminus A \ne \emptyset \quad \text{(Branch 4b: Partial Overlap)} \\
+\text{BetweenStrength}(A, B) \ge \Theta_{\text{ob}} = 0.40 & \text{if } A \setminus B \ne \emptyset \land B \setminus A \ne \emptyset \quad \text{(Branch 4b: Partial Overlap)} \\
 \text{False} & \text{otherwise (e.g. proper subsets)}
 \end{cases}$$
-$$\mathcal{G}_{\text{guards}}(A, B) = \bigwedge_{x \in A \cup B} [M_{\text{live}}(x \mid B \to \text{ARCHIVED}) \le M_{\text{max}} \land \text{KeepGuard}(x, A \cup B)]$$
+$$\mathcal{G}_{\text{guards}}(A, B) = \bigwedge_{x \in A \cup B} [M_{\text{live}}(x \mid B \to \text{ARCHIVED}) \le M_{\text{max}} = 12 \land \text{KeepGuard}(x, A \cup B)]$$
 
 ---
 
@@ -202,19 +217,23 @@ Reporting strictly conforms to frozen schemas in [src/dgca/lifecycle/exposure_tx
 
 ## 6. Verified Baseline & Counterfactual Timeline
 
+The alternating curriculum stimulus across the relevant roots is strictly defined:
+- **Even Roots (e.g. Root 8, Root 10):** `النسر يشرب ماء <EOS>` (Eagle DB)
+- **Odd Roots (e.g. Root 9):** `القط يشرب حليب <EOS>` (Cat DB)
+
 The following table compares the verified frozen baseline with the counterfactual consolidation trajectory:
 
 | Curriculum Event | Baseline Production (Measured) | Counterfactual Consolidation (Predicted) | Status / Invariant |
 | :--- | :--- | :--- | :--- |
-| **Root 8 Close** | $A_5$ born (Gen 1, size 3); $A_6$ born (Gen 1, size 3). | $A_5$ born (Gen 1, size 3); $A_6$ born (Gen 1, size 3). | Frozen Law (Measured). |
-| **Root 9 GROW** | Both recruit 5 cells (`10646, 10915, 11153, 11583, 12116`). Generations: $1 + 5 = 6$. Both Gen 6 (size 8). | Both recruit 5 cells. Generations: $1 + 5 = 6$. Both Gen 6 (size 8). | Frozen Law (Measured). |
-| **Root 9 MERGE** | MERGE fails ($0.0 < \Theta_{\text{ob}}$). Both remain `LIVE` at Gen 6. | Branch 4a triggers. $A_5$ survives ($6 + 1 = 7$); $A_6$ archived ($6 + 1 = 7$). | Core §2.0 Operator 4 (Predicted). |
-| **Root 10 GROW** | Unmodified baseline adds cell `12117` to both. Both become Gen 7 (size 9). | Cell `12117` added to $A_5$. Survivor generation increments: $7 + 1 = 8$ (size 9). | First stable post-merge generation is **Gen 8** (Predicted). |
-| **Root 10 MERGE** | MERGE fails. Both remain `LIVE` at Gen 7. | Ineligible (Asm 6 archived; Asm 5 in $T_c = 200$ cooldown). | Cooldown Protection (Predicted). |
-| **Root 10–56 Readout** | Dual identical attractors ($A_5, A_6$) score identically; `READOUT_AMBIGUOUS` collision. | Single attractor ($A_5$ Gen 8). Unattested until 2 external roots confirm. Fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Collision Eliminated; Attestation Gate Active (Predicted). |
-| **1st Eligible Ext. Root** | Both fire on `<EOS>`; collision halts readout. | $A_5$ Gen 8 fires on `<EOS>`; ledger records 1st confirmation (`external_count = 1 < 2`). Readout remains fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Attestation Condition 1 Enforced (Predicted). |
-| **2nd Eligible Ext. Root** | Collision persists. | $A_5$ Gen 8 fires on `<EOS>`; ledger records 2nd confirmation (`external_count = 2 \ge 2`). $A_5$ Gen 8 becomes **attested**! | `MIN_ATTESTED_EXTERNAL_ROOTS = 2` Satisfied (Predicted). |
-| **Subsequent Readout** | Collision persists permanently. | Autonomous generation resolves $A_5$ Gen 8 to `<EOS>` cleanly with positive margin (`StatusCode.OK`). | Readout Recovery Achieved (Predicted). |
+| **Root 8 (Eagle) Close** | Born in Event 3 (`Marker.EOS`): $A_5 = (8834, 9209, 10570)$ (Gen 1); $A_6 = (10646, 10915, 11153)$ (Gen 1). Disjoint seeds. | $A_5$ born (Gen 1, size 3); $A_6$ born (Gen 1, size 3). | Frozen Law (Measured). |
+| **Root 9 (Cat) GROW** | Both recruit 5 cells (`10646, 10915, 11153, 11583, 12116` to $A_5$; reciprocal to $A_6$). Generations: $1 + 5 = 6$. Both Gen 6 (size 8). Membership: `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116)`. | Both recruit 5 cells. Generations: $1 + 5 = 6$. Both Gen 6 (size 8). | Frozen Law (Measured). |
+| **Root 9 (Cat) MERGE** | MERGE fails ($0.0 < \Theta_{\text{ob}} = 0.40$). Both remain `LIVE` at Gen 6. | Branch 4a triggers. $A_5$ survives ($6 + 1 = 7$); $A_6$ archived ($6 + 1 = 7$). | Core §2.0 Operator 4 (Predicted). |
+| **Root 10 (Eagle) GROW** | Unmodified baseline adds cell `12117` to both. Both become Gen 7 (size 9): `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)`. | Cell `12117` added to $A_5$. Survivor generation increments: $7 + 1 = 8$ (size 9). Note: $A_6$ is archived and does not grow. | First stable post-merge generation is **Gen 8** (Predicted). |
+| **Root 10 (Eagle) MERGE** | MERGE fails ($0.0 < \Theta_{\text{ob}} = 0.40$). Both remain `LIVE` at Gen 7. | Ineligible ($A_6$ archived; $A_5$ in $T_c = 200$ cooldown). | Cooldown Protection (Predicted). |
+| **Root 10–56 Readout** | Dual identical attractors ($A_5, A_6$) score identically ($S_5 = S_6 = 0.2069442431$); zero score margin in neural ranking triggers `AMBIGUOUS` / `GEN_STOP_AMBIGUOUS` safe-halt. | Single attractor ($A_5$ Gen 8). Unattested until 2 external roots confirm. Fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Collision Eliminated; Attestation Gate Active (Predicted). |
+| **1st Eligible Ext. Root** | Both fire on `<EOS>`; score tie triggers neural `AMBIGUOUS` safe-halt. | $A_5$ Gen 8 fires on `<EOS>`; ledger records 1st confirmation (`external_count = 1 < 2`). Readout remains fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Attestation Condition 1 Enforced (Predicted). |
+| **2nd Eligible Ext. Root** | Neural ambiguity persists. | $A_5$ Gen 8 fires on `<EOS>`; ledger records 2nd confirmation (`external_count = 2 \ge 2`). $A_5$ Gen 8 becomes **attested**! | `MIN_ATTESTED_EXTERNAL_ROOTS = 2` Satisfied (Predicted). |
+| **Subsequent Readout** | Neural ambiguity persists permanently. | Autonomous generation resolves $A_5$ Gen 8 to `<EOS>` cleanly with positive margin (`StatusCode.OK`). | Readout Recovery Achieved (Predicted). |
 
 > [!NOTE]
 > All counterfactual entries are formally labeled as **PREDICTED**, pending authorization of implementation and verification under R2-B03.
@@ -283,7 +302,9 @@ $$(\text{assembly\_id}, \text{structural\_generation})$$
    - Ledger returns `StatusCode.READOUT_UNKNOWN`.
    - Generator function [`_map_ledger_failure_to_gen_stop()`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/generator.py#L76-L88) maps this to `StatusCode.GEN_STOP_READOUT_UNKNOWN`.
    - **No fallback to lower-ranked printable assemblies:** Under Core §9.3 and `LG-T12`, peripheral lookup is strictly evaluated on the neural winner. If the winner is unattested, generation halts fail-closed.
-5. **Attestation Requirement:**
+5. **Separation from Neural Ambiguity:**
+   Contrast `StatusCode.READOUT_UNKNOWN` (peripheral ledger lacks sufficient confirmations for winner) with `StatusCode.AMBIGUOUS` (neural activation margin between top 2 assemblies is below $M_{\text{read}} = 0.04$). The original Root 56 failure was a neural ranking tie (`StatusCode.AMBIGUOUS`), which duplicate consolidation eliminates structurally.
+6. **Attestation Requirement:**
    Attestation strictly requires $\ge 2$ independent qualifying external roots (`MIN_ATTESTED_EXTERNAL_ROOTS = 2`).
 
 ---
@@ -293,7 +314,7 @@ $$(\text{assembly\_id}, \text{structural\_generation})$$
 The proposed amendment introduces zero modifications to transactional architecture:
 
 ### Ordinary MERGE Ineligibility
-- If a candidate pair is ineligible (e.g., $J < 0.80$, capacity exceeded, keep guard failure, or cooldown active):
+- If a candidate pair is ineligible (e.g., $J < 0.70$, capacity exceeded, keep guard failure, or cooldown active):
 - `_try_merge_pair()` returns `False`.
 - The merge loop simply proceeds to the next candidate pair in the active pass.
 - **No transaction abort occurs.** The pipeline continues normally under frozen rules.
@@ -316,8 +337,8 @@ The proposed amendment introduces zero modifications to transactional architectu
 | Case | Structure | Evaluation | Merge Outcome | Reason |
 | :--- | :--- | :--- | :--- | :--- |
 | **Case 1: Proper Subsets** | $A \subset B$ ($|A|=4, |B|=5$) | $A \setminus B = \emptyset$, but $B \setminus A = \{c_5\} \ne \emptyset$. | **REJECTED** | Fails Branch 4a condition ($B \setminus A \ne \emptyset$). Evaluates under Branch 4b, where empty $A \setminus B$ yields `between_strength = 0.0 < THETA_OB`. Prevents subset absorption. |
-| **Case 2: Low-Jaccard Overlap** | $|A \cap B| = 6$, $|A \cup B| = 10$ | $J(A, B) = 0.60 < \Theta_{\text{merge}} = 0.80$. | **REJECTED** | Fails overlap threshold $\Theta_{\text{merge}}$ prior to support gate. |
-| **Case 3: Weak Exclusive Support** | $|A|=8, |B|=8$, $|A \cap B|=7$ | $|A \setminus B|=1, |B \setminus A|=1$, $R^B = 0.20 < \Theta_{\text{ob}} = 0.35$. | **REJECTED** | Evaluates under Branch 4b; fails mutual-support threshold. |
+| **Case 2: Low-Jaccard Overlap** | $|A \cap B| = 6$, $|A \cup B| = 10$ | $J(A, B) = 0.60 < \Theta_{\text{merge}} = 0.70$. | **REJECTED** | Fails overlap threshold $\Theta_{\text{merge}}$ prior to support gate. |
+| **Case 3: Weak Exclusive Support** | $|A|=8, |B|=8$, $|A \cap B|=7$ | $|A \setminus B|=1, |B \setminus A|=1$, $R^B = 0.20 < \Theta_{\text{ob}} = 0.40$. | **REJECTED** | Evaluates under Branch 4b; fails mutual-support threshold. |
 | **Case 4: Cooldown Violation** | $A \equiv B$, but $A$ merged 50 events ago | $W.\text{completed\_events} - A.\text{last\_merge\_serial} = 50 < T_c = 200$. | **REJECTED** | Cooldown guard $\mathcal{G}_{\text{cooldown}}$ fails before predicate evaluation. |
 | **Case 5: Cell Membership Overflow** | $A \equiv B$, member $x$ in 12 live assemblies | Live count after archiving $B$: $12 - 1 = 11 \le 12$. If union adds any cell exceeding 12: | **REJECTED** | Capacity guard $\mathcal{G}_{\text{guards}}$ fails. |
 
@@ -325,18 +346,18 @@ The proposed amendment introduces zero modifications to transactional architectu
 
 ## 10. Scientific Acceptance Test Matrix
 
-The acceptance suite consists of seven primary validation experiments and nine negative tests:
+The acceptance suite consists of seven primary validation experiments and nine negative tests. Acceptance requires observed empirical measurements, not assumed improvement claims.
 
 ### Primary Validation Experiments
 
 | Test ID | Experiment Name | Stimulus / Configuration | Expected Empirical Outcome | Invariant Verified |
 | :--- | :--- | :--- | :--- | :--- |
 | **EXP-B02-01** | Exact Duplicate Consolidation | Replay Root 9 where Assemblies 5 & 6 have converged to identical 8 cells. | $A_5$ remains `LIVE` (Gen 7 post-merge); $A_6$ becomes `ARCHIVED` (Gen 7); single assembly published; cooldown applied. | Core §2.0 Operator 4 (Branch 4a). |
-| **EXP-B02-02** | Partial Overlap Invariance | Synthetic pair with 8 shared cells, 2 exclusive cells, $R^B = 0.50 \ge \Theta_{\text{ob}}$. | Pair merges legally under Branch 4b; between-strength evaluated accurately. | Core §2.0 Operator 4 (Branch 4b). |
+| **EXP-B02-02** | Partial Overlap Invariance | Synthetic pair with 8 shared cells, 2 exclusive cells, $R^B = 0.50 \ge \Theta_{\text{ob}} = 0.40$. | Pair merges legally under Branch 4b; between-strength evaluated accurately. | Core §2.0 Operator 4 (Branch 4b). |
 | **EXP-B02-03** | Proper Subset Rejection | Synthetic pair with $A \subset B$ ($|A|=4, |B|=5$). | Merge rejected with `between_strength = 0.0 < THETA_OB`. | Prevention of subset absorption. |
 | **EXP-B02-04** | Ledger Generation Safety | Query readout immediately after Root 9 consolidation without qualifying external exposure. | Surviving $A_5$ (Gen 7/8) has 0 ledger attestations; readout halts fail-closed with `GEN_STOP_READOUT_UNKNOWN`. | Core §9.4 ledger generation barrier. |
-| **EXP-B02-05** | Post-Merge Re-Attestation | Expose consolidated model to 2 independent qualifying external roots containing `<EOS>`. | 1st root yields `external_count = 1` (readout remains unknown); 2nd root yields `external_count = 2` (attested); subsequent readout emits `<EOS>` cleanly. | Core §9.4 (`MIN_ATTESTED_EXTERNAL_ROOTS = 2`). |
-| **EXP-B02-06** | 56-Root Curriculum Replay | Full 56-root curriculum with consolidation active at Root 9. | Empirical evaluation across all 56 roots; dual-replay state equality; optional extended-curriculum condition to evaluate re-attestation. | Curriculum determinism and non-interference. |
+| **EXP-B02-05** | Post-Merge Re-Attestation | Expose consolidated model to 2 independent qualifying external roots containing `<EOS>`. | 1st root yields `external_count = 1` (readout remains unknown); 2nd root yields `external_count = 2` (attested); subsequent readout evaluates $A_5$ against ledger. | Core §9.4 (`MIN_ATTESTED_EXTERNAL_ROOTS = 2`). |
+| **EXP-B02-06** | 56-Root Curriculum Replay | Full 56-root curriculum with consolidation active at Root 9. | Empirical evaluation across all 56 roots; dual-replay state equality; measure actual winner rankings without assuming automatic generation success. | Curriculum determinism and non-interference. |
 | **EXP-B02-07** | Transaction Fault Semantics | Evaluate ordinary ineligibility (returns `False`) vs injected pre-publication failure. | Ineligibility continues pipeline; injected failure discards shadow state while preserving legal OPEN sensory states; committed neural state durable. | Transaction failure boundaries. |
 
 ### Negative Tests
@@ -398,13 +419,15 @@ When authorized, implementation will be strictly confined to:
 
 ## 12. Scientific Limitations & Lead Engineer Review
 
-### Explicit Scientific Boundaries
-Exact-duplicate consolidation addresses the specific causal defect of identical structural duplicates. It does **not** provide blanket guarantees:
-1. **No Guarantee of Immediate Generation Success:** Consolidation eliminates duplicate collisions, but the surviving assembly enters a new structural generation (Gen 7 post-merge, Gen 8 post-Root 10). Autonomous generation halts with `GEN_STOP_READOUT_UNKNOWN` until at least two qualifying external roots ground the new generation.
-2. **No Guarantee of Total Readout Unambiguity:** Future distinct assemblies could theoretically converge or collide if learning dynamics produce overlapping attractors.
-3. **No Immediate Generation Stability:** Survivor generation advances upon merge ($6 \to 7$) and advances again if subsequent growth occurs at Root 10 ($7 \to 8$). Generation stability requires completion of growth phases.
-4. **Curriculum Independence:** A fixed curriculum of 56 roots without subsequent exposures will leave the consolidated assembly unattested at curriculum close. An extended curriculum condition is required to observe re-attestation.
-5. **Diverging Historical Surface Risk:** If two structurally identical assemblies historically witnessed different peripheral surfaces, Core consolidation **must not** consult those surfaces to resolve the discrepancy (zero selection leakage). Any loss of printable distinction must be reported faithfully, not hidden by aliasing or artificial evidence blending.
+### Explicit Counterfactual Boundaries
+Exact-duplicate consolidation addresses the specific causal defect of identical structural duplicates. Under counterfactual scientific discipline, the following boundaries must be recognized:
+1. **Root 9 Consolidation is Predicted, Not Measured:** The merge amendment has not been implemented in production. Its exact runtime behavior is an untested hypothesis pending R2-B03.
+2. **Root 10 Growth is Predicted, Not Measured:** Growth of $A_5$ to Gen 8 after consolidation is a modeled projection; actual cell recruitment depends on synaptic weights and unassigned pool availability.
+3. **Gen 8 is Not Guaranteed to be Final:** If subsequent curriculum roots present unassigned emitters that form reciprocal synapses with $A_5$, further GROW operations could advance its generation beyond Gen 8.
+4. **New-Generation Attestation Not Guaranteed by Fixed Root:** Attestation requires $\ge 2$ distinct completed external roots where $A_5$ fires with $C_t \ge 0.70$. If curriculum stimuli do not activate $A_5$, attestation will not occur within the standard 56 roots.
+5. **Attestation Does Not Guarantee Neural Winner Selection:** Even if $A_5$ becomes attested at Gen 8, neural candidate competition is strictly based on continuous activation overlap. Another assembly could achieve a higher score.
+6. **Neural Selection Does Not Guarantee Successful EOS Generation:** Surface emission requires matching markers, valid feature bundles, and uncorrupted envelopes.
+7. **Diverging Historical Surface Risk:** If two structurally identical assemblies historically witnessed different peripheral surfaces, Core consolidation **must not** consult those surfaces to resolve the discrepancy (zero selection leakage). Any loss of printable distinction must be reported faithfully, not hidden by aliasing or artificial evidence blending.
 
 ---
 

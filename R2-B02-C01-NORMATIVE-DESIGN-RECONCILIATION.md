@@ -4,13 +4,14 @@
 
 | Parameter | Specification |
 | :--- | :--- |
-| **Document Version** | `1.0.0-normative-reconciled` |
+| **Document Version** | `1.1.0-normative-reconciled` |
 | **Authoritative Baseline** | `faf361b6b95de6287b466eb1dc524ea49c732635` (`main`) |
 | **Investigation Branch** | `investigation/r2-b01-assembly-forensics` |
 | **Starting HEAD** | `2ea323f3afbf110028641dcd5349e61629ee9183` |
 | **Accepted Forensic Baseline** | `205efa0e664dc26f31f131d5efc19ac37b3eb95d` (R2-B01 Closeout) |
 | **Target Design Contract** | `R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md` |
 | **Target Erratum Report** | `R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md` |
+| **Actual Remote Commit SHA** | `cb8f3cc9689d6afb813f8a6767e80d4faf7ca87d` |
 | **Status** | **NORMATIVELY RECONCILED — AWAITING FINAL DESIGN FREEZE** |
 
 ---
@@ -21,7 +22,7 @@ Following formal review of the initial R2-B02 design contract (`2ea323f`), the L
 
 Under task **R2-B02-C01**, a comprehensive normative audit and reconciliation was conducted. All ten directive sections (C01-S01 through C01-S10) have been fully resolved with zero changes to production source code (`src/dgca/`), test suites, runtime configurations, or scientific evidence digests.
 
-The formal design contract [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md) has been updated to version `2.0.0-normative-reconciled`. The final forensic documentation erratum in [`R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md) ($B_i = 64, B_i^x = 12$) has been corrected.
+The formal design contract [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md) has been updated to version `2.1.0-scientific-baseline-reconciled`. The final forensic documentation erratum in [`R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md#L48-L49) ($B_i = 64, B_i^x = 12$) has been corrected.
 
 ---
 
@@ -51,14 +52,14 @@ The formal design contract [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRAC
 ### 2. C01-S02 — Correct Structural Generation Timeline
 - **Normative Conflict:** The original design claimed Assemblies 5 and 6 reached Gen 7 prior to consolidation at Root 9, and advanced to Gen 8 immediately upon MERGE via $\max(\text{gen}_A, \text{gen}_B) + 1$.
 - **Authoritative Rule:** Inspection of the forensic replay and `src/dgca/core/assembly.py` establishes:
-  - Root 8: Assemblies 5 and 6 born at Gen 1 (seed size 3).
-  - Root 9 GROW: Adds 5 cells (`10646, 10915, 11153, 11583, 12116`) sequentially. Each cell addition increments `structural_generation` by 1:
+  - Root 8 (Eagle): Assemblies 5 and 6 born at Gen 1 during Event 3 (`Marker.EOS`) with seed sets `(8834, 9209, 10570)` and `(10646, 10915, 11153)`.
+  - Root 9 (Cat) GROW: Adds 5 cells (`10646, 10915, 11153, 11583, 12116`) sequentially. Each cell addition increments `structural_generation` by 1:
     $$1 + 5 = 6$$
-    Both assemblies reach Gen 6 (size 8).
-  - Root 9 MERGE: Under proposed consolidation, `_try_merge_pair()` increments both assemblies:
+    Both assemblies reach Gen 6 (size 8): `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116)`.
+  - Root 9 (Cat) MERGE: Under proposed consolidation, `_try_merge_pair()` increments both assemblies:
     $$\text{asm\_a.structural\_generation} += 1 \implies 6 + 1 = 7$$
     $$\text{asm\_b.structural\_generation} += 1 \implies 6 + 1 = 7 \quad (\text{ARCHIVED})$$
-  - Root 10 GROW: Adds cell `12117` to survivor $A_5$:
+  - Root 10 (Eagle) GROW: Adds cell `12117` to survivor $A_5$:
     $$\text{asm\_a.structural\_generation} += 1 \implies 7 + 1 = 8 \quad (\text{size } 9)$$
   - First stable post-merge generation: **Gen 8** at Root 10.
 - **Reconciliation Action:**
@@ -90,13 +91,17 @@ The formal design contract [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRAC
 ---
 
 ### 5. C01-S05 — Correct Readout Failure Codes
-- **Normative Conflict:** The original design introduced a nonexistent status code `StatusCode.UNATTESTED_READOUT` and claimed the decoder emits this code.
+- **Normative Conflict:** The original design introduced a nonexistent status code `StatusCode.UNATTESTED_READOUT` and labeled the Root 56 neural collision as `StatusCode.READOUT_AMBIGUOUS`.
 - **Authoritative Rule:** In `src/dgca/common/errors.py`, `src/dgca/peripheral/readout_ledger.py`, and `src/dgca/core/generator.py`:
+  - The Root 56 duplicate collision occurs during **neural assembly candidate ranking**:
+    `ReadoutEvaluationResult.status = StatusCode.AMBIGUOUS`
+    `GenerateEpisodeResult.stop_status = StatusCode.GEN_STOP_AMBIGUOUS`
+  - `StatusCode.READOUT_AMBIGUOUS` belongs strictly to the peripheral ledger failure class when $\ge 2$ distinct candidate tuples are attested.
   - `SurfaceReadoutLedgerV1.resolve_readout()` returns `StatusCode.READOUT_UNKNOWN` when zero rows or a single candidate row with `external_count < 2` exists.
   - `generator.py::_map_ledger_failure_to_gen_stop()` maps `StatusCode.READOUT_UNKNOWN` to `StatusCode.GEN_STOP_READOUT_UNKNOWN`.
   - Neural winner selection occurs strictly before peripheral lookup (`LG-T12`). If the winner is unattested, generation halts fail-closed; no fallback to lower-ranked printable assemblies is permitted.
 - **Reconciliation Action:**
-  Replaced all occurrences of `UNATTESTED_READOUT` with `StatusCode.GEN_STOP_READOUT_UNKNOWN` (generator level) and `StatusCode.READOUT_UNKNOWN` (ledger level). Reaffirmed strict winner selection without peripheral fallback.
+  Replaced all occurrences of `UNATTESTED_READOUT` with `StatusCode.GEN_STOP_READOUT_UNKNOWN` (generator level) and `StatusCode.READOUT_UNKNOWN` (ledger level). Corrected the neural collision status to `StatusCode.AMBIGUOUS` / `StatusCode.GEN_STOP_AMBIGUOUS`.
 
 ---
 
@@ -123,10 +128,16 @@ The formal design contract [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRAC
 
 ### 8. C01-S08 — Retain Accepted Mathematical Design
 - **Normative Consistency:** Alternative A (Explicit Exact-Duplicate Structural Branch) is retained.
+- **Authoritative Parameters:**
+  - $\Theta_{\text{merge}} = 0.70$
+  - $\Theta_{\text{ob}} = 0.40$
+  - $K_{\text{max}} = 16$
+  - $M_{\text{max}} = 12$
+  - $T_c = 200$
 - **Predicate Boundaries:**
   - Exact duplicate check: `not excl_a and not excl_b` ($A \setminus B = \emptyset \land B \setminus A = \emptyset$).
-  - Bypasses ONLY the mutual-support gate ($\text{between\_strength} \ge \Theta_{\text{ob}}$).
-  - All other guards remain strictly mandatory: live status, cooldown ($T_c = 200$), capacity ($K_{\text{max}} = 16$), Jaccard ($1.0 \ge 0.80$), cell membership limits ($M_{\text{live}} \le 12$), keep guards.
+  - Bypasses ONLY the mutual-support gate ($\text{between\_strength} \ge \Theta_{\text{ob}} = 0.40$).
+  - All other guards remain strictly mandatory: live status, cooldown ($T_c = 200$), capacity ($K_{\text{max}} = 16$), Jaccard ($1.0 \ge \Theta_{\text{merge}} = 0.70$), cell membership limits ($M_{\text{live}} \le 12$), keep guards.
   - Non-identical pairs evaluate under unchanged frozen Branch 4b rules.
   - Lower-ID survivor convention $\min(a, b)$ is preserved.
 
@@ -171,6 +182,8 @@ The following matrix documents the complete reconciliation across all affected d
 | **Merge Failure Semantics:** Any merge validation failure triggers full transaction abort. | `assembly.py`: merge ineligibility returns `False`; pipeline continues to next pair. | Differentiated ordinary ineligibility (`return False`) from exceptional abort. | EXP-B02-07, EXP-B02-NEG-09 | **RECONCILED** |
 | **Pre-Publication Abort:** Abort restores 100% pre-BEGIN state. | R2-A01 transaction law: sensory states committed during `OPEN` are preserved. | Shadow state discarded; legal `OPEN` sensory state preserved. | EXP-B02-07 | **RECONCILED** |
 | **Readout Failure Code:** Decoder emits `StatusCode.UNATTESTED_READOUT`. | `generator.py` & `readout_ledger.py`: maps `READOUT_UNKNOWN` to `GEN_STOP_READOUT_UNKNOWN`. | Code `UNATTESTED_READOUT` removed; mapped to `GEN_STOP_READOUT_UNKNOWN`. | EXP-B02-04 | **RECONCILED** |
+| **Root 56 Ambiguity Code:** Labeled as `StatusCode.READOUT_AMBIGUOUS`. | `generator.py` neural evaluator: returns `StatusCode.AMBIGUOUS` / `StatusCode.GEN_STOP_AMBIGUOUS`. | Corrected to `AMBIGUOUS` / `GEN_STOP_AMBIGUOUS` during neural ranking. | Forensic Baseline | **RECONCILED** |
+| **Merge Parameters:** $\Theta_{\text{merge}} = 0.80, \Theta_{\text{ob}} = 0.35$. | `assembly.py` lines 45–46: $\Theta_{\text{merge}} = 0.70, \Theta_{\text{ob}} = 0.40$. | Restored frozen parameters $\Theta_{\text{merge}} = 0.70, \Theta_{\text{ob}} = 0.40$. | EXP-B02-01, EXP-B02-02 | **RECONCILED** |
 | **Implementation Touchpoint:** Permitted edit in `src/dgca/core/transaction.py`. | Path does not exist; lifecycle transactions reside in `src/dgca/lifecycle/exposure_tx.py`. | Removed nonexistent path; touchpoint strictly confined to `src/dgca/core/assembly.py`. | Implementation Scope | **RECONCILED** |
 | **Snapshot Budget Values:** C04 report listed $B_i = 16, B_i^x = 8$. | Frozen production constants: $B_i = 64, B_i^x = 12$. | Updated C04 report to $B_i = 64, B_i^x = 12$. | C04 Documentation | **RECONCILED** |
 
@@ -190,23 +203,28 @@ The complete DGCA test suite was executed to verify zero regression:
 ```bash
 python -m pytest tests/ -q
 ```
-**Result:** 192 passed in 106.14s.
+**Observed Execution Times:**
+- Execution run 1: 192 passed in 106.14s.
+- Execution run 2 (verification closeout): 192 passed in 72.31s.
 
 ### 4. Forensic Investigation Regression Suite
 The forensic investigation test suite was executed:
 ```bash
 python -m pytest tests/forensics/ -v
 ```
-**Result:** 9 passed in 44.46s.
+**Observed Execution Times:**
+- Execution run 1: 9 passed in 44.46s.
+- Execution run 2 (verification closeout): 9 passed in 26.67s.
 
 ---
 
 ## Final Delivery Summary
 
-1. Updated [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md) to version `2.0.0-normative-reconciled`.
+1. Updated [`R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B02-EXACT-DUPLICATE-CONSOLIDATION-DESIGN-CONTRACT.md) to version `2.1.0-scientific-baseline-reconciled`.
 2. Created [`R2-B02-C01-NORMATIVE-DESIGN-RECONCILIATION.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B02-C01-NORMATIVE-DESIGN-RECONCILIATION.md).
 3. Corrected budget values in [`R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-B01-C04-FINAL-SNAPSHOT-COVERAGE-REPORT.md).
-4. Preserved 100% frozen status of Core specification, production code, and test assets.
+4. Verified remote Git commit SHA `cb8f3cc9689d6afb813f8a6767e80d4faf7ca87d`.
+5. Preserved 100% frozen status of Core specification, production code, and test assets.
 
 ---
 
