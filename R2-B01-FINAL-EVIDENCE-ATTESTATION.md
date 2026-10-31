@@ -94,7 +94,7 @@ All 56 roots recorded in the canonical evidence artifact were subjected to full 
 | Root | Milestone Stimulus Branch | Run A (Untouched Reference) Combined SHA-256 | Run B (Instrumented Observer) Combined SHA-256 | Match |
 |:---:|:---|:---:|:---:|:---:|
 | **01** | Cat AB (`القط يشرب حليب <EOS>`) — Cold Start | `dbe07a73e2cbba9798eb3d4ae698845fd70638ca23d77a835efebb49ccda8220` | `dbe07a73e2cbba9798eb3d4ae698845fd70638ca23d77a835efebb49ccda8220` | **MATCH** |
-| **06** | Eagle DB (`النسر يصيد سمك <EOS>`) — Pre-Formation | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | **MATCH** |
+| **06** | Eagle DB (`النسر يشرب ماء <EOS>`) — Pre-Formation | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | **MATCH** |
 | **07** | Cat AB — Birth of Assemblies 1 & 2 | `8537fae3706092113a8c380b841b6d85820edde01e874cecf4a57d835f2b00bd` | `8537fae3706092113a8c380b841b6d85820edde01e874cecf4a57d835f2b00bd` | **MATCH** |
 | **08** | Eagle DB — Birth of Assemblies 3, 4, 5, 6 | `1589c622b88c5e145c15616443c854ac2f046b5cbed0f7548cf710e98351375d` | `1589c622b88c5e145c15616443c854ac2f046b5cbed0f7548cf710e98351375d` | **MATCH** |
 | **09** | Cat AB — Structural Convergence of Asm 5 & 6 | `f90dd9dd4e19078120744e4c09cfc221877af219fe9af36b234183f49e83682a` | `f90dd9dd4e19078120744e4c09cfc221877af219fe9af36b234183f49e83682a` | **MATCH** |
@@ -157,8 +157,8 @@ All 56 roots recorded in the canonical evidence artifact were subjected to full 
 | Forensic Invariant | Required Specification / Property | Observed Empirical Value | Verdict |
 |:---|:---|:---|:---:|
 | **1. 56/56 Differential Replay Equality** | Untouched Reference (Run A) == Monitored Observer (Run B) | 56/56 component matches, 56/56 combined matches | **PASS** |
-| **2. Exact Formation-Event Attribution** | Passive event birth observation, single-call FORM | Root 8, Event 0, event_order 3 (anchors ط & ي) | **PASS** |
-| **3. Root-Wide FORM Budget** | `theta_create_x` and `theta_create` root-wide limits | Event 0: 7 formed, Event 1: 5 formed (Total: 12) | **PASS** |
+| **2. Exact Formation-Event Attribution** | Passive event birth observation, single-call FORM | Root 8, Event 3 (`<EOS>`), event_order 3 (marker `Marker.EOS`) | **PASS** |
+| **3. Root-Wide FORM Budget** | `theta_create_x` and `theta_create` root-wide limits | Sensitivity Check B: Event 0: 7, Event 1: 5 (Total: 12); Root 8: 4 formed (Events 0, 1, 3) | **PASS** |
 | **4. Isolated Observer Cache** | Merge calculation cache non-interference | Pristine `n_rec_cache` preserved for production call | **PASS** |
 | **5. 49 Total MERGE Evaluations** | Pair (5, 6) evaluated once per root from birth (Root 8) through Root 56 | Exactly 49 evaluations logged across Roots 8–56 | **PASS** |
 | **6. 48 Duplicate MERGE Rejections** | Identical membership post-convergence must reject merge | 48 evaluations (Roots 9–56) with Jaccard=1.0, between_strength=0.0 blocked | **PASS** |

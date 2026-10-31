@@ -196,7 +196,7 @@ $$\mathbf{Autonomous\ Generation\ Stop\ Statuses:\ Cat\ (GEN\_STOP\_EOS)\ \mid\ 
 | Root | Milestone Stimulus Branch | Run A (Untouched Reference) Combined SHA-256 | Run B (Instrumented Observer) Combined SHA-256 | Match |
 |:---:|:---|:---:|:---:|:---:|
 | **01** | Cat AB (`القط يشرب حليب <EOS>`) — Cold Start | `dbe07a73e2cbba9798eb3d4ae698845fd70638ca23d77a835efebb49ccda8220` | `dbe07a73e2cbba9798eb3d4ae698845fd70638ca23d77a835efebb49ccda8220` | **MATCH** |
-| **06** | Eagle DB (`النسر يصيد سمك <EOS>`) — Pre-Formation | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | **MATCH** |
+| **06** | Eagle DB (`النسر يشرب ماء <EOS>`) — Pre-Formation | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | `57006608660d4b3ea35675323499c6b5fbe74dfbac5797c9e62aea8b1bec87b6` | **MATCH** |
 | **07** | Cat AB — Birth of Assemblies 1 & 2 | `8537fae3706092113a8c380b841b6d85820edde01e874cecf4a57d835f2b00bd` | `8537fae3706092113a8c380b841b6d85820edde01e874cecf4a57d835f2b00bd` | **MATCH** |
 | **08** | Eagle DB — Birth of Assemblies 3, 4, 5, 6 | `1589c622b88c5e145c15616443c854ac2f046b5cbed0f7548cf710e98351375d` | `1589c622b88c5e145c15616443c854ac2f046b5cbed0f7548cf710e98351375d` | **MATCH** |
 | **09** | Cat AB — Structural Convergence of Asm 5 & 6 | `f90dd9dd4e19078120744e4c09cfc221877af219fe9af36b234183f49e83682a` | `f90dd9dd4e19078120744e4c09cfc221877af219fe9af36b234183f49e83682a` | **MATCH** |
