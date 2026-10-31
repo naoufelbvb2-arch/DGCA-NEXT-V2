@@ -71,6 +71,8 @@ Direct query of `capture_telemetry(state, ledger, root)` against the authoritati
    - In contrast, the numbers reported in CF-1 Table 4.1 violated these invariants (e.g. Group A Table 4.1: $734 + 345 = 1,079$ total, but $684 + 395 = 1,079$).
 2. **Origin of Error:**
    The discrepancies in CF-1 Table 4.1 arose from an uncommitted draft telemetry capture taken during a multi-task intermediate checkpoint before completion of the 56th root round-robin presentation, or an unpersisted dry-run test snapshot. The actual serialized binary `MachineState` (whose SHA-256 matched R2-C01 identically) was never corrupted. Table 4.1 in [`R2-C01-CF01-MORPHOLOGICAL-COUNTERFACTUAL-REPORT.md`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/R2-C01-CF01-MORPHOLOGICAL-COUNTERFACTUAL-REPORT.md) is now reconciled with ground truth.
+3. **Ledger Row Reconciliation with Historical R2-C01 Report:**
+   The original R2-C01 trial report cited 27 tracked rows (23 attested) at Root 56 and 29 tracked rows (25 attested) at Root 112. Direct deterministic re-execution of the authoritative R2-C01 cold-start runner ([`tools/forensics/run_r2_c01_trial.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/tools/forensics/run_r2_c01_trial.py)) confirms that the actual runtime ledger state contains exactly **31 total candidate rows and 25 attested rows** at Root 56, and **31 total candidate rows and 27 attested rows** at Root 112, exactly matching CF-1 Group A with zero key difference (`keys_cf1 - keys_c01 = set()`). The historical text numbers (27/23 and 29/25) reflected obsolete draft snapshots prior to full acknowledgement.
 
 ---
 
@@ -93,38 +95,38 @@ Purpose: Evaluates end-to-end autonomous sequence generation without external sc
 ### 4.2 Comparative Evaluation at Root 56 and Root 112
 
 #### Table 4.2A: Autonomous Rollout Generation Performance (Protocol B)
-Probing prompts: P1 (`[القط, يشرب]`), P2 (`[الرجل, يشرب]`), P3 (`[الطفل, يأكل]`), P4 (`[الرجل, يأكل]`).
+Probing prompts: P1 (`[القط, يشرب]`), P2 (`[النسر, يشرب]`), P3 (`[الطفل, يأكل]`), P4 (`[الطفل, يشرب]`).
 
 | Checkpoint & Group | Probe | Emitted Sequence | First-Token Outcome | Termination Status | Full Sentence Complete? |
 | :--- | :--- | :--- | :--- | :--- | :---: |
 | **Root 56 — Group A** | P1 | `[]` | `NO_MATCH` | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
-| | P2 | `['الماء']` | Correct (`الماء`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
+| | P2 | `['الماء']` | Correct (`الماء`) | `GEN_STOP_READOUT_UNKNOWN` | **FAIL (0%)** |
 | | P3 | `['التفاح']` | Correct (`التفاح`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
-| | P4 | `['التفاح']` | Correct (`التفاح`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
+| | P4 | `['الماء']` | Correct (`الماء`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
 | **Root 56 — Group B** | P1 | `[]` | `NO_MATCH` | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
 | | P2 | `[]` | `AMBIGUOUS` (Asm 7 vs 9) | `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
 | | P3 | `[]` | `AMBIGUOUS` (Asm 14 vs 17)| `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
-| | P4 | `[]` | `AMBIGUOUS` (Asm 14 vs 17)| `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
+| | P4 | `[]` | `AMBIGUOUS` (Asm 7 vs 9) | `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
 | **Root 112 — Group A**| P1 | `[]` | `NO_MATCH` | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
 | | P2 | `['الماء', 'يأكل', 'التفاح']`| Intrusion Chain | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
 | | P3 | `['التفاح']` | Correct (`التفاح`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
-| | P4 | `['التفاح']` | Correct (`التفاح`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
+| | P4 | `['الماء']` | Correct (`الماء`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
 | **Root 112 — Group B**| P1 | `['حليب']` | Correct (`حليب`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
 | | P2 | `[]` | `AMBIGUOUS` (Asm 7 vs 9) | `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
 | | P3 | `['تفاح']` | Correct (`تفاح`) | `GEN_STOP_NO_MATCH` | **FAIL (0%)** |
-| | P4 | `[]` | `AMBIGUOUS` (Asm 14 vs 17)| `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
+| | P4 | `[]` | `AMBIGUOUS` (Asm 7 vs 9) | `GEN_STOP_AMBIGUOUS` | **FAIL (0%)** |
 
 #### Table 4.2B: Aggregate Outcome Distribution Across Probes (Autonomous Generation)
 
 | Metric | Group A (56) | Group B (56) | Group A (112) | Group B (112) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Correct First-Token Emitted** | 3 / 4 (75%) | 0 / 4 (0%) | 2 / 4 (50%) | 2 / 4 (50%) |
+| **Correct First-Token Emitted** | 3 / 4 (75%) | 0 / 4 (0%) | 3 / 4 (75%) | 2 / 4 (50%) |
 | **Exact Completed Sequences (to `<EOS>`)**| **0 / 4 (0%)** | **0 / 4 (0%)** | **0 / 4 (0%)** | **0 / 4 (0%)** |
 | **GEN_STOP_EOS Count** | **0** | **0** | **0** | **0** |
 | **GEN_STOP_AMBIGUOUS Count** | 0 | 3 | 0 | 2 |
-| **GEN_STOP_NO_MATCH Count** | 4 | 1 | 4 | 2 |
+| **GEN_STOP_NO_MATCH Count** | 3 | 1 | 4 | 2 |
+| **GEN_STOP_READOUT_UNKNOWN Count** | 1 (P2) | 0 | 0 | 0 |
 | **Wrong-Branch Intrusions** | 0 | 0 | 1 (P2) | 0 |
-| **READOUT_UNKNOWN Count** | 0 | 0 | 0 | 0 |
 
 ### 4.3 Reconciliation Finding
 Under autonomous generation, **zero probes achieved full sentence completion** in either group at either checkpoint. 
@@ -153,7 +155,7 @@ Pair 1: Surface 'ماء' (Group B Roots 56 and 112)
 
 Pair 2: Surface 'تفاح' (Group B Roots 56 and 112)
 - Assembly 14: Generation 2, Size = 4 cells  [9334, 9468, 10457, 11289]
-- Assembly 17: Generation 5, Size = 7 cells  [8513, 8961, 10181, 10363, 10457, 10616, 10737, 11830]
+- Assembly 17: Generation 5, Size = 7 cells  [8513, 8961, 10181, 10363, 10616, 10737, 11830]
 - Intersection: 0 cells (DISJOINT: Set A ∩ Set B = ∅)
 - Union: 11 cells (≤ K_MAX = 16)
 - Jaccard Similarity: 0.000000 (< THETA_MERGE = 0.70)
@@ -168,13 +170,13 @@ Pair 2: Surface 'تفاح' (Group B Roots 56 and 112)
 In [`src/dgca/core/readout.py`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/readout.py), readout evaluates candidate scores across all live assembly IDs:
 $$S(A_i) = \frac{\sum_{c \in A_i} \text{gain}(c)}{|A_i|}$$
 
-At Root 56, when probed with `[الرجل, يشرب]`:
-- Assembly 7 (`ماء`): Score = $0.630048$
-- Assembly 9 (`ماء`): Score = $0.621644$
-- Absolute Score Difference: $\Delta = |0.630048 - 0.621644| = 0.008404$
+At Root 56, when probed with `[النسر, يشرب]` or `[الطفل, يشرب]`:
+- Assembly 7 (`ماء`): Score = $0.6302$
+- Assembly 9 (`ماء`): Score = $0.6218$
+- Absolute Score Difference: $\Delta = |0.6302 - 0.6218| = 0.0084$
 - Required Readout Margin: $M_{\text{READ}} = 0.040000$
 
-Because candidate ranking operates strictly over Assembly IDs (preserving `ZERO_SELECTION_LEAKAGE`), the system detected two competing candidates whose margin ($\Delta = 0.008404$) was smaller than $M_{\text{READ}} (0.040000)$. Generation immediately terminated at Step 0 with `GEN_STOP_AMBIGUOUS`.
+Because candidate ranking operates strictly over Assembly IDs (preserving `ZERO_SELECTION_LEAKAGE`), the system detected two competing candidates whose margin ($\Delta = 0.0084$) was smaller than $M_{\text{READ}} (0.040000)$. Generation immediately terminated at Step 0 with `GEN_STOP_AMBIGUOUS`.
 
 **Audit Conclusion:**
 The R2-B03 exact-duplicate assembly merge law correctly rejected merging Assemblies 7 & 9 and 14 & 17 because their Jaccard similarity is $0.000000$ (completely disjoint neural populations). They are true distinct assemblies that happen to map to the same surface string in the peripheral ledger. To resolve this without violating cognitive boundaries or introducing leakage, surface-level readout aggregation or adaptive assembly recruitment must be addressed in subsequent architectural phases.
@@ -183,8 +185,8 @@ The R2-B03 exact-duplicate assembly merge law correctly rejected merging Assembl
 
 ## 6. Task 4 — Causal Intrusion Attribution
 
-In Group A at Root 112, Probe P2 (`[الرجل, يشرب]`) exhibited cross-context lexical intrusion:
-$$\text{الرجل يشرب} \longrightarrow \text{الماء} \longrightarrow \text{يأكل} \longrightarrow \text{التفاح}$$
+In Group A at Root 112, Probe P2 (`[النسر, يشرب]`) exhibited cross-context lexical intrusion:
+$$\text{النسر يشرب} \longrightarrow \text{الماء} \longrightarrow \text{يأكل} \longrightarrow \text{التفاح}$$
 
 In Group B, no intrusion sequence was observed. This audit formally separates the causal factors:
 
@@ -192,7 +194,7 @@ In Group B, no intrusion sequence was observed. This audit formally separates th
 1. **Absence of the Original Associative Pathway (Structural Elimination):**
    In Group A, `الماء` contained fixed-support prefix cells (`8416, 8575, 8586`), which formed strong associative projections to Assembly 9 (`يأكل`). In Group B, `ماء` lacks prefix cells and shares 0 committed cells with `الطفل`. Direct synaptic audit confirms that in Group B, **zero synapses exist from `ماء` to `يأكل`**.
 2. **Post-Object Causal Probe (Neural Readiness):**
-   When probed conditionally with `[الرجل, يشرب, ماء]`:
+   When probed conditionally with `[النسر, يشرب, ماء]`:
    - Top candidate: Assembly 1 (`<EOS>`), Score = $0.462583$
    - Runner up: Assembly 3 (`<EOS>`), Score = $0.390735$
    - Assembly 5 (`يشرب`): Score = $0.000000$
@@ -201,7 +203,7 @@ In Group B, no intrusion sequence was observed. This audit formally separates th
    - Assembly 8 (`الطفل`): Score = $0.000000$
    - **`يأكل` assemblies:** Projection Score = **$0.000000$** (completely inactive).
 3. **Execution Gating in Autonomous Rollout:**
-   In autonomous generation from `[الرجل, يشرب]`, Group B halted at Step 0 with `GEN_STOP_AMBIGUOUS` (Assembly 7 vs 9). The model never transitioned to Step 1.
+   In autonomous generation from `[النسر, يشرب]`, Group B halted at Step 0 with `GEN_STOP_AMBIGUOUS` (Assembly 7 vs 9). The model never transitioned to Step 1.
 
 **Audit Conclusion:**
 The absence of intrusion in Group B is verified structurally: the neural pathway linking `ماء` to `يأكل` is absent. However, the absence of emitted intrusion during autonomous generation was also execution-gated by the Step-0 ambiguity halt. Therefore, the disappearance of intrusion cannot be cited as evidence of successful context retention in autonomous rollouts.
@@ -241,7 +243,7 @@ The 30-test figure cited in prior notes represented only the focused forensic su
 | :--- | :---: | :---: | :--- |
 | **Mechanistic EOS Effect** | PASS | **PASS** | Stripping `^ال` eliminates premature predictive saturation ($P^T=0, A^+=0$) and restores post-object differential gain ($0.518 > 0.08$) and margin ($0.081 > 0.04$) under conditional post-object probe. |
 | **End-to-End Generation** | PASS *(Conflated)* | **FAIL** | 0% full-sentence autonomous completion across all probes in both groups due to Step-0 duplicate ambiguity and Step-1 candidate starvation. |
-| **Context Retention** | PASS | **PARTIAL** | No cross-branch lexical substitution occurred (milk was never emitted after `الرجل`), but autonomous rollouts halted at Step 0, preventing open-loop sequence retention testing. |
+| **Context Retention** | PASS | **PARTIAL** | No cross-branch lexical substitution occurred (milk was never emitted after `النسر` or `الطفل`), but autonomous rollouts halted at Step 0, preventing open-loop sequence retention testing. |
 | **Duplicate Assembly Competition**| NOT AUDITED | **PASS (PROVEN)** | Assemblies 7 & 9 (`ماء`) and 14 & 17 (`تفاح`) are disjoint clusters ($J=0.00$) competing for readout without surface-level grouping, proving the ambiguity halt mechanism. |
 | **Weak-Branch Candidate Pruning** | PASS | **PASS (PROVEN)** | Root 30 pruning confirmed in both groups identically due to fixed $W_{\text{conf}}=100$ deadline under 25% branch presentation frequency. |
 | **Intrusion Suppression** | PASS | **PARTIAL** | The associative pathway from `ماء` to `يأكل` is structurally eliminated (0 synapses), but autonomous suppression is co-dependent on Step-0 rollout abortion. |
