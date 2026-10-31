@@ -1,0 +1,2107 @@
+{
+  "group_a": {
+    "name": "Group A (Two Contexts)",
+    "corpus": {
+      "S1": "القط يشرب حليب",
+      "S2": "النسر يشرب ماء",
+      "S3": "الطفل يأكل تفاح",
+      "S4": "الطفل يشرب ماء"
+    },
+    "assemblies": {
+      "1": {
+        "birth_root": 7,
+        "birth_sentence": "S3",
+        "surface": "<EOS>",
+        "founding_cells": [
+          8728,
+          10417,
+          11859
+        ],
+        "grow_events": [
+          {
+            "root_id": 8,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              12117
+            ],
+            "members_after": [
+              8728,
+              10417,
+              11859,
+              12117
+            ]
+          },
+          {
+            "root_id": 23,
+            "sentence_key": "S3",
+            "from_gen": 2,
+            "to_gen": 3,
+            "added_cells": [
+              8834
+            ],
+            "members_after": [
+              8728,
+              8834,
+              10417,
+              11859,
+              12117
+            ]
+          }
+        ],
+        "members_at_112": [
+          8728,
+          8834,
+          10417,
+          11859,
+          12117
+        ],
+        "generation_at_112": 3
+      },
+      "2": {
+        "birth_root": 8,
+        "birth_sentence": "S4",
+        "surface": "UNATTESTED",
+        "founding_cells": [
+          8416,
+          8575,
+          10899
+        ],
+        "grow_events": [
+          {
+            "root_id": 9,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              8586
+            ],
+            "members_after": [
+              8416,
+              8575,
+              8586,
+              10899
+            ]
+          },
+          {
+            "root_id": 19,
+            "sentence_key": "S3",
+            "from_gen": 2,
+            "to_gen": 9,
+            "added_cells": [
+              9007,
+              9178,
+              9618,
+              10220,
+              10704,
+              10933,
+              12044
+            ],
+            "members_after": [
+              8416,
+              8575,
+              8586,
+              9007,
+              9178,
+              9618,
+              10220,
+              10704,
+              10899,
+              10933,
+              12044
+            ]
+          },
+          {
+            "root_id": 20,
+            "sentence_key": "S4",
+            "from_gen": 9,
+            "to_gen": 10,
+            "added_cells": [
+              8420
+            ],
+            "members_after": [
+              8416,
+              8420,
+              8575,
+              8586,
+              9007,
+              9178,
+              9618,
+              10220,
+              10704,
+              10899,
+              10933,
+              12044
+            ]
+          }
+        ],
+        "members_at_112": [
+          8416,
+          8420,
+          8575,
+          8586,
+          9007,
+          9178,
+          9618,
+          10220,
+          10704,
+          10899,
+          10933,
+          12044
+        ],
+        "generation_at_112": 10
+      },
+      "3": {
+        "birth_root": 8,
+        "birth_sentence": "S4",
+        "surface": "<EOS>",
+        "founding_cells": [
+          8834,
+          9209,
+          10570
+        ],
+        "grow_events": [
+          {
+            "root_id": 9,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 7,
+            "added_cells": [
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ],
+            "members_after": [
+              8834,
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ]
+          },
+          {
+            "root_id": 10,
+            "sentence_key": "S2",
+            "from_gen": 7,
+            "to_gen": 8,
+            "added_cells": [
+              12117
+            ],
+            "members_after": [
+              8834,
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116,
+              12117
+            ]
+          }
+        ],
+        "members_at_112": [
+          8834,
+          9209,
+          10570,
+          10646,
+          10915,
+          11153,
+          11583,
+          12116,
+          12117
+        ],
+        "generation_at_112": 8
+      },
+      "4": {
+        "birth_root": 8,
+        "birth_sentence": "S4",
+        "surface": "UNATTESTED",
+        "founding_cells": [
+          10646,
+          10915,
+          11153
+        ],
+        "grow_events": [
+          {
+            "root_id": 9,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 7,
+            "added_cells": [
+              8834,
+              9209,
+              10570,
+              11583,
+              12116
+            ],
+            "members_after": [
+              8834,
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ]
+          }
+        ],
+        "members_at_112": [
+          8834,
+          9209,
+          10570,
+          10646,
+          10915,
+          11153,
+          11583,
+          12116
+        ],
+        "generation_at_112": 7
+      },
+      "5": {
+        "birth_root": 9,
+        "birth_sentence": "S1",
+        "surface": "يشرب",
+        "founding_cells": [
+          8327,
+          9005,
+          10167
+        ],
+        "grow_events": [
+          {
+            "root_id": 10,
+            "sentence_key": "S2",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              10696
+            ],
+            "members_after": [
+              8327,
+              9005,
+              10167,
+              10696
+            ]
+          }
+        ],
+        "members_at_112": [
+          8327,
+          9005,
+          10167,
+          10696
+        ],
+        "generation_at_112": 2
+      },
+      "6": {
+        "birth_root": 10,
+        "birth_sentence": "S2",
+        "surface": "يشرب",
+        "founding_cells": [
+          9669,
+          11119,
+          12123
+        ],
+        "grow_events": [
+          {
+            "root_id": 11,
+            "sentence_key": "S3",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              11195,
+              11784,
+              11807,
+              12241
+            ],
+            "members_after": [
+              9669,
+              11119,
+              11195,
+              11784,
+              11807,
+              12123,
+              12241
+            ]
+          },
+          {
+            "root_id": 41,
+            "sentence_key": "S1",
+            "from_gen": 5,
+            "to_gen": 7,
+            "added_cells": [
+              8651,
+              11663
+            ],
+            "members_after": [
+              8651,
+              9669,
+              11119,
+              11195,
+              11663,
+              11784,
+              11807,
+              12123,
+              12241
+            ]
+          }
+        ],
+        "members_at_112": [
+          8651,
+          9669,
+          11119,
+          11195,
+          11663,
+          11784,
+          11807,
+          12123,
+          12241
+        ],
+        "generation_at_112": 7
+      },
+      "7": {
+        "birth_root": 14,
+        "birth_sentence": "S2",
+        "surface": "ماء",
+        "founding_cells": [
+          8242,
+          9854,
+          11638
+        ],
+        "grow_events": [
+          {
+            "root_id": 15,
+            "sentence_key": "S3",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11984
+            ],
+            "members_after": [
+              8242,
+              9854,
+              11638,
+              11984
+            ]
+          }
+        ],
+        "members_at_112": [
+          8242,
+          9854,
+          11638,
+          11984
+        ],
+        "generation_at_112": 2
+      },
+      "8": {
+        "birth_root": 15,
+        "birth_sentence": "S3",
+        "surface": "الطفل",
+        "founding_cells": [
+          8958,
+          10326,
+          11140
+        ],
+        "grow_events": [
+          {
+            "root_id": 16,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11370
+            ],
+            "members_after": [
+              8958,
+              10326,
+              11140,
+              11370
+            ]
+          }
+        ],
+        "members_at_112": [
+          8958,
+          10326,
+          11140,
+          11370
+        ],
+        "generation_at_112": 2
+      },
+      "9": {
+        "birth_root": 16,
+        "birth_sentence": "S4",
+        "surface": "ماء",
+        "founding_cells": [
+          8809,
+          9740,
+          10634
+        ],
+        "grow_events": [
+          {
+            "root_id": 17,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              9734,
+              10044,
+              10308,
+              11193
+            ],
+            "members_after": [
+              8809,
+              9734,
+              9740,
+              10044,
+              10308,
+              10634,
+              11193
+            ]
+          }
+        ],
+        "members_at_112": [
+          8809,
+          9734,
+          9740,
+          10044,
+          10308,
+          10634,
+          11193
+        ],
+        "generation_at_112": 5
+      },
+      "10": {
+        "birth_root": 25,
+        "birth_sentence": "S1",
+        "surface": "القط",
+        "founding_cells": [
+          9061,
+          10595,
+          11077
+        ],
+        "grow_events": [
+          {
+            "root_id": 26,
+            "sentence_key": "S2",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11811
+            ],
+            "members_after": [
+              9061,
+              10595,
+              11077,
+              11811
+            ]
+          }
+        ],
+        "members_at_112": [
+          9061,
+          10595,
+          11077,
+          11811
+        ],
+        "generation_at_112": 2
+      },
+      "11": {
+        "birth_root": 25,
+        "birth_sentence": "S1",
+        "surface": "حليب",
+        "founding_cells": [
+          9319,
+          9325,
+          11220
+        ],
+        "grow_events": [
+          {
+            "root_id": 29,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              10903
+            ],
+            "members_after": [
+              9319,
+              9325,
+              10903,
+              11220
+            ]
+          }
+        ],
+        "members_at_112": [
+          9319,
+          9325,
+          10903,
+          11220
+        ],
+        "generation_at_112": 2
+      },
+      "12": {
+        "birth_root": 26,
+        "birth_sentence": "S2",
+        "surface": "النسر",
+        "founding_cells": [
+          9205,
+          9369,
+          9487
+        ],
+        "grow_events": [
+          {
+            "root_id": 30,
+            "sentence_key": "S2",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              8589
+            ],
+            "members_after": [
+              8589,
+              9205,
+              9369,
+              9487
+            ]
+          }
+        ],
+        "members_at_112": [
+          8589,
+          9205,
+          9369,
+          9487
+        ],
+        "generation_at_112": 2
+      },
+      "13": {
+        "birth_root": 27,
+        "birth_sentence": "S3",
+        "surface": "يأكل",
+        "founding_cells": [
+          9103,
+          9201,
+          10087
+        ],
+        "grow_events": [
+          {
+            "root_id": 28,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11942
+            ],
+            "members_after": [
+              9103,
+              9201,
+              10087,
+              11942
+            ]
+          },
+          {
+            "root_id": 55,
+            "sentence_key": "S3",
+            "from_gen": 2,
+            "to_gen": 3,
+            "added_cells": [
+              10318
+            ],
+            "members_after": [
+              9103,
+              9201,
+              10087,
+              10318,
+              11942
+            ]
+          }
+        ],
+        "members_at_112": [
+          9103,
+          9201,
+          10087,
+          10318,
+          11942
+        ],
+        "generation_at_112": 3
+      },
+      "14": {
+        "birth_root": 27,
+        "birth_sentence": "S3",
+        "surface": "تفاح",
+        "founding_cells": [
+          9334,
+          9468,
+          10457
+        ],
+        "grow_events": [
+          {
+            "root_id": 28,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11289
+            ],
+            "members_after": [
+              9334,
+              9468,
+              10457,
+              11289
+            ]
+          }
+        ],
+        "members_at_112": [
+          9334,
+          9468,
+          10457,
+          11289
+        ],
+        "generation_at_112": 2
+      },
+      "15": {
+        "birth_root": 29,
+        "birth_sentence": "S1",
+        "surface": "حليب",
+        "founding_cells": [
+          9183,
+          11191,
+          11463
+        ],
+        "grow_events": [],
+        "members_at_112": [
+          9183,
+          11191,
+          11463
+        ],
+        "generation_at_112": 1
+      },
+      "16": {
+        "birth_root": 31,
+        "birth_sentence": "S3",
+        "surface": "يأكل",
+        "founding_cells": [
+          10318,
+          11641,
+          11782
+        ],
+        "grow_events": [
+          {
+            "root_id": 32,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11961
+            ],
+            "members_after": [
+              10318,
+              11641,
+              11782,
+              11961
+            ]
+          },
+          {
+            "root_id": 91,
+            "sentence_key": "S3",
+            "from_gen": 2,
+            "to_gen": 3,
+            "added_cells": [
+              9201
+            ],
+            "members_after": [
+              9201,
+              10318,
+              11641,
+              11782,
+              11961
+            ]
+          }
+        ],
+        "members_at_112": [
+          9201,
+          10318,
+          11641,
+          11782,
+          11961
+        ],
+        "generation_at_112": 3
+      },
+      "17": {
+        "birth_root": 31,
+        "birth_sentence": "S3",
+        "surface": "تفاح",
+        "founding_cells": [
+          8513,
+          10363,
+          10616
+        ],
+        "grow_events": [
+          {
+            "root_id": 32,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              8961,
+              10181,
+              10737,
+              11830
+            ],
+            "members_after": [
+              8513,
+              8961,
+              10181,
+              10363,
+              10616,
+              10737,
+              11830
+            ]
+          }
+        ],
+        "members_at_112": [
+          8513,
+          8961,
+          10181,
+          10363,
+          10616,
+          10737,
+          11830
+        ],
+        "generation_at_112": 5
+      }
+    },
+    "probes_56": {
+      "P_eagle_drink (النسر يشرب)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.630178,
+        "margin": 0.008404,
+        "ranked_candidates": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.630178,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.621774,
+            "size": 7
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.140937,
+            "size": 4
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.132237,
+            "size": 3
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          }
+        ]
+      },
+      "P_child_drink (الطفل يشرب)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.630196,
+        "margin": 0.008426,
+        "ranked_candidates": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.630196,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.621769,
+            "size": 7
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.234597,
+            "size": 3
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.227311,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          }
+        ]
+      },
+      "P_child_eat (الطفل يأكل)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.476088,
+        "margin": 0.014596,
+        "ranked_candidates": [
+          {
+            "assembly_id": 17,
+            "generation": 5,
+            "surface": "تفاح",
+            "score": 0.476088,
+            "size": 7
+          },
+          {
+            "assembly_id": 14,
+            "generation": 2,
+            "surface": "تفاح",
+            "score": 0.461492,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 3,
+            "generation": 8,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 9
+          },
+          {
+            "assembly_id": 5,
+            "generation": 2,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 4
+          }
+        ]
+      }
+    },
+    "probes_112": {
+      "P_eagle_drink (النسر يشرب)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.565988,
+        "margin": 0.00728,
+        "ranked_candidates": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.565988,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.558708,
+            "size": 7
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.078261,
+            "size": 4
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.049571,
+            "size": 3
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          }
+        ]
+      },
+      "P_child_drink (الطفل يشرب)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.565976,
+        "margin": 0.007282,
+        "ranked_candidates": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.565976,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.558695,
+            "size": 7
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.18209,
+            "size": 4
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.135479,
+            "size": 3
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          }
+        ]
+      },
+      "P_child_eat (الطفل يأكل)": {
+        "stop_status": "GEN_STOP_MAX_LEN",
+        "readout_status": "OK",
+        "top_score": 0.468219,
+        "margin": 0.048723,
+        "ranked_candidates": [
+          {
+            "assembly_id": 17,
+            "generation": 5,
+            "surface": "تفاح",
+            "score": 0.468219,
+            "size": 7
+          },
+          {
+            "assembly_id": 14,
+            "generation": 2,
+            "surface": "تفاح",
+            "score": 0.419496,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 3,
+            "generation": 8,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 9
+          },
+          {
+            "assembly_id": 5,
+            "generation": 2,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 4
+          }
+        ]
+      }
+    }
+  },
+  "group_b": {
+    "name": "Group B (Repeated Single Context)",
+    "corpus": {
+      "S1": "القط يشرب حليب",
+      "S2": "النسر يشرب ماء",
+      "S3": "الطفل يأكل تفاح",
+      "S4": "النسر يشرب ماء"
+    },
+    "assemblies": {
+      "1": {
+        "birth_root": 7,
+        "birth_sentence": "S3",
+        "surface": "<EOS>",
+        "founding_cells": [
+          8728,
+          10417,
+          11859
+        ],
+        "grow_events": [
+          {
+            "root_id": 8,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              12117
+            ],
+            "members_after": [
+              8728,
+              10417,
+              11859,
+              12117
+            ]
+          },
+          {
+            "root_id": 21,
+            "sentence_key": "S1",
+            "from_gen": 2,
+            "to_gen": 3,
+            "added_cells": [
+              8834
+            ],
+            "members_after": [
+              8728,
+              8834,
+              10417,
+              11859,
+              12117
+            ]
+          },
+          {
+            "root_id": 38,
+            "sentence_key": "S2",
+            "from_gen": 3,
+            "to_gen": 10,
+            "added_cells": [
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ],
+            "members_after": [
+              8728,
+              8834,
+              9209,
+              10417,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              11859,
+              12116,
+              12117
+            ]
+          }
+        ],
+        "members_at_112": [
+          8728,
+          8834,
+          9209,
+          10417,
+          10570,
+          10646,
+          10915,
+          11153,
+          11583,
+          11859,
+          12116,
+          12117
+        ],
+        "generation_at_112": 10
+      },
+      "2": {
+        "birth_root": 8,
+        "birth_sentence": "S4",
+        "surface": "UNATTESTED",
+        "founding_cells": [
+          8416,
+          8575,
+          10899
+        ],
+        "grow_events": [
+          {
+            "root_id": 9,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              8586
+            ],
+            "members_after": [
+              8416,
+              8575,
+              8586,
+              10899
+            ]
+          },
+          {
+            "root_id": 16,
+            "sentence_key": "S4",
+            "from_gen": 2,
+            "to_gen": 3,
+            "added_cells": [
+              9411
+            ],
+            "members_after": [
+              8416,
+              8575,
+              8586,
+              9411,
+              10899
+            ]
+          },
+          {
+            "root_id": 18,
+            "sentence_key": "S2",
+            "from_gen": 3,
+            "to_gen": 9,
+            "added_cells": [
+              8530,
+              9240,
+              10258,
+              10397,
+              11191,
+              11921
+            ],
+            "members_after": [
+              8416,
+              8530,
+              8575,
+              8586,
+              9240,
+              9411,
+              10258,
+              10397,
+              10899,
+              11191,
+              11921
+            ]
+          },
+          {
+            "root_id": 20,
+            "sentence_key": "S4",
+            "from_gen": 9,
+            "to_gen": 11,
+            "added_cells": [
+              8589,
+              10698
+            ],
+            "members_after": [
+              8416,
+              8530,
+              8575,
+              8586,
+              8589,
+              9240,
+              9411,
+              10258,
+              10397,
+              10698,
+              10899,
+              11191,
+              11921
+            ]
+          }
+        ],
+        "members_at_112": [
+          8416,
+          8530,
+          8575,
+          8586,
+          8589,
+          9240,
+          9411,
+          10258,
+          10397,
+          10698,
+          10899,
+          11191,
+          11921
+        ],
+        "generation_at_112": 11
+      },
+      "3": {
+        "birth_root": 8,
+        "birth_sentence": "S4",
+        "surface": "<EOS>",
+        "founding_cells": [
+          8834,
+          9209,
+          10570
+        ],
+        "grow_events": [
+          {
+            "root_id": 9,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 7,
+            "added_cells": [
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ],
+            "members_after": [
+              8834,
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ]
+          },
+          {
+            "root_id": 10,
+            "sentence_key": "S2",
+            "from_gen": 7,
+            "to_gen": 8,
+            "added_cells": [
+              12117
+            ],
+            "members_after": [
+              8834,
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116,
+              12117
+            ]
+          }
+        ],
+        "members_at_112": [
+          8834,
+          9209,
+          10570,
+          10646,
+          10915,
+          11153,
+          11583,
+          12116,
+          12117
+        ],
+        "generation_at_112": 8
+      },
+      "4": {
+        "birth_root": 8,
+        "birth_sentence": "S4",
+        "surface": "UNATTESTED",
+        "founding_cells": [
+          10646,
+          10915,
+          11153
+        ],
+        "grow_events": [
+          {
+            "root_id": 9,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 7,
+            "added_cells": [
+              8834,
+              9209,
+              10570,
+              11583,
+              12116
+            ],
+            "members_after": [
+              8834,
+              9209,
+              10570,
+              10646,
+              10915,
+              11153,
+              11583,
+              12116
+            ]
+          }
+        ],
+        "members_at_112": [
+          8834,
+          9209,
+          10570,
+          10646,
+          10915,
+          11153,
+          11583,
+          12116
+        ],
+        "generation_at_112": 7
+      },
+      "5": {
+        "birth_root": 9,
+        "birth_sentence": "S1",
+        "surface": "يشرب",
+        "founding_cells": [
+          8327,
+          9005,
+          10167
+        ],
+        "grow_events": [
+          {
+            "root_id": 10,
+            "sentence_key": "S2",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              10696
+            ],
+            "members_after": [
+              8327,
+              9005,
+              10167,
+              10696
+            ]
+          }
+        ],
+        "members_at_112": [
+          8327,
+          9005,
+          10167,
+          10696
+        ],
+        "generation_at_112": 2
+      },
+      "6": {
+        "birth_root": 10,
+        "birth_sentence": "S2",
+        "surface": "يشرب",
+        "founding_cells": [
+          9669,
+          11119,
+          12123
+        ],
+        "grow_events": [
+          {
+            "root_id": 11,
+            "sentence_key": "S3",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              11195,
+              11784,
+              11807,
+              12241
+            ],
+            "members_after": [
+              9669,
+              11119,
+              11195,
+              11784,
+              11807,
+              12123,
+              12241
+            ]
+          }
+        ],
+        "members_at_112": [
+          9669,
+          11119,
+          11195,
+          11784,
+          11807,
+          12123,
+          12241
+        ],
+        "generation_at_112": 5
+      },
+      "7": {
+        "birth_root": 14,
+        "birth_sentence": "S2",
+        "surface": "النسر",
+        "founding_cells": [
+          9205,
+          9369,
+          9487
+        ],
+        "grow_events": [
+          {
+            "root_id": 16,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              8589
+            ],
+            "members_after": [
+              8589,
+              9205,
+              9369,
+              9487
+            ]
+          }
+        ],
+        "members_at_112": [
+          8589,
+          9205,
+          9369,
+          9487
+        ],
+        "generation_at_112": 2
+      },
+      "8": {
+        "birth_root": 14,
+        "birth_sentence": "S2",
+        "surface": "ماء",
+        "founding_cells": [
+          8242,
+          9854,
+          11638
+        ],
+        "grow_events": [
+          {
+            "root_id": 15,
+            "sentence_key": "S3",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11984
+            ],
+            "members_after": [
+              8242,
+              9854,
+              11638,
+              11984
+            ]
+          }
+        ],
+        "members_at_112": [
+          8242,
+          9854,
+          11638,
+          11984
+        ],
+        "generation_at_112": 2
+      },
+      "9": {
+        "birth_root": 16,
+        "birth_sentence": "S4",
+        "surface": "ماء",
+        "founding_cells": [
+          8809,
+          9740,
+          10634
+        ],
+        "grow_events": [
+          {
+            "root_id": 17,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              9734,
+              10044,
+              10308,
+              11193
+            ],
+            "members_after": [
+              8809,
+              9734,
+              9740,
+              10044,
+              10308,
+              10634,
+              11193
+            ]
+          }
+        ],
+        "members_at_112": [
+          8809,
+          9734,
+          9740,
+          10044,
+          10308,
+          10634,
+          11193
+        ],
+        "generation_at_112": 5
+      },
+      "10": {
+        "birth_root": 25,
+        "birth_sentence": "S1",
+        "surface": "القط",
+        "founding_cells": [
+          9061,
+          10595,
+          11077
+        ],
+        "grow_events": [
+          {
+            "root_id": 26,
+            "sentence_key": "S2",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11811
+            ],
+            "members_after": [
+              9061,
+              10595,
+              11077,
+              11811
+            ]
+          }
+        ],
+        "members_at_112": [
+          9061,
+          10595,
+          11077,
+          11811
+        ],
+        "generation_at_112": 2
+      },
+      "11": {
+        "birth_root": 25,
+        "birth_sentence": "S1",
+        "surface": "حليب",
+        "founding_cells": [
+          9319,
+          9325,
+          11220
+        ],
+        "grow_events": [
+          {
+            "root_id": 29,
+            "sentence_key": "S1",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11191
+            ],
+            "members_after": [
+              9319,
+              9325,
+              11191,
+              11220
+            ]
+          }
+        ],
+        "members_at_112": [
+          9319,
+          9325,
+          11191,
+          11220
+        ],
+        "generation_at_112": 2
+      },
+      "12": {
+        "birth_root": 27,
+        "birth_sentence": "S3",
+        "surface": "الطفل",
+        "founding_cells": [
+          8958,
+          10326,
+          11140
+        ],
+        "grow_events": [
+          {
+            "root_id": 28,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11370
+            ],
+            "members_after": [
+              8958,
+              10326,
+              11140,
+              11370
+            ]
+          }
+        ],
+        "members_at_112": [
+          8958,
+          10326,
+          11140,
+          11370
+        ],
+        "generation_at_112": 2
+      },
+      "13": {
+        "birth_root": 27,
+        "birth_sentence": "S3",
+        "surface": "يأكل",
+        "founding_cells": [
+          9103,
+          9201,
+          10087
+        ],
+        "grow_events": [
+          {
+            "root_id": 28,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11942
+            ],
+            "members_after": [
+              9103,
+              9201,
+              10087,
+              11942
+            ]
+          },
+          {
+            "root_id": 107,
+            "sentence_key": "S3",
+            "from_gen": 2,
+            "to_gen": 3,
+            "added_cells": [
+              10318
+            ],
+            "members_after": [
+              9103,
+              9201,
+              10087,
+              10318,
+              11942
+            ]
+          }
+        ],
+        "members_at_112": [
+          9103,
+          9201,
+          10087,
+          10318,
+          11942
+        ],
+        "generation_at_112": 3
+      },
+      "14": {
+        "birth_root": 27,
+        "birth_sentence": "S3",
+        "surface": "تفاح",
+        "founding_cells": [
+          9334,
+          9468,
+          10457
+        ],
+        "grow_events": [
+          {
+            "root_id": 28,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 2,
+            "added_cells": [
+              11289
+            ],
+            "members_after": [
+              9334,
+              9468,
+              10457,
+              11289
+            ]
+          }
+        ],
+        "members_at_112": [
+          9334,
+          9468,
+          10457,
+          11289
+        ],
+        "generation_at_112": 2
+      },
+      "15": {
+        "birth_root": 29,
+        "birth_sentence": "S1",
+        "surface": "حليب",
+        "founding_cells": [
+          9183,
+          10903,
+          11463
+        ],
+        "grow_events": [],
+        "members_at_112": [
+          9183,
+          10903,
+          11463
+        ],
+        "generation_at_112": 1
+      },
+      "16": {
+        "birth_root": 31,
+        "birth_sentence": "S3",
+        "surface": "يأكل",
+        "founding_cells": [
+          10318,
+          11641,
+          11782
+        ],
+        "grow_events": [
+          {
+            "root_id": 32,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              8889,
+              10847,
+              11447,
+              11961
+            ],
+            "members_after": [
+              8889,
+              10318,
+              10847,
+              11447,
+              11641,
+              11782,
+              11961
+            ]
+          },
+          {
+            "root_id": 87,
+            "sentence_key": "S3",
+            "from_gen": 5,
+            "to_gen": 6,
+            "added_cells": [
+              12236
+            ],
+            "members_after": [
+              8889,
+              10318,
+              10847,
+              11447,
+              11641,
+              11782,
+              11961,
+              12236
+            ]
+          }
+        ],
+        "members_at_112": [
+          8889,
+          10318,
+          10847,
+          11447,
+          11641,
+          11782,
+          11961,
+          12236
+        ],
+        "generation_at_112": 6
+      },
+      "17": {
+        "birth_root": 31,
+        "birth_sentence": "S3",
+        "surface": "تفاح",
+        "founding_cells": [
+          8513,
+          10363,
+          10616
+        ],
+        "grow_events": [
+          {
+            "root_id": 32,
+            "sentence_key": "S4",
+            "from_gen": 1,
+            "to_gen": 5,
+            "added_cells": [
+              8961,
+              10181,
+              10737,
+              11830
+            ],
+            "members_after": [
+              8513,
+              8961,
+              10181,
+              10363,
+              10616,
+              10737,
+              11830
+            ]
+          }
+        ],
+        "members_at_112": [
+          8513,
+          8961,
+          10181,
+          10363,
+          10616,
+          10737,
+          11830
+        ],
+        "generation_at_112": 5
+      }
+    },
+    "probes_56": {
+      "P_eagle_drink (النسر يشرب)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.628285,
+        "margin": 0.005312,
+        "ranked_candidates": [
+          {
+            "assembly_id": 8,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.628285,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.622972,
+            "size": 7
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.293762,
+            "size": 3
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.044625,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 11,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 13
+          }
+        ]
+      },
+      "P_child_eat (الطفل يأكل)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.479672,
+        "margin": 0.03141,
+        "ranked_candidates": [
+          {
+            "assembly_id": 17,
+            "generation": 5,
+            "surface": "تفاح",
+            "score": 0.479672,
+            "size": 7
+          },
+          {
+            "assembly_id": 14,
+            "generation": 2,
+            "surface": "تفاح",
+            "score": 0.448262,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 11,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 13
+          },
+          {
+            "assembly_id": 3,
+            "generation": 8,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 9
+          },
+          {
+            "assembly_id": 5,
+            "generation": 2,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 4
+          }
+        ]
+      }
+    },
+    "probes_112": {
+      "P_eagle_drink (النسر يشرب)": {
+        "stop_status": "GEN_STOP_AMBIGUOUS",
+        "readout_status": "AMBIGUOUS",
+        "top_score": 0.565323,
+        "margin": 0.004789,
+        "ranked_candidates": [
+          {
+            "assembly_id": 8,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.565323,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.560533,
+            "size": 7
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.204872,
+            "size": 3
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.029557,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 11,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 13
+          }
+        ]
+      },
+      "P_child_eat (الطفل يأكل)": {
+        "stop_status": "GEN_STOP_MAX_LEN",
+        "readout_status": "OK",
+        "top_score": 0.505622,
+        "margin": 0.05923,
+        "ranked_candidates": [
+          {
+            "assembly_id": 17,
+            "generation": 5,
+            "surface": "تفاح",
+            "score": 0.505622,
+            "size": 7
+          },
+          {
+            "assembly_id": 14,
+            "generation": 2,
+            "surface": "تفاح",
+            "score": 0.446392,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 11,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 13
+          },
+          {
+            "assembly_id": 3,
+            "generation": 8,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 9
+          },
+          {
+            "assembly_id": 5,
+            "generation": 2,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 4
+          }
+        ]
+      }
+    }
+  }
+}
