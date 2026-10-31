@@ -1,17 +1,18 @@
 # DGCA NEXT V2 — R2-B02 DESIGN CONTRACT
 
 ## Exact-Duplicate Assembly Consolidation — Formal Design Contract
-### Scientific Baseline Integrity Reconciled under R2-B02-C02
+### Formally Frozen Baseline under R2-B02 Final Freeze
 
 | Parameter | Specification |
 | :--- | :--- |
-| **Document Version** | `2.1.0-scientific-baseline-reconciled` |
+| **Document Version** | `2.2.0-frozen` |
 | **Authoritative Baseline** | `faf361b6b95de6287b466eb1dc524ea49c732635` (`main`) |
 | **Investigation Branch** | `investigation/r2-b01-assembly-forensics` |
-| **Starting HEAD** | `cb8f3cc9689d6afb813f8a6767e80d4faf7ca87d` |
+| **Starting Task HEAD** | `2fc30a10b2afd1e21b6e1a11082120a23ee7f2c0` |
 | **Accepted Forensic Baseline** | `205efa0e664dc26f31f131d5efc19ac37b3eb95d` (R2-B01 Closeout) |
 | **Target Operators** | Core §2.0 Operator 4 (`MERGE`), Core §9.4 (`SurfaceReadoutLedgerV1`), `src/dgca/core/assembly.py` |
-| **Status** | **SCIENTIFIC BASELINE VERIFIED — READY FOR FINAL DESIGN FREEZE** |
+| **Design Identifier** | `DGCA-R2-B02-DESIGN-FROZEN-20261030` |
+| **Status** | **FORMALLY FROZEN — R2-B03 IMPLEMENTATION READY** |
 
 ---
 
@@ -48,8 +49,8 @@ The R2-B01 forensic investigation established the exact physical sequence leadin
 To prevent normative ambiguity, the architecture differentiates four distinct scientific gates:
 1. **Structural Duplicate Elimination:** Core neural operator consolidating identical assemblies into a single survivor ($\min(a, b)$).
 2. **New-Generation Attestation Recovery:** Peripheral ledger requirement that the new structural generation be confirmed by at least two distinct external roots (`MIN_ATTESTED_EXTERNAL_ROOTS = 2`).
-3. **Neural Winner Selection:** Core dynamics selection of the winning assembly based solely on neural activation overlap; zero consultation of peripheral ledger.
-4. **Language Generation Success:** Peripheral emission of grounded surface tokens upon successful attestation resolution.
+3. **Neural Winner Selection:** Core dynamics selection of the winning assembly based solely on neural activation overlap; zero consultation of peripheral ledger. Consolidating $(A_5, A_6)$ ensures only one member of the pair participates, but does not guarantee it defeats other live candidate assemblies.
+4. **Language Generation Success:** Peripheral emission of grounded surface tokens upon successful attestation resolution. Eagle `<EOS>` emission is not an automatic consequence of merging, but requires winning neural ranking and resolving attested surface tokens.
 
 Solving Gate 1 (structural duplicate elimination) is necessary for Gate 4, but does not instantly satisfy Gate 2, Gate 3, or Gate 4 without subsequent qualifying external grounding.
 
@@ -230,10 +231,10 @@ The following table compares the verified frozen baseline with the counterfactua
 | **Root 9 (Cat) MERGE** | MERGE fails ($0.0 < \Theta_{\text{ob}} = 0.40$). Both remain `LIVE` at Gen 6. | Branch 4a triggers. $A_5$ survives ($6 + 1 = 7$); $A_6$ archived ($6 + 1 = 7$). | Core §2.0 Operator 4 (Predicted). |
 | **Root 10 (Eagle) GROW** | Unmodified baseline adds cell `12117` to both. Both become Gen 7 (size 9): `(8834, 9209, 10570, 10646, 10915, 11153, 11583, 12116, 12117)`. | Cell `12117` added to $A_5$. Survivor generation increments: $7 + 1 = 8$ (size 9). Note: $A_6$ is archived and does not grow. | First stable post-merge generation is **Gen 8** (Predicted). |
 | **Root 10 (Eagle) MERGE** | MERGE fails ($0.0 < \Theta_{\text{ob}} = 0.40$). Both remain `LIVE` at Gen 7. | Ineligible ($A_6$ archived; $A_5$ in $T_c = 200$ cooldown). | Cooldown Protection (Predicted). |
-| **Root 10–56 Readout** | Dual identical attractors ($A_5, A_6$) score identically ($S_5 = S_6 = 0.2069442431$); zero score margin in neural ranking triggers `AMBIGUOUS` / `GEN_STOP_AMBIGUOUS` safe-halt. | Single attractor ($A_5$ Gen 8). Unattested until 2 external roots confirm. Fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Collision Eliminated; Attestation Gate Active (Predicted). |
+| **Root 10–56 Readout** | Dual identical attractors ($A_5, A_6$) score identically ($S_5 = S_6 = 0.2069442431$); zero score margin in neural ranking triggers `AMBIGUOUS` / `GEN_STOP_AMBIGUOUS` safe-halt. | Single survivor $A_5$ (Gen 8) remains from duplicate pair. Unattested until 2 external roots confirm. If selected in neural ranking, fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Duplicate Collision Eliminated; Attestation Gate Active (Predicted). |
 | **1st Eligible Ext. Root** | Both fire on `<EOS>`; score tie triggers neural `AMBIGUOUS` safe-halt. | $A_5$ Gen 8 fires on `<EOS>`; ledger records 1st confirmation (`external_count = 1 < 2`). Readout remains fail-closed `GEN_STOP_READOUT_UNKNOWN`. | Attestation Condition 1 Enforced (Predicted). |
 | **2nd Eligible Ext. Root** | Neural ambiguity persists. | $A_5$ Gen 8 fires on `<EOS>`; ledger records 2nd confirmation (`external_count = 2 \ge 2`). $A_5$ Gen 8 becomes **attested**! | `MIN_ATTESTED_EXTERNAL_ROOTS = 2` Satisfied (Predicted). |
-| **Subsequent Readout** | Neural ambiguity persists permanently. | Autonomous generation resolves $A_5$ Gen 8 to `<EOS>` cleanly with positive margin (`StatusCode.OK`). | Readout Recovery Achieved (Predicted). |
+| **Subsequent Readout** | Neural ambiguity persists permanently. | If $A_5$ Gen 8 achieves attestation and wins neural competition against other live candidates, readout resolves to `<EOS>` cleanly with positive margin (`StatusCode.OK`). | Readout Recovery Evaluated Empirically (Predicted). |
 
 > [!NOTE]
 > All counterfactual entries are formally labeled as **PREDICTED**, pending authorization of implementation and verification under R2-B03.
@@ -247,27 +248,30 @@ $$(\text{assembly\_id}, \text{structural\_generation})$$
 
 ```
                 +-------------------------------------------------------+
-                | Consolidation at Root 9 & Growth at Root 10:          |
-                | Root 9: Asm 5 (Gen 6) -> Gen 7; Asm 6 -> Gen 7 (ARCH) |
-                | Root 10: Asm 5 (Gen 7) + cell 12117 -> Gen 8          |
+                | Structural Timeline (Root 8 to Root 10):              |
+                | - Root 8: Asm 5 & 6 born at Gen 1 (Root Close)        |
+                | - Root 9: GROW (Gen 1->6) & MERGE (Gen 6->7) at Close  |
+                | - Root 10: Survivor Asm 5 GROW (Gen 7->8) at Close     |
                 +-------------------------------------------------------+
                                            |
                                            v
         +---------------------------------------------------------------+
-        | Ledger State Post-Root 10:                                    |
-        | - Row (5, 6): Historical pre-merge evidence [STALE]           |
-        | - Row (6, 6): Historical archived-ID evidence [ARCHIVED]       |
-        | - Row (5, 7): Intermediate transient generation [STALE]       |
-        | - Row (5, 8): EMPTY (0 confirmations registered)              |
+        | Ledger State for Key (5, 8) at Root 10 Close:                 |
+        | - Key (5, 8): EMPTY (0 candidate rows, 0 confirmations)       |
+        | - Note: Unstable transient generations (Gen 6, 7) acquired no |
+        |   outbox attestations under Core §9.4 / Outbox stability laws.|
+        | - Any genuine historical rows for prior keys remain immutable |
+        |   but are strictly invalidated for (5, 8) queries.            |
         +---------------------------------------------------------------+
                                            |
                 +--------------------------+----------------------------+
                 |                                                       |
                 v                                                       v
 +------------------------------------+         +------------------------------------+
-| Autonomous Readout Query (Gen 8):  |         | Subsequent External Root 1:        |
-| - Neural winner: Asm 5 (Gen 8)     |         | - Model exposed to root with <EOS> |
-| - Query ledger for key (5, 8)      |         | - Asm 5 (Gen 8) fires on <EOS>     |
+| Readout Query When Asm 5 Wins:     |         | Subsequent External Root 1:        |
+| - Pre-condition: Asm 5 (Gen 8) wins|         | - Model exposed to root with <EOS> |
+|   neural ranking against live asms |         | - Asm 5 (Gen 8) fires on <EOS>     |
+| - Query ledger for key (5, 8)      |         | - Generation stable across root    |
 | - Result: 0 candidate rows         |         | - Outbox emits notification        |
 | - Ledger: StatusCode.READOUT_UNKNOWN|        | - Ledger records Root 1 (count=1)  |
 | - Generator maps failure code:     |         | - Count 1 < 2 -> NOT YET ATTESTED  |
@@ -280,27 +284,32 @@ $$(\text{assembly\_id}, \text{structural\_generation})$$
                                                | - Asm 5 (Gen 8) fires on <EOS>     |
                                                | - Ledger records Root 2 (count=2)  |
                                                | - Count 2 >= 2 -> ATTESTED!        |
-                                               | - Subsequent Readout: SUCCESS (OK) |
+                                               | - If Asm 5 wins neural competition |
+                                               |   in later readout: EMITS <EOS>    |
                                                +------------------------------------+
 ```
 
 ### Invalidation & Safety Laws
 1. **Strict Generation Invalidation:**
-   Old-generation attestations (Gen 6 or 7) must **never** be matched for new-generation queries (Gen 8):
+   Old-generation attestations must **never** be matched for new-generation queries (Gen 8):
    $$\text{get\_candidate\_rows}(5, 8) \equiv ()$$
-   Even though Assembly 5 had prior evidence for `<EOS>` at Gen 6, that evidence was witnessed on an 8-cell assembly prior to consolidation and subsequent growth. The post-merge entity is a new structural generation.
+   Even if Assembly 5 or other assemblies possessed genuine historical ledger evidence for earlier keys, that evidence was witnessed on a different structural generation. The post-merge entity is a new structural generation.
 2. **Zero Retroactive Witnessing:**
    The surviving assembly cannot backdate or synthesize attestation. An attestation can only be registered when a genuine, live external event activates Assembly 5 at Gen 8.
-3. **No Archived-ID Aliasing:**
-   The readout ledger must **never** resolve an alias from $A_{\text{arch}}$ to $A_{\text{surv}}$:
-   $$\text{Resolve}(6) \ne 5$$
-   Creating an alias violates transactional immutability and corrupts audit trails. Assembly 6 is archived and permanently inert.
+3. **Archived Identity Invariance & No Aliasing:**
+   The peripheral ledger and core neural dynamics strictly enforce archived identity isolation:
+   - **Neural Exclusion:** An archived assembly ($A_{\text{arch}}.\text{status} == \text{ARCHIVED}$) is permanently ineligible for neural candidate selection. It cannot generate activation scores or enter competitive ranking.
+   - **No Alias Resolution:** The readout ledger must **never** resolve an alias from $A_{\text{arch}}$ to $A_{\text{surv}}$ ($\text{Resolve}(6) \ne 5$).
+   - **No Evidence Transfer:** Historical ledger observations recorded for $A_{\text{arch}}$ are never transferred or credited to $A_{\text{surv}}$.
+   - **Evidence Immutability:** Pre-existing historical ledger candidate rows for archived assemblies remain immutable in ledger storage; they are not purged, but cannot be queried by survivor IDs.
+   - **Live Generation Matching:** Readout resolution requires that a candidate assembly be `LIVE` and match its `current_live_generation`.
 4. **Readout Failure Code Mapping:**
-   If autonomous generation queries an unattested winner assembly:
-   - Neural competition selects Assembly 5 as the sole winner based on activation overlap.
-   - Ledger query `resolve_readout(5, 8)` finds zero rows or a single row with `external_count < 2`.
-   - Ledger returns `StatusCode.READOUT_UNKNOWN`.
-   - Generator function [`_map_ledger_failure_to_gen_stop()`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/generator.py#L76-L88) maps this to `StatusCode.GEN_STOP_READOUT_UNKNOWN`.
+   If autonomous generation queries an unattested candidate assembly:
+   - Assembly 5 becomes the sole surviving member of the original duplicate pair. Actual neural winner selection remains subject to competition against all other legal LIVE assemblies.
+   - If Assembly 5 emerges as the top-ranking candidate:
+     - Ledger query `resolve_readout(5, 8)` finds zero rows or a single row with `external_count < 2`.
+     - Ledger returns `StatusCode.READOUT_UNKNOWN`.
+     - Generator function [`_map_ledger_failure_to_gen_stop()`](file:///c:/Users/Laptop/Desktop/DGCA%20NEXT%20V2/src/dgca/core/generator.py#L76-L88) maps this to `StatusCode.GEN_STOP_READOUT_UNKNOWN`.
    - **No fallback to lower-ranked printable assemblies:** Under Core §9.3 and `LG-T12`, peripheral lookup is strictly evaluated on the neural winner. If the winner is unattested, generation halts fail-closed.
 5. **Separation from Neural Ambiguity:**
    Contrast `StatusCode.READOUT_UNKNOWN` (peripheral ledger lacks sufficient confirmations for winner) with `StatusCode.AMBIGUOUS` (neural activation margin between top 2 assemblies is below $M_{\text{read}} = 0.04$). The original Root 56 failure was a neural ranking tie (`StatusCode.AMBIGUOUS`), which duplicate consolidation eliminates structurally.
@@ -366,11 +375,11 @@ The acceptance suite consists of seven primary validation experiments and nine n
 | :--- | :--- | :--- | :--- |
 | **EXP-B02-NEG-01** | Single External Confirmation | Model exposed to exactly 1 external root post-merge. | `external_count = 1 < 2`; ledger lookup returns `READOUT_UNKNOWN`; generator halts with `GEN_STOP_READOUT_UNKNOWN`. |
 | **EXP-B02-NEG-02** | Repeated Observations Within Root | Model witnesses `<EOS>` multiple times within the same external root. | Ledger deduplicates by `root_id`; `len(confirmed_roots) == 1`; attestation rejected. |
-| **EXP-B02-NEG-03** | Old-Generation Evidence Reuse | Readout queried at Gen 8 with pre-existing attestations at Gen 6 or 7. | Strict key mismatch `(5, 8) != (5, 6)`; 0 rows returned; generation invalidation enforced. |
+| **EXP-B02-NEG-03** | Old-Generation Evidence Invalidation | Query readout at Gen 8 against a ledger containing pre-existing historical evidence for an older generation ($g < 8$). | Strict key mismatch `(5, 8) != (5, g)`; 0 candidate rows returned; generation invalidation enforced. |
 | **EXP-B02-NEG-04** | Same-Surface / Differing-Bundle Conflict | Injected conflicting feature bundle for same surface string. | Ledger detects bundle divergence (`LG-T08`); returns `READOUT_AMBIGUOUS_PENDING`; readout halts fail-closed. |
 | **EXP-B02-NEG-05** | Proper Subset Absorption Attempt | Candidate pair with $A \subset B$ ($|A|=4, |B|=5$). | Predicate returns `False`; pair remains unmerged; no subset absorption. |
 | **EXP-B02-NEG-06** | Cooldown Bypass Attempt | Identical pair evaluated while $T_c < 200$ events since last mutation. | Predicate returns `False`; consolidation blocked during cooldown. |
-| **EXP-B02-NEG-07** | Archived-ID Aliasing Attempt | Query peripheral readout for archived ID $A_6$. | Ledger lookup returns empty/unknown; zero alias resolution to $A_5$. |
+| **EXP-B02-NEG-07** | Archived Assembly Governance | Candidate competition and readout query involving archived $A_6$. | (1) Archived $A_6$ strictly excluded from neural candidate ranking; (2) Zero alias resolution from $A_6$ to $A_5$; (3) Zero evidence transfer from $A_6$ to $A_5$; (4) Historical Ledger records for $A_6$ remain immutable when present; (5) Autonomous readout requires legal LIVE assembly at current generation. |
 | **EXP-B02-NEG-08** | Peripheral Selection Leakage | Ledger populated with attestations; evaluate neural winner selection. | Neural competition strictly ignores ledger rows; winner determined solely by continuous activation overlap (`LG-T12`). |
 | **EXP-B02-NEG-09** | Ordinary Ineligibility Pipeline Continuity | Rejected pair in Stage 4. | `_try_merge_pair()` returns `False`; next pair in list is evaluated; transaction does not abort. |
 
@@ -428,9 +437,11 @@ Exact-duplicate consolidation addresses the specific causal defect of identical 
 5. **Attestation Does Not Guarantee Neural Winner Selection:** Even if $A_5$ becomes attested at Gen 8, neural candidate competition is strictly based on continuous activation overlap. Another assembly could achieve a higher score.
 6. **Neural Selection Does Not Guarantee Successful EOS Generation:** Surface emission requires matching markers, valid feature bundles, and uncorrupted envelopes.
 7. **Diverging Historical Surface Risk:** If two structurally identical assemblies historically witnessed different peripheral surfaces, Core consolidation **must not** consult those surfaces to resolve the discrepancy (zero selection leakage). Any loss of printable distinction must be reported faithfully, not hidden by aliasing or artificial evidence blending.
+8. **No Guaranteed Neural Winner Selection:** Consolidating Assemblies 5 and 6 eliminates the score collision between them. However, it does not guarantee that surviving Assembly 5 is the highest-scoring candidate among all legal LIVE assemblies in any given episode.
+9. **No Automatic Eagle EOS Generation Guarantee:** Eagle `<EOS>` emission is not an automatic consequence of merging. It requires that Assembly 5 survive growth, win neural candidate ranking against all other live assemblies, and possess an attested candidate row in the ledger.
 
 ---
 
 ## Final Verdict Declaration
 
-$$\mathbf{R2-B02\ DESIGN\ CONTRACT\ RECONCILED\ \text{—}\ AWAITING\ FINAL\ DESIGN\ FREEZE}$$
+$$\mathbf{R2-B02\ FINAL\ DESIGN\ FROZEN\ \text{—}\ R2-B03\ IMPLEMENTATION\ READY}$$
