@@ -302,6 +302,7 @@ def _run_maintain_stage(
 def _run_grow_stage(
     w: WState,
     n_rec_cache: dict[int, dict[int, float]],
+    target_assembly_ids: Sequence[int] | None = None,
 ) -> list[int]:
     """Stage 2: GROW (Core §2.0 item 2).
 
@@ -312,8 +313,11 @@ def _run_grow_stage(
     and membership cap M_max=12 allows it. Increment structural_generation on each addition.
     """
     grown_ids: list[int] = []
+    target_ids = sorted(w.assemblies.keys()) if target_assembly_ids is None else sorted(target_assembly_ids)
 
-    for aid in sorted(w.assemblies.keys()):
+    for aid in target_ids:
+        if aid not in w.assemblies:
+            continue
         asm = w.assemblies[aid]
         if asm.status != AssemblyStatus.LIVE:
             continue
@@ -716,6 +720,7 @@ def execute_assembly_end_pipeline(
     w: WState,
     h_slow: HSlowState,
     event_results: Sequence[EventExecutionResult],
+    enable_birth_time_grow: bool = False,
 ) -> AssemblyEndReport:
     """Execute one deterministic END_EXPOSURE Assembly pass: MAINTAIN -> GROW -> FORM -> MERGE -> SPLIT (Core §2.0).
 
@@ -735,6 +740,11 @@ def execute_assembly_end_pipeline(
     formed_ids, diagnostics = _run_form_stage(
         w_shadow, h_slow, event_results, preexisting_live, n_rec_cache
     )
+    if enable_birth_time_grow and formed_ids:
+        birth_grown_ids = _run_grow_stage(
+            w_shadow, n_rec_cache, target_assembly_ids=formed_ids
+        )
+        grown_ids = sorted(set(grown_ids) | set(birth_grown_ids))
     merged_pairs = _run_merge_stage(w_shadow, n_rec_cache)
     split_pairs = _run_split_stage(w_shadow, n_rec_cache)
 

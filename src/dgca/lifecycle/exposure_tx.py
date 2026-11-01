@@ -570,6 +570,7 @@ class ExposureTransactionManager:
         min_additional_opportunities: int = 0,
         readout_ledger: object | None = None,
         allow_headless_events: bool = False,
+        enable_birth_time_grow: bool = False,
     ) -> None:
         self.state: MachineState = state
         self.theta_create: float = theta_create
@@ -582,6 +583,7 @@ class ExposureTransactionManager:
         self.min_additional_opportunities: int = min_additional_opportunities
         self.readout_ledger: object | None = readout_ledger
         self.allow_headless_events: bool = allow_headless_events
+        self.enable_birth_time_grow: bool = enable_birth_time_grow
 
         self.open_journal: OpenExposureJournal | None = None
         self._publication_view = TransactionPublicationView(
@@ -1033,6 +1035,7 @@ class ExposureTransactionManager:
                 w_shadow,
                 self.state.H_slow,
                 journal.event_results,
+                enable_birth_time_grow=self.enable_birth_time_grow,
             )
 
         # Step 5.1 (Core §7.6, §11 & R2-A01 Patch 2): Transactional settlement of stale bindings on w_shadow
