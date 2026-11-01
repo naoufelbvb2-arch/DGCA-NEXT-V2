@@ -492,6 +492,7 @@ def _update_coactive_latent_neighborhoods_for_event(
     curr_event: EventExecutionResult,
     prev_event: EventExecutionResult | None,
     protected_in_open_root: set[tuple[int, int]],
+    enable_cross_clique_diversification: bool = False,
 ) -> None:
     """Populate co-active latent neighborhood slots (0..5 intra, 12..17 inter) for active cells (Core §1.3, Encoder §2.1).
 
@@ -532,7 +533,17 @@ def _update_coactive_latent_neighborhoods_for_event(
         prev_peers = [p for p in active_prev if p != cid and p not in same_peers][:3]
         desired_partners = same_peers + prev_peers
 
+        cross_peer = None
+        if enable_cross_clique_diversification:
+            opposite_pool = secondary_curr_clique if cid in top_curr_clique else top_curr_clique
+            cross_candidates = [p for p in opposite_pool if p != cid and p not in desired_partners]
+            if cross_candidates:
+                cross_peer = cross_candidates[0]
+                desired_partners.append(cross_peer)
+
         for partner_id in desired_partners:
+            is_cross = (partner_id == cross_peer)
+            reason = "CROSS_CLIQUE_DIVERSIFICATION" if is_cross else "ORDINARY_COACTIVE"
             if w.latent_table.is_eligible(cid, partner_id):
                 protected_in_open_root.add((cid, partner_id))
                 protected_in_open_root.add((partner_id, cid))
@@ -543,7 +554,7 @@ def _update_coactive_latent_neighborhoods_for_event(
                     partner_id,
                     protected_bidirectional_neighbors=protected,
                     event_clock=w.global_event_clock,
-                    reason="ORDINARY_COACTIVE",
+                    reason=reason,
                 )
                 protected.add(partner_id)
                 protected_in_open_root.add((cid, partner_id))
@@ -571,6 +582,7 @@ class ExposureTransactionManager:
         readout_ledger: object | None = None,
         allow_headless_events: bool = False,
         enable_birth_time_grow: bool = False,
+        enable_cross_clique_diversification: bool = False,
     ) -> None:
         self.state: MachineState = state
         self.theta_create: float = theta_create
@@ -584,6 +596,7 @@ class ExposureTransactionManager:
         self.readout_ledger: object | None = readout_ledger
         self.allow_headless_events: bool = allow_headless_events
         self.enable_birth_time_grow: bool = enable_birth_time_grow
+        self.enable_cross_clique_diversification: bool = enable_cross_clique_diversification
 
         self.open_journal: OpenExposureJournal | None = None
         self._publication_view = TransactionPublicationView(
@@ -883,6 +896,7 @@ class ExposureTransactionManager:
                 ev_result,
                 prev_event,
                 self._protected_open_root_pairs,
+                enable_cross_clique_diversification=self.enable_cross_clique_diversification,
             )
 
         # 4. Generate and stage LINK_PROPOSALs in the OPEN journal

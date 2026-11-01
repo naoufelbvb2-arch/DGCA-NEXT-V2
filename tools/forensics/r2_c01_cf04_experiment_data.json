@@ -1,0 +1,1654 @@
+{
+  "group_a": {
+    "form_events": [
+      {
+        "root_id": 7,
+        "sentence_key": "S3",
+        "assembly_id": 1,
+        "generation": 1,
+        "members": [
+          8728,
+          10417,
+          11859
+        ]
+      },
+      {
+        "root_id": 8,
+        "sentence_key": "S4",
+        "assembly_id": 2,
+        "generation": 1,
+        "members": [
+          8416,
+          8575,
+          10899
+        ]
+      },
+      {
+        "root_id": 8,
+        "sentence_key": "S4",
+        "assembly_id": 3,
+        "generation": 1,
+        "members": [
+          8834,
+          9209,
+          10570
+        ]
+      },
+      {
+        "root_id": 8,
+        "sentence_key": "S4",
+        "assembly_id": 4,
+        "generation": 1,
+        "members": [
+          10646,
+          10915,
+          11153
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 5,
+        "generation": 1,
+        "members": [
+          8327,
+          9005,
+          10167
+        ]
+      },
+      {
+        "root_id": 10,
+        "sentence_key": "S2",
+        "assembly_id": 6,
+        "generation": 1,
+        "members": [
+          9669,
+          11119,
+          12123
+        ]
+      },
+      {
+        "root_id": 14,
+        "sentence_key": "S2",
+        "assembly_id": 7,
+        "generation": 1,
+        "members": [
+          8242,
+          9854,
+          11638
+        ]
+      },
+      {
+        "root_id": 15,
+        "sentence_key": "S3",
+        "assembly_id": 8,
+        "generation": 1,
+        "members": [
+          8958,
+          10326,
+          11140
+        ]
+      },
+      {
+        "root_id": 16,
+        "sentence_key": "S4",
+        "assembly_id": 9,
+        "generation": 1,
+        "members": [
+          8809,
+          9740,
+          10634
+        ]
+      },
+      {
+        "root_id": 25,
+        "sentence_key": "S1",
+        "assembly_id": 10,
+        "generation": 1,
+        "members": [
+          9061,
+          10595,
+          11077
+        ]
+      },
+      {
+        "root_id": 25,
+        "sentence_key": "S1",
+        "assembly_id": 11,
+        "generation": 1,
+        "members": [
+          9319,
+          9325,
+          11220
+        ]
+      },
+      {
+        "root_id": 26,
+        "sentence_key": "S2",
+        "assembly_id": 12,
+        "generation": 1,
+        "members": [
+          9205,
+          9369,
+          9487
+        ]
+      },
+      {
+        "root_id": 27,
+        "sentence_key": "S3",
+        "assembly_id": 13,
+        "generation": 1,
+        "members": [
+          9103,
+          9201,
+          10087
+        ]
+      },
+      {
+        "root_id": 27,
+        "sentence_key": "S3",
+        "assembly_id": 14,
+        "generation": 1,
+        "members": [
+          9334,
+          9468,
+          10457
+        ]
+      },
+      {
+        "root_id": 29,
+        "sentence_key": "S1",
+        "assembly_id": 15,
+        "generation": 1,
+        "members": [
+          9183,
+          11191,
+          11463
+        ]
+      },
+      {
+        "root_id": 31,
+        "sentence_key": "S3",
+        "assembly_id": 16,
+        "generation": 1,
+        "members": [
+          10318,
+          11641,
+          11782
+        ]
+      },
+      {
+        "root_id": 31,
+        "sentence_key": "S3",
+        "assembly_id": 17,
+        "generation": 1,
+        "members": [
+          8513,
+          10363,
+          10616
+        ]
+      }
+    ],
+    "grow_events": [
+      {
+        "root_id": 8,
+        "sentence_key": "S4",
+        "assembly_id": 1,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          12117
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 2,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          8586
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 3,
+        "from_gen": 1,
+        "to_gen": 7,
+        "from_size": 3,
+        "to_size": 8,
+        "added_cells": [
+          10646,
+          10915,
+          11153,
+          11583,
+          12116
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 4,
+        "from_gen": 1,
+        "to_gen": 7,
+        "from_size": 3,
+        "to_size": 8,
+        "added_cells": [
+          8834,
+          9209,
+          10570,
+          11583,
+          12116
+        ]
+      },
+      {
+        "root_id": 10,
+        "sentence_key": "S2",
+        "assembly_id": 3,
+        "from_gen": 7,
+        "to_gen": 8,
+        "from_size": 8,
+        "to_size": 9,
+        "added_cells": [
+          12117
+        ]
+      },
+      {
+        "root_id": 10,
+        "sentence_key": "S2",
+        "assembly_id": 5,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          10696
+        ]
+      },
+      {
+        "root_id": 11,
+        "sentence_key": "S3",
+        "assembly_id": 6,
+        "from_gen": 1,
+        "to_gen": 5,
+        "from_size": 3,
+        "to_size": 7,
+        "added_cells": [
+          11195,
+          11784,
+          11807,
+          12241
+        ]
+      },
+      {
+        "root_id": 15,
+        "sentence_key": "S3",
+        "assembly_id": 7,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11984
+        ]
+      },
+      {
+        "root_id": 16,
+        "sentence_key": "S4",
+        "assembly_id": 8,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11370
+        ]
+      },
+      {
+        "root_id": 17,
+        "sentence_key": "S1",
+        "assembly_id": 9,
+        "from_gen": 1,
+        "to_gen": 5,
+        "from_size": 3,
+        "to_size": 7,
+        "added_cells": [
+          9734,
+          10044,
+          10308,
+          11193
+        ]
+      },
+      {
+        "root_id": 19,
+        "sentence_key": "S3",
+        "assembly_id": 2,
+        "from_gen": 2,
+        "to_gen": 9,
+        "from_size": 4,
+        "to_size": 11,
+        "added_cells": [
+          9007,
+          9178,
+          9618,
+          10220,
+          10704,
+          10933,
+          12044
+        ]
+      },
+      {
+        "root_id": 20,
+        "sentence_key": "S4",
+        "assembly_id": 2,
+        "from_gen": 9,
+        "to_gen": 10,
+        "from_size": 11,
+        "to_size": 12,
+        "added_cells": [
+          8420
+        ]
+      },
+      {
+        "root_id": 23,
+        "sentence_key": "S3",
+        "assembly_id": 1,
+        "from_gen": 2,
+        "to_gen": 3,
+        "from_size": 4,
+        "to_size": 5,
+        "added_cells": [
+          8834
+        ]
+      },
+      {
+        "root_id": 26,
+        "sentence_key": "S2",
+        "assembly_id": 10,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11811
+        ]
+      },
+      {
+        "root_id": 28,
+        "sentence_key": "S4",
+        "assembly_id": 13,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11942
+        ]
+      },
+      {
+        "root_id": 28,
+        "sentence_key": "S4",
+        "assembly_id": 14,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11289
+        ]
+      },
+      {
+        "root_id": 29,
+        "sentence_key": "S1",
+        "assembly_id": 11,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          10903
+        ]
+      },
+      {
+        "root_id": 30,
+        "sentence_key": "S2",
+        "assembly_id": 12,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          8589
+        ]
+      },
+      {
+        "root_id": 32,
+        "sentence_key": "S4",
+        "assembly_id": 16,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11961
+        ]
+      },
+      {
+        "root_id": 32,
+        "sentence_key": "S4",
+        "assembly_id": 17,
+        "from_gen": 1,
+        "to_gen": 5,
+        "from_size": 3,
+        "to_size": 7,
+        "added_cells": [
+          8961,
+          10181,
+          10737,
+          11830
+        ]
+      },
+      {
+        "root_id": 41,
+        "sentence_key": "S1",
+        "assembly_id": 6,
+        "from_gen": 5,
+        "to_gen": 7,
+        "from_size": 7,
+        "to_size": 9,
+        "added_cells": [
+          8651,
+          11663
+        ]
+      },
+      {
+        "root_id": 55,
+        "sentence_key": "S3",
+        "assembly_id": 13,
+        "from_gen": 2,
+        "to_gen": 3,
+        "from_size": 4,
+        "to_size": 5,
+        "added_cells": [
+          10318
+        ]
+      },
+      {
+        "root_id": 91,
+        "sentence_key": "S3",
+        "assembly_id": 16,
+        "from_gen": 2,
+        "to_gen": 3,
+        "from_size": 4,
+        "to_size": 5,
+        "added_cells": [
+          9201
+        ]
+      }
+    ],
+    "state_hashes": {
+      "14": "e8ed6ba87ecf13513d738014941c872d8103dc047ace218e5055d64ae3c46196",
+      "16": "64eac0897b144ec04e1e7ade80441f9dc71c0971beb76d8466f665e37a9f03f8",
+      "27": "e8c70c791cdb689b48d291ff0dd9a14d223545385b43e7a97fb45ceae6370eb7",
+      "31": "fe3e013f325e49c094edc7b92c585a182f095e825086b928ffd1e7a4b11d115a",
+      "56": "19f3a4a24dd1145cf59d317c92f72d79c8207369e9109b61fa00645cf573129d",
+      "112": "56cc7b15a600fa7caaa51c0d1aeeb1e903da04cad3fc5e028724a104284857f0"
+    },
+    "probes_56": {
+      "P1 (القط يشرب)": {
+        "first_step_stop_status": "GEN_STOP_NO_MATCH",
+        "first_step_readout_status": "NO_MATCH",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.049006,
+        "ranked": [
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.049006,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 3,
+            "generation": 8,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 9
+          }
+        ],
+        "full_trajectory": [
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P2 (النسر يشرب)": {
+        "first_step_stop_status": "GEN_STOP_AMBIGUOUS",
+        "first_step_readout_status": "AMBIGUOUS",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.008404,
+        "ranked": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.630178,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.621774,
+            "size": 7
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.140937,
+            "size": 4
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.132237,
+            "size": 3
+          }
+        ],
+        "full_trajectory": [
+          "AMBIGUOUS"
+        ],
+        "full_stop_status": "GEN_STOP_AMBIGUOUS"
+      },
+      "P3 (الطفل يأكل)": {
+        "first_step_stop_status": "GEN_STOP_AMBIGUOUS",
+        "first_step_readout_status": "AMBIGUOUS",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.014596,
+        "ranked": [
+          {
+            "assembly_id": 17,
+            "generation": 5,
+            "surface": "تفاح",
+            "score": 0.476088,
+            "size": 7
+          },
+          {
+            "assembly_id": 14,
+            "generation": 2,
+            "surface": "تفاح",
+            "score": 0.461492,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          }
+        ],
+        "full_trajectory": [
+          "AMBIGUOUS"
+        ],
+        "full_stop_status": "GEN_STOP_AMBIGUOUS"
+      },
+      "P4 (الطفل يشرب)": {
+        "first_step_stop_status": "GEN_STOP_AMBIGUOUS",
+        "first_step_readout_status": "AMBIGUOUS",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.008426,
+        "ranked": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.630196,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.621769,
+            "size": 7
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.234597,
+            "size": 3
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.227311,
+            "size": 4
+          }
+        ],
+        "full_trajectory": [
+          "AMBIGUOUS"
+        ],
+        "full_stop_status": "GEN_STOP_AMBIGUOUS"
+      }
+    },
+    "probes_112": {
+      "P1 (القط يشرب)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 11,
+        "winner_surface": "حليب",
+        "margin": 0.08806,
+        "ranked": [
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.08806,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 3,
+            "generation": 8,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 9
+          }
+        ],
+        "full_trajectory": [
+          "حليب",
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P2 (النسر يشرب)": {
+        "first_step_stop_status": "GEN_STOP_AMBIGUOUS",
+        "first_step_readout_status": "AMBIGUOUS",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.00728,
+        "ranked": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.565988,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.558708,
+            "size": 7
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.078261,
+            "size": 4
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.049571,
+            "size": 3
+          }
+        ],
+        "full_trajectory": [
+          "AMBIGUOUS"
+        ],
+        "full_stop_status": "GEN_STOP_AMBIGUOUS"
+      },
+      "P3 (الطفل يأكل)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 17,
+        "winner_surface": "تفاح",
+        "margin": 0.048723,
+        "ranked": [
+          {
+            "assembly_id": 17,
+            "generation": 5,
+            "surface": "تفاح",
+            "score": 0.468219,
+            "size": 7
+          },
+          {
+            "assembly_id": 14,
+            "generation": 2,
+            "surface": "تفاح",
+            "score": 0.419496,
+            "size": 4
+          },
+          {
+            "assembly_id": 1,
+            "generation": 3,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 5
+          },
+          {
+            "assembly_id": 2,
+            "generation": 10,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 12
+          }
+        ],
+        "full_trajectory": [
+          "تفاح",
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P4 (الطفل يشرب)": {
+        "first_step_stop_status": "GEN_STOP_AMBIGUOUS",
+        "first_step_readout_status": "AMBIGUOUS",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.007282,
+        "ranked": [
+          {
+            "assembly_id": 7,
+            "generation": 2,
+            "surface": "ماء",
+            "score": 0.565976,
+            "size": 4
+          },
+          {
+            "assembly_id": 9,
+            "generation": 5,
+            "surface": "ماء",
+            "score": 0.558695,
+            "size": 7
+          },
+          {
+            "assembly_id": 11,
+            "generation": 2,
+            "surface": "حليب",
+            "score": 0.18209,
+            "size": 4
+          },
+          {
+            "assembly_id": 15,
+            "generation": 1,
+            "surface": "حليب",
+            "score": 0.135479,
+            "size": 3
+          }
+        ],
+        "full_trajectory": [
+          "AMBIGUOUS"
+        ],
+        "full_stop_status": "GEN_STOP_AMBIGUOUS"
+      }
+    }
+  },
+  "group_b": {
+    "form_events": [
+      {
+        "root_id": 7,
+        "sentence_key": "S3",
+        "assembly_id": 1,
+        "generation": 1,
+        "members": [
+          8728,
+          8834,
+          10417
+        ]
+      },
+      {
+        "root_id": 8,
+        "sentence_key": "S4",
+        "assembly_id": 2,
+        "generation": 1,
+        "members": [
+          8416,
+          8575,
+          10899
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 3,
+        "generation": 1,
+        "members": [
+          8327,
+          9005,
+          10167
+        ]
+      },
+      {
+        "root_id": 14,
+        "sentence_key": "S2",
+        "assembly_id": 4,
+        "generation": 1,
+        "members": [
+          8242,
+          9854,
+          11638
+        ]
+      },
+      {
+        "root_id": 15,
+        "sentence_key": "S3",
+        "assembly_id": 5,
+        "generation": 1,
+        "members": [
+          8958,
+          10326,
+          11140
+        ]
+      },
+      {
+        "root_id": 25,
+        "sentence_key": "S1",
+        "assembly_id": 6,
+        "generation": 1,
+        "members": [
+          9319,
+          9325,
+          11191
+        ]
+      },
+      {
+        "root_id": 27,
+        "sentence_key": "S3",
+        "assembly_id": 7,
+        "generation": 1,
+        "members": [
+          9103,
+          9201,
+          10087
+        ]
+      },
+      {
+        "root_id": 27,
+        "sentence_key": "S3",
+        "assembly_id": 8,
+        "generation": 1,
+        "members": [
+          8513,
+          9468,
+          10457
+        ]
+      },
+      {
+        "root_id": 29,
+        "sentence_key": "S1",
+        "assembly_id": 9,
+        "generation": 1,
+        "members": [
+          9061,
+          10595,
+          11077
+        ]
+      },
+      {
+        "root_id": 30,
+        "sentence_key": "S2",
+        "assembly_id": 10,
+        "generation": 1,
+        "members": [
+          9205,
+          9369,
+          9487
+        ]
+      },
+      {
+        "root_id": 31,
+        "sentence_key": "S3",
+        "assembly_id": 11,
+        "generation": 1,
+        "members": [
+          11641,
+          11782,
+          11961
+        ]
+      }
+    ],
+    "grow_events": [
+      {
+        "root_id": 8,
+        "sentence_key": "S4",
+        "assembly_id": 1,
+        "from_gen": 1,
+        "to_gen": 3,
+        "from_size": 3,
+        "to_size": 5,
+        "added_cells": [
+          11859,
+          12117
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 1,
+        "from_gen": 3,
+        "to_gen": 10,
+        "from_size": 5,
+        "to_size": 12,
+        "added_cells": [
+          9209,
+          10570,
+          10646,
+          10915,
+          11153,
+          11583,
+          12116
+        ]
+      },
+      {
+        "root_id": 9,
+        "sentence_key": "S1",
+        "assembly_id": 2,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          8586
+        ]
+      },
+      {
+        "root_id": 10,
+        "sentence_key": "S2",
+        "assembly_id": 3,
+        "from_gen": 1,
+        "to_gen": 3,
+        "from_size": 3,
+        "to_size": 5,
+        "added_cells": [
+          9669,
+          10696
+        ]
+      },
+      {
+        "root_id": 15,
+        "sentence_key": "S3",
+        "assembly_id": 4,
+        "from_gen": 1,
+        "to_gen": 3,
+        "from_size": 3,
+        "to_size": 5,
+        "added_cells": [
+          8809,
+          11984
+        ]
+      },
+      {
+        "root_id": 16,
+        "sentence_key": "S4",
+        "assembly_id": 2,
+        "from_gen": 2,
+        "to_gen": 5,
+        "from_size": 4,
+        "to_size": 7,
+        "added_cells": [
+          8958,
+          9178,
+          9618
+        ]
+      },
+      {
+        "root_id": 16,
+        "sentence_key": "S4",
+        "assembly_id": 5,
+        "from_gen": 1,
+        "to_gen": 3,
+        "from_size": 3,
+        "to_size": 5,
+        "added_cells": [
+          8575,
+          11370
+        ]
+      },
+      {
+        "root_id": 19,
+        "sentence_key": "S3",
+        "assembly_id": 2,
+        "from_gen": 5,
+        "to_gen": 9,
+        "from_size": 7,
+        "to_size": 11,
+        "added_cells": [
+          9007,
+          10220,
+          10704,
+          10933
+        ]
+      },
+      {
+        "root_id": 19,
+        "sentence_key": "S3",
+        "assembly_id": 5,
+        "from_gen": 3,
+        "to_gen": 4,
+        "from_size": 5,
+        "to_size": 6,
+        "added_cells": [
+          10220
+        ]
+      },
+      {
+        "root_id": 20,
+        "sentence_key": "S4",
+        "assembly_id": 2,
+        "from_gen": 9,
+        "to_gen": 11,
+        "from_size": 11,
+        "to_size": 13,
+        "added_cells": [
+          8420,
+          12044
+        ]
+      },
+      {
+        "root_id": 20,
+        "sentence_key": "S4",
+        "assembly_id": 5,
+        "from_gen": 4,
+        "to_gen": 7,
+        "from_size": 6,
+        "to_size": 9,
+        "added_cells": [
+          8416,
+          9178,
+          9618
+        ]
+      },
+      {
+        "root_id": 21,
+        "sentence_key": "S1",
+        "assembly_id": 5,
+        "from_gen": 7,
+        "to_gen": 10,
+        "from_size": 9,
+        "to_size": 12,
+        "added_cells": [
+          8586,
+          9007,
+          10899
+        ]
+      },
+      {
+        "root_id": 26,
+        "sentence_key": "S2",
+        "assembly_id": 6,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11220
+        ]
+      },
+      {
+        "root_id": 28,
+        "sentence_key": "S4",
+        "assembly_id": 7,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11942
+        ]
+      },
+      {
+        "root_id": 28,
+        "sentence_key": "S4",
+        "assembly_id": 8,
+        "from_gen": 1,
+        "to_gen": 3,
+        "from_size": 3,
+        "to_size": 5,
+        "added_cells": [
+          9334,
+          11289
+        ]
+      },
+      {
+        "root_id": 29,
+        "sentence_key": "S1",
+        "assembly_id": 6,
+        "from_gen": 2,
+        "to_gen": 3,
+        "from_size": 4,
+        "to_size": 5,
+        "added_cells": [
+          10903
+        ]
+      },
+      {
+        "root_id": 30,
+        "sentence_key": "S2",
+        "assembly_id": 9,
+        "from_gen": 1,
+        "to_gen": 2,
+        "from_size": 3,
+        "to_size": 4,
+        "added_cells": [
+          11811
+        ]
+      },
+      {
+        "root_id": 31,
+        "sentence_key": "S3",
+        "assembly_id": 7,
+        "from_gen": 2,
+        "to_gen": 3,
+        "from_size": 4,
+        "to_size": 5,
+        "added_cells": [
+          10318
+        ]
+      },
+      {
+        "root_id": 32,
+        "sentence_key": "S4",
+        "assembly_id": 11,
+        "from_gen": 1,
+        "to_gen": 3,
+        "from_size": 3,
+        "to_size": 5,
+        "added_cells": [
+          9103,
+          10318
+        ]
+      },
+      {
+        "root_id": 35,
+        "sentence_key": "S3",
+        "assembly_id": 5,
+        "from_gen": 10,
+        "to_gen": 11,
+        "from_size": 12,
+        "to_size": 13,
+        "added_cells": [
+          10704
+        ]
+      },
+      {
+        "root_id": 37,
+        "sentence_key": "S1",
+        "assembly_id": 6,
+        "from_gen": 3,
+        "to_gen": 5,
+        "from_size": 5,
+        "to_size": 7,
+        "added_cells": [
+          9183,
+          11463
+        ]
+      },
+      {
+        "root_id": 40,
+        "sentence_key": "S4",
+        "assembly_id": 3,
+        "from_gen": 3,
+        "to_gen": 4,
+        "from_size": 5,
+        "to_size": 6,
+        "added_cells": [
+          12241
+        ]
+      },
+      {
+        "root_id": 47,
+        "sentence_key": "S3",
+        "assembly_id": 2,
+        "from_gen": 11,
+        "to_gen": 12,
+        "from_size": 13,
+        "to_size": 14,
+        "added_cells": [
+          10326
+        ]
+      },
+      {
+        "root_id": 47,
+        "sentence_key": "S3",
+        "assembly_id": 7,
+        "from_gen": 3,
+        "to_gen": 7,
+        "from_size": 5,
+        "to_size": 8,
+        "added_cells": [
+          11641,
+          11782,
+          11961
+        ]
+      },
+      {
+        "root_id": 47,
+        "sentence_key": "S3",
+        "assembly_id": 11,
+        "from_gen": 3,
+        "to_gen": 7,
+        "from_size": 5,
+        "to_size": 8,
+        "added_cells": [
+          9201,
+          10087,
+          11942
+        ]
+      },
+      {
+        "root_id": 64,
+        "sentence_key": "S4",
+        "assembly_id": 3,
+        "from_gen": 4,
+        "to_gen": 9,
+        "from_size": 6,
+        "to_size": 11,
+        "added_cells": [
+          8651,
+          11119,
+          11195,
+          11663,
+          12123
+        ]
+      }
+    ],
+    "state_hashes": {
+      "14": "66d8705166c9e7559a1f1df0c0694624a80fbc715b939c4842a438a255de140b",
+      "16": "b47f3dcbd88845ae751654fca018eb0d20459ae0b3c27c105896d32097d42be6",
+      "27": "bb4b9e8272031ad6de1b6fd4d6bdc863b9cb1d38421494e97e6649cbac67231d",
+      "31": "aa49f4d12af69eb9a43e353d547f1ab9c4b2c4b36dc5d3cc97f6e42be696120a",
+      "56": "6ea47e4ece5f0b8ce7efa9fb5c0e65f55bb79a15b4ca1614cc4b9032f4fa13bd",
+      "112": "c43472918698145807c37e8c1e2688e7ddd05a1da07bf27ff1e045c1a656a7d6"
+    },
+    "probes_56": {
+      "P1 (القط يشرب)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 4,
+        "winner_surface": "ماء",
+        "margin": 0.331402,
+        "ranked": [
+          {
+            "assembly_id": 4,
+            "generation": 3,
+            "surface": "ماء",
+            "score": 0.633882,
+            "size": 5
+          },
+          {
+            "assembly_id": 6,
+            "generation": 5,
+            "surface": "حليب",
+            "score": 0.30248,
+            "size": 7
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          }
+        ],
+        "full_trajectory": [
+          "ماء",
+          "<EOS>"
+        ],
+        "full_stop_status": "GEN_STOP_EOS"
+      },
+      "P2 (النسر يشرب)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 4,
+        "winner_surface": "ماء",
+        "margin": 0.505734,
+        "ranked": [
+          {
+            "assembly_id": 4,
+            "generation": 3,
+            "surface": "ماء",
+            "score": 0.634123,
+            "size": 5
+          },
+          {
+            "assembly_id": 6,
+            "generation": 5,
+            "surface": "حليب",
+            "score": 0.128388,
+            "size": 7
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          }
+        ],
+        "full_trajectory": [
+          "ماء",
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P3 (الطفل يأكل)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 8,
+        "winner_surface": "تفاح",
+        "margin": 0.497945,
+        "ranked": [
+          {
+            "assembly_id": 8,
+            "generation": 3,
+            "surface": "تفاح",
+            "score": 0.497945,
+            "size": 5
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          },
+          {
+            "assembly_id": 3,
+            "generation": 4,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 6
+          }
+        ],
+        "full_trajectory": [
+          "تفاح",
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P4 (الطفل يشرب)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 4,
+        "winner_surface": "ماء",
+        "margin": 0.350202,
+        "ranked": [
+          {
+            "assembly_id": 4,
+            "generation": 3,
+            "surface": "ماء",
+            "score": 0.634129,
+            "size": 5
+          },
+          {
+            "assembly_id": 6,
+            "generation": 5,
+            "surface": "حليب",
+            "score": 0.283928,
+            "size": 7
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          }
+        ],
+        "full_trajectory": [
+          "ماء",
+          "<EOS>"
+        ],
+        "full_stop_status": "GEN_STOP_EOS"
+      }
+    },
+    "probes_112": {
+      "P1 (القط يشرب)": {
+        "first_step_stop_status": "GEN_STOP_NO_MATCH",
+        "first_step_readout_status": "NO_MATCH",
+        "winner_assembly_id": null,
+        "winner_surface": "NONE",
+        "margin": 0.026901,
+        "ranked": [
+          {
+            "assembly_id": 6,
+            "generation": 5,
+            "surface": "حليب",
+            "score": 0.026901,
+            "size": 7
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          },
+          {
+            "assembly_id": 3,
+            "generation": 9,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 11
+          }
+        ],
+        "full_trajectory": [
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P2 (النسر يشرب)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 4,
+        "winner_surface": "ماء",
+        "margin": 0.503426,
+        "ranked": [
+          {
+            "assembly_id": 4,
+            "generation": 3,
+            "surface": "ماء",
+            "score": 0.563531,
+            "size": 5
+          },
+          {
+            "assembly_id": 6,
+            "generation": 5,
+            "surface": "حليب",
+            "score": 0.060106,
+            "size": 7
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          }
+        ],
+        "full_trajectory": [
+          "ماء",
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P3 (الطفل يأكل)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 8,
+        "winner_surface": "تفاح",
+        "margin": 0.473636,
+        "ranked": [
+          {
+            "assembly_id": 8,
+            "generation": 3,
+            "surface": "تفاح",
+            "score": 0.473636,
+            "size": 5
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          },
+          {
+            "assembly_id": 3,
+            "generation": 9,
+            "surface": "يشرب",
+            "score": 0.0,
+            "size": 11
+          }
+        ],
+        "full_trajectory": [
+          "تفاح",
+          "NO_MATCH"
+        ],
+        "full_stop_status": "GEN_STOP_NO_MATCH"
+      },
+      "P4 (الطفل يشرب)": {
+        "first_step_stop_status": "GEN_STOP_MAX_LEN",
+        "first_step_readout_status": "OK",
+        "winner_assembly_id": 4,
+        "winner_surface": "ماء",
+        "margin": 0.362959,
+        "ranked": [
+          {
+            "assembly_id": 4,
+            "generation": 3,
+            "surface": "ماء",
+            "score": 0.563523,
+            "size": 5
+          },
+          {
+            "assembly_id": 6,
+            "generation": 5,
+            "surface": "حليب",
+            "score": 0.200564,
+            "size": 7
+          },
+          {
+            "assembly_id": 1,
+            "generation": 10,
+            "surface": "<EOS>",
+            "score": 0.0,
+            "size": 12
+          },
+          {
+            "assembly_id": 2,
+            "generation": 12,
+            "surface": "UNATTESTED",
+            "score": 0.0,
+            "size": 14
+          }
+        ],
+        "full_trajectory": [
+          "ماء",
+          "<EOS>"
+        ],
+        "full_stop_status": "GEN_STOP_EOS"
+      }
+    }
+  }
+}
