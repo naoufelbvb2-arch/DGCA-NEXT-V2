@@ -1,0 +1,714 @@
+{
+  "context_audit": {
+    "56": {
+      "stable_bindings_count": 0,
+      "bindings": []
+    },
+    "57": {
+      "stable_bindings_count": 1,
+      "bindings": [
+        {
+          "binding_id": 8320,
+          "z_cell_id": 8320,
+          "anchor_id": 8327,
+          "status": "ACTIVE",
+          "y_keys_count": 2,
+          "target_cells": [
+            9319,
+            9325
+          ],
+          "p_keys": [
+            [
+              11077,
+              8320,
+              "ASSOCIATIVE"
+            ],
+            [
+              11811,
+              8320,
+              "ASSOCIATIVE"
+            ]
+          ],
+          "anchor_source_set": [
+            8327,
+            8651,
+            9005,
+            9669,
+            10167,
+            10696,
+            10710,
+            11119,
+            11195,
+            11663,
+            11703,
+            11784,
+            11807,
+            12123,
+            12241,
+            12253
+          ]
+        }
+      ]
+    },
+    "60": {
+      "stable_bindings_count": 1,
+      "bindings": [
+        {
+          "binding_id": 8320,
+          "z_cell_id": 8320,
+          "anchor_id": 8327,
+          "status": "ACTIVE",
+          "y_keys_count": 2,
+          "target_cells": [
+            9319,
+            9325
+          ],
+          "p_keys": [
+            [
+              11077,
+              8320,
+              "ASSOCIATIVE"
+            ],
+            [
+              11811,
+              8320,
+              "ASSOCIATIVE"
+            ]
+          ],
+          "anchor_source_set": [
+            8327,
+            8651,
+            9005,
+            9669,
+            10167,
+            10696,
+            10710,
+            11119,
+            11195,
+            11663,
+            11703,
+            11784,
+            11807,
+            12123,
+            12241,
+            12253
+          ]
+        }
+      ]
+    },
+    "64": {
+      "stable_bindings_count": 1,
+      "bindings": [
+        {
+          "binding_id": 8320,
+          "z_cell_id": 8320,
+          "anchor_id": 8327,
+          "status": "ACTIVE",
+          "y_keys_count": 2,
+          "target_cells": [
+            9319,
+            9325
+          ],
+          "p_keys": [
+            [
+              11077,
+              8320,
+              "ASSOCIATIVE"
+            ],
+            [
+              11811,
+              8320,
+              "ASSOCIATIVE"
+            ]
+          ],
+          "anchor_source_set": [
+            8327,
+            8651,
+            9005,
+            9669,
+            10167,
+            10696,
+            10710,
+            11119,
+            11195,
+            11663,
+            11703,
+            11784,
+            11807,
+            12123,
+            12241,
+            12253
+          ]
+        }
+      ]
+    },
+    "112": {
+      "stable_bindings_count": 1,
+      "bindings": [
+        {
+          "binding_id": 8320,
+          "z_cell_id": 8320,
+          "anchor_id": 8327,
+          "status": "ACTIVE",
+          "y_keys_count": 2,
+          "target_cells": [
+            9319,
+            9325
+          ],
+          "p_keys": [
+            [
+              11077,
+              8320,
+              "ASSOCIATIVE"
+            ],
+            [
+              11811,
+              8320,
+              "ASSOCIATIVE"
+            ]
+          ],
+          "anchor_source_set": [
+            8327,
+            8651,
+            9005,
+            9669,
+            10167,
+            10696,
+            10710,
+            11119,
+            11195,
+            11663,
+            11703,
+            11784,
+            11807,
+            12123,
+            12241,
+            12253
+          ]
+        }
+      ]
+    }
+  },
+  "assembly_metrics_112": {
+    "asm1": {
+      "size": 12,
+      "gen": 10,
+      "members": [
+        8728,
+        8834,
+        9209,
+        10417,
+        10570,
+        10646,
+        10915,
+        11153,
+        11583,
+        11859,
+        12116,
+        12117
+      ]
+    },
+    "asm4": {
+      "size": 5,
+      "gen": 3,
+      "members": [
+        8242,
+        8809,
+        9854,
+        11638,
+        11984
+      ]
+    },
+    "asm6": {
+      "size": 7,
+      "gen": 5,
+      "members": [
+        9183,
+        9319,
+        9325,
+        10903,
+        11191,
+        11220,
+        11463
+      ]
+    }
+  },
+  "genuine_eos_traces": {
+    "P2": {
+      "step0_winner": 4,
+      "step0_score": 0.5635310574985185,
+      "step1_status": "NO_MATCH",
+      "step1_winner": null,
+      "step1_top_score": 0.036007405274389476,
+      "asm1_score": 0.036007405274389476,
+      "active_ctx_cells": [],
+      "assembly1_size": 12,
+      "ranked_step1": [
+        {
+          "assembly_id": 1,
+          "generation": 10,
+          "surface": "<EOS>",
+          "score": 0.036007,
+          "size": 12,
+          "eligible_count": 8
+        },
+        {
+          "assembly_id": 2,
+          "generation": 12,
+          "surface": "UNATTESTED",
+          "score": 0.0,
+          "size": 14,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 3,
+          "generation": 9,
+          "surface": "يشرب",
+          "score": 0.0,
+          "size": 11,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 4,
+          "generation": 3,
+          "surface": "ماء",
+          "score": 0.0,
+          "size": 5,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 5,
+          "generation": 11,
+          "surface": "UNATTESTED",
+          "score": 0.0,
+          "size": 13,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 6,
+          "generation": 5,
+          "surface": "حليب",
+          "score": 0.0,
+          "size": 7,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 7,
+          "generation": 7,
+          "surface": "يأكل",
+          "score": 0.0,
+          "size": 8,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 8,
+          "generation": 3,
+          "surface": "تفاح",
+          "score": 0.0,
+          "size": 5,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 9,
+          "generation": 2,
+          "surface": "القط",
+          "score": 0.0,
+          "size": 4,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 10,
+          "generation": 1,
+          "surface": "النسر",
+          "score": 0.0,
+          "size": 3,
+          "eligible_count": 0
+        }
+      ],
+      "members_breakdown": [
+        {
+          "cell_id": 8728,
+          "P_T": 0.775904,
+          "A_prev": 0.461615,
+          "A_full": 0.906675,
+          "A_ctrl": 0.890609,
+          "diff_gain": 0.016066,
+          "eligible": true,
+          "score_contrib": 0.001339,
+          "pred_sources_count": 2,
+          "rec_sources_count": 10
+        },
+        {
+          "cell_id": 8834,
+          "P_T": 0.0,
+          "A_prev": 0.474142,
+          "A_full": 0.916693,
+          "A_ctrl": 0.904526,
+          "diff_gain": 0.012167,
+          "eligible": false,
+          "score_contrib": 0.001014,
+          "pred_sources_count": 0,
+          "rec_sources_count": 11
+        },
+        {
+          "cell_id": 9209,
+          "P_T": 0.0,
+          "A_prev": 0.474136,
+          "A_full": 0.916676,
+          "A_ctrl": 0.903366,
+          "diff_gain": 0.01331,
+          "eligible": false,
+          "score_contrib": 0.001109,
+          "pred_sources_count": 0,
+          "rec_sources_count": 10
+        },
+        {
+          "cell_id": 10417,
+          "P_T": 0.872953,
+          "A_prev": 0.121833,
+          "A_full": 0.661304,
+          "A_ctrl": 0.484409,
+          "diff_gain": 0.176895,
+          "eligible": true,
+          "score_contrib": 0.014741,
+          "pred_sources_count": 3,
+          "rec_sources_count": 4
+        },
+        {
+          "cell_id": 10570,
+          "P_T": 0.893846,
+          "A_prev": 0.474091,
+          "A_full": 0.916616,
+          "A_ctrl": 0.897966,
+          "diff_gain": 0.01865,
+          "eligible": true,
+          "score_contrib": 0.001554,
+          "pred_sources_count": 3,
+          "rec_sources_count": 8
+        },
+        {
+          "cell_id": 10646,
+          "P_T": 0.0,
+          "A_prev": 0.47413,
+          "A_full": 0.916638,
+          "A_ctrl": 0.90148,
+          "diff_gain": 0.015158,
+          "eligible": false,
+          "score_contrib": 0.001263,
+          "pred_sources_count": 0,
+          "rec_sources_count": 9
+        },
+        {
+          "cell_id": 10915,
+          "P_T": 0.526915,
+          "A_prev": 0.474132,
+          "A_full": 0.916651,
+          "A_ctrl": 0.901482,
+          "diff_gain": 0.01517,
+          "eligible": true,
+          "score_contrib": 0.001264,
+          "pred_sources_count": 1,
+          "rec_sources_count": 9
+        },
+        {
+          "cell_id": 11153,
+          "P_T": 0.894883,
+          "A_prev": 0.514744,
+          "A_full": 0.94768,
+          "A_ctrl": 0.928549,
+          "diff_gain": 0.01913,
+          "eligible": true,
+          "score_contrib": 0.001594,
+          "pred_sources_count": 4,
+          "rec_sources_count": 8
+        },
+        {
+          "cell_id": 11583,
+          "P_T": 0.894535,
+          "A_prev": 0.501661,
+          "A_full": 0.937197,
+          "A_ctrl": 0.911984,
+          "diff_gain": 0.025214,
+          "eligible": true,
+          "score_contrib": 0.002101,
+          "pred_sources_count": 4,
+          "rec_sources_count": 7
+        },
+        {
+          "cell_id": 11859,
+          "P_T": 0.877115,
+          "A_prev": 0.173302,
+          "A_full": 0.703332,
+          "A_ctrl": 0.58179,
+          "diff_gain": 0.121542,
+          "eligible": true,
+          "score_contrib": 0.010128,
+          "pred_sources_count": 3,
+          "rec_sources_count": 5
+        },
+        {
+          "cell_id": 12116,
+          "P_T": 0.0,
+          "A_prev": 0.342767,
+          "A_full": 0.765506,
+          "A_ctrl": 0.736712,
+          "diff_gain": 0.028794,
+          "eligible": false,
+          "score_contrib": 0.0024,
+          "pred_sources_count": 0,
+          "rec_sources_count": 7
+        },
+        {
+          "cell_id": 12117,
+          "P_T": 0.875143,
+          "A_prev": 0.259097,
+          "A_full": 0.723556,
+          "A_ctrl": 0.684134,
+          "diff_gain": 0.039422,
+          "eligible": true,
+          "score_contrib": 0.003285,
+          "pred_sources_count": 3,
+          "rec_sources_count": 8
+        }
+      ]
+    },
+    "P4": {
+      "step0_winner": 4,
+      "step0_score": 0.5635233519980507,
+      "step1_status": "OK",
+      "step1_winner": 1,
+      "step1_top_score": 0.3553771452920991,
+      "asm1_score": 0.3553771452920991,
+      "active_ctx_cells": [],
+      "assembly1_size": 12,
+      "ranked_step1": [
+        {
+          "assembly_id": 1,
+          "generation": 10,
+          "surface": "<EOS>",
+          "score": 0.355377,
+          "size": 12,
+          "eligible_count": 8
+        },
+        {
+          "assembly_id": 2,
+          "generation": 12,
+          "surface": "UNATTESTED",
+          "score": 0.0,
+          "size": 14,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 3,
+          "generation": 9,
+          "surface": "يشرب",
+          "score": 0.0,
+          "size": 11,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 4,
+          "generation": 3,
+          "surface": "ماء",
+          "score": 0.0,
+          "size": 5,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 5,
+          "generation": 11,
+          "surface": "UNATTESTED",
+          "score": 0.0,
+          "size": 13,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 6,
+          "generation": 5,
+          "surface": "حليب",
+          "score": 0.0,
+          "size": 7,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 7,
+          "generation": 7,
+          "surface": "يأكل",
+          "score": 0.0,
+          "size": 8,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 8,
+          "generation": 3,
+          "surface": "تفاح",
+          "score": 0.0,
+          "size": 5,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 9,
+          "generation": 2,
+          "surface": "القط",
+          "score": 0.0,
+          "size": 4,
+          "eligible_count": 0
+        },
+        {
+          "assembly_id": 10,
+          "generation": 1,
+          "surface": "النسر",
+          "score": 0.0,
+          "size": 3,
+          "eligible_count": 0
+        }
+      ],
+      "members_breakdown": [
+        {
+          "cell_id": 8728,
+          "P_T": 0.775904,
+          "A_prev": 0.0,
+          "A_full": 0.534911,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.534911,
+          "eligible": true,
+          "score_contrib": 0.044576,
+          "pred_sources_count": 2,
+          "rec_sources_count": 10
+        },
+        {
+          "cell_id": 8834,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.530614,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.530614,
+          "eligible": false,
+          "score_contrib": 0.044218,
+          "pred_sources_count": 0,
+          "rec_sources_count": 11
+        },
+        {
+          "cell_id": 9209,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.525195,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.525195,
+          "eligible": false,
+          "score_contrib": 0.043766,
+          "pred_sources_count": 0,
+          "rec_sources_count": 10
+        },
+        {
+          "cell_id": 10417,
+          "P_T": 0.872953,
+          "A_prev": 0.0,
+          "A_full": 0.552629,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.552629,
+          "eligible": true,
+          "score_contrib": 0.046052,
+          "pred_sources_count": 3,
+          "rec_sources_count": 4
+        },
+        {
+          "cell_id": 10570,
+          "P_T": 0.893846,
+          "A_prev": 0.0,
+          "A_full": 0.529901,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.529901,
+          "eligible": true,
+          "score_contrib": 0.044158,
+          "pred_sources_count": 3,
+          "rec_sources_count": 8
+        },
+        {
+          "cell_id": 10646,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.515305,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.515305,
+          "eligible": false,
+          "score_contrib": 0.042942,
+          "pred_sources_count": 0,
+          "rec_sources_count": 9
+        },
+        {
+          "cell_id": 10915,
+          "P_T": 0.526915,
+          "A_prev": 0.0,
+          "A_full": 0.523174,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.523174,
+          "eligible": true,
+          "score_contrib": 0.043598,
+          "pred_sources_count": 1,
+          "rec_sources_count": 9
+        },
+        {
+          "cell_id": 11153,
+          "P_T": 0.894883,
+          "A_prev": 0.0,
+          "A_full": 0.528629,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.528629,
+          "eligible": true,
+          "score_contrib": 0.044052,
+          "pred_sources_count": 4,
+          "rec_sources_count": 8
+        },
+        {
+          "cell_id": 11583,
+          "P_T": 0.894535,
+          "A_prev": 0.0,
+          "A_full": 0.528577,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.528577,
+          "eligible": true,
+          "score_contrib": 0.044048,
+          "pred_sources_count": 4,
+          "rec_sources_count": 7
+        },
+        {
+          "cell_id": 11859,
+          "P_T": 0.877115,
+          "A_prev": 0.0,
+          "A_full": 0.553262,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.553262,
+          "eligible": true,
+          "score_contrib": 0.046105,
+          "pred_sources_count": 3,
+          "rec_sources_count": 5
+        },
+        {
+          "cell_id": 12116,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.426866,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.426866,
+          "eligible": false,
+          "score_contrib": 0.035572,
+          "pred_sources_count": 0,
+          "rec_sources_count": 7
+        },
+        {
+          "cell_id": 12117,
+          "P_T": 0.875143,
+          "A_prev": 0.0,
+          "A_full": 0.513443,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.513443,
+          "eligible": true,
+          "score_contrib": 0.042787,
+          "pred_sources_count": 3,
+          "rec_sources_count": 8
+        }
+      ]
+    }
+  }
+}
