@@ -1,0 +1,1587 @@
+{
+  "metadata": {
+    "task": "DGCA NEXT V2 — EGCP E0 Baseline Reproduction",
+    "frozen_main_sha": "f044c20b532f89749675120ffb1d8ada997e3a5e",
+    "cf04_baseline_sha": "e43ba731deeb8ee4433fd633cb36f2823bce9e79",
+    "branch": "experiment/egcp-e0-baseline-reproduction",
+    "checkpoint_roots": [
+      14,
+      16,
+      27,
+      31,
+      56,
+      57,
+      112
+    ]
+  },
+  "checkpoint_hashes": {
+    "group_a": {
+      "14": "e8ed6ba87ecf13513d738014941c872d8103dc047ace218e5055d64ae3c46196",
+      "16": "64eac0897b144ec04e1e7ade80441f9dc71c0971beb76d8466f665e37a9f03f8",
+      "27": "e8c70c791cdb689b48d291ff0dd9a14d223545385b43e7a97fb45ceae6370eb7",
+      "31": "fe3e013f325e49c094edc7b92c585a182f095e825086b928ffd1e7a4b11d115a",
+      "56": "19f3a4a24dd1145cf59d317c92f72d79c8207369e9109b61fa00645cf573129d",
+      "57": "f418f42c73ca67577b27a71f151adf3ce604776f2078a54ca331e81dfb0076db",
+      "112": "56cc7b15a600fa7caaa51c0d1aeeb1e903da04cad3fc5e028724a104284857f0"
+    },
+    "group_b": {
+      "14": "66d8705166c9e7559a1f1df0c0694624a80fbc715b939c4842a438a255de140b",
+      "16": "b47f3dcbd88845ae751654fca018eb0d20459ae0b3c27c105896d32097d42be6",
+      "27": "bb4b9e8272031ad6de1b6fd4d6bdc863b9cb1d38421494e97e6649cbac67231d",
+      "31": "aa49f4d12af69eb9a43e353d547f1ab9c4b2c4b36dc5d3cc97f6e42be696120a",
+      "56": "6ea47e4ece5f0b8ce7efa9fb5c0e65f55bb79a15b4ca1614cc4b9032f4fa13bd",
+      "57": "f91371f3d54eb20ffed8f14758da126a26952bd10e22303270e68d8ecde86dbf",
+      "112": "c43472918698145807c37e8c1e2688e7ddd05a1da07bf27ff1e045c1a656a7d6"
+    }
+  },
+  "group_b_assemblies_112": {
+    "1": {
+      "assembly_id": 1,
+      "structural_generation": 10,
+      "size": 12,
+      "surface": "<EOS>",
+      "status": "LIVE",
+      "members": [
+        8728,
+        8834,
+        9209,
+        10417,
+        10570,
+        10646,
+        10915,
+        11153,
+        11583,
+        11859,
+        12116,
+        12117
+      ]
+    },
+    "2": {
+      "assembly_id": 2,
+      "structural_generation": 12,
+      "size": 14,
+      "surface": "NONE",
+      "status": "LIVE",
+      "members": [
+        8416,
+        8420,
+        8575,
+        8586,
+        8958,
+        9007,
+        9178,
+        9618,
+        10220,
+        10326,
+        10704,
+        10899,
+        10933,
+        12044
+      ]
+    },
+    "3": {
+      "assembly_id": 3,
+      "structural_generation": 9,
+      "size": 11,
+      "surface": "يشرب",
+      "status": "LIVE",
+      "members": [
+        8327,
+        8651,
+        9005,
+        9669,
+        10167,
+        10696,
+        11119,
+        11195,
+        11663,
+        12123,
+        12241
+      ]
+    },
+    "4": {
+      "assembly_id": 4,
+      "structural_generation": 3,
+      "size": 5,
+      "surface": "ماء",
+      "status": "LIVE",
+      "members": [
+        8242,
+        8809,
+        9854,
+        11638,
+        11984
+      ]
+    },
+    "5": {
+      "assembly_id": 5,
+      "structural_generation": 11,
+      "size": 13,
+      "surface": "NONE",
+      "status": "LIVE",
+      "members": [
+        8416,
+        8575,
+        8586,
+        8958,
+        9007,
+        9178,
+        9618,
+        10220,
+        10326,
+        10704,
+        10899,
+        11140,
+        11370
+      ]
+    },
+    "6": {
+      "assembly_id": 6,
+      "structural_generation": 5,
+      "size": 7,
+      "surface": "حليب",
+      "status": "LIVE",
+      "members": [
+        9183,
+        9319,
+        9325,
+        10903,
+        11191,
+        11220,
+        11463
+      ]
+    },
+    "7": {
+      "assembly_id": 7,
+      "structural_generation": 7,
+      "size": 8,
+      "surface": "يأكل",
+      "status": "LIVE",
+      "members": [
+        9103,
+        9201,
+        10087,
+        10318,
+        11641,
+        11782,
+        11942,
+        11961
+      ]
+    },
+    "8": {
+      "assembly_id": 8,
+      "structural_generation": 3,
+      "size": 5,
+      "surface": "تفاح",
+      "status": "LIVE",
+      "members": [
+        8513,
+        9334,
+        9468,
+        10457,
+        11289
+      ]
+    },
+    "9": {
+      "assembly_id": 9,
+      "structural_generation": 2,
+      "size": 4,
+      "surface": "القط",
+      "status": "LIVE",
+      "members": [
+        9061,
+        10595,
+        11077,
+        11811
+      ]
+    },
+    "10": {
+      "assembly_id": 10,
+      "structural_generation": 1,
+      "size": 3,
+      "surface": "النسر",
+      "status": "LIVE",
+      "members": [
+        9205,
+        9369,
+        9487
+      ]
+    },
+    "11": {
+      "assembly_id": 11,
+      "structural_generation": 7,
+      "size": 8,
+      "surface": "NONE",
+      "status": "ARCHIVED",
+      "members": [
+        9103,
+        9201,
+        10087,
+        10318,
+        11641,
+        11782,
+        11942,
+        11961
+      ]
+    }
+  },
+  "probe_rollouts": {
+    "56": {
+      "P1": {
+        "prompt": "القط يشرب",
+        "stop_status": "GEN_STOP_EOS",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.331402,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.633882,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.30248,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": 1,
+            "winner_generation": 10,
+            "emitted_surface": "<EOS>",
+            "readout_status": "OK",
+            "margin": 0.424113,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.424113,
+                "size": 12,
+                "eligible_count": 8
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P2": {
+        "prompt": "النسر يشرب",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.505734,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.634123,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.128388,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.023853,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.023853,
+                "size": 12,
+                "eligible_count": 3
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P3": {
+        "prompt": "الطفل يأكل",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [
+          "تفاح"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 8,
+            "winner_generation": 3,
+            "emitted_surface": "تفاح",
+            "readout_status": "OK",
+            "margin": 0.497945,
+            "ranked": [
+              {
+                "assembly_id": 8,
+                "generation": 3,
+                "surface": "تفاح",
+                "score": 0.497945,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.0,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P4": {
+        "prompt": "الطفل يشرب",
+        "stop_status": "GEN_STOP_EOS",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.350202,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.634129,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.283928,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": 1,
+            "winner_generation": 10,
+            "emitted_surface": "<EOS>",
+            "readout_status": "OK",
+            "margin": 0.424113,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.424113,
+                "size": 12,
+                "eligible_count": 8
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "57": {
+      "P1": {
+        "prompt": "القط يشرب",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [],
+        "steps_count": 1,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.027585,
+            "ranked": [
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.027585,
+                "size": 7,
+                "eligible_count": 2
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P2": {
+        "prompt": "النسر يشرب",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.504625,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.632048,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.127423,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.022945,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.022945,
+                "size": 12,
+                "eligible_count": 3
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P3": {
+        "prompt": "الطفل يأكل",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [
+          "تفاح"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 8,
+            "winner_generation": 3,
+            "emitted_surface": "تفاح",
+            "readout_status": "OK",
+            "margin": 0.496784,
+            "ranked": [
+              {
+                "assembly_id": 8,
+                "generation": 3,
+                "surface": "تفاح",
+                "score": 0.496784,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.0,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P4": {
+        "prompt": "الطفل يشرب",
+        "stop_status": "GEN_STOP_EOS",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.321577,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.632055,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.310477,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": 1,
+            "winner_generation": 10,
+            "emitted_surface": "<EOS>",
+            "readout_status": "OK",
+            "margin": 0.422974,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.422974,
+                "size": 12,
+                "eligible_count": 8
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 4,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 6,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "112": {
+      "P1": {
+        "prompt": "القط يشرب",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [],
+        "steps_count": 1,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.026901,
+            "ranked": [
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.026901,
+                "size": 7,
+                "eligible_count": 2
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 9,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 11,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P2": {
+        "prompt": "النسر يشرب",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.503426,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.563531,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.060106,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.036007,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.036007,
+                "size": 12,
+                "eligible_count": 8
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 9,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 11,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P3": {
+        "prompt": "الطفل يأكل",
+        "stop_status": "GEN_STOP_NO_MATCH",
+        "emitted_surfaces": [
+          "تفاح"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 8,
+            "winner_generation": 3,
+            "emitted_surface": "تفاح",
+            "readout_status": "OK",
+            "margin": 0.473636,
+            "ranked": [
+              {
+                "assembly_id": 8,
+                "generation": 3,
+                "surface": "تفاح",
+                "score": 0.473636,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 9,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 11,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": null,
+            "winner_generation": null,
+            "emitted_surface": null,
+            "readout_status": "NO_MATCH",
+            "margin": 0.0,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 9,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 11,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      },
+      "P4": {
+        "prompt": "الطفل يشرب",
+        "stop_status": "GEN_STOP_EOS",
+        "emitted_surfaces": [
+          "ماء"
+        ],
+        "steps_count": 2,
+        "step_traces": [
+          {
+            "step_index": 0,
+            "winner_assembly_id": 4,
+            "winner_generation": 3,
+            "emitted_surface": "ماء",
+            "readout_status": "OK",
+            "margin": 0.362959,
+            "ranked": [
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.563523,
+                "size": 5,
+                "eligible_count": 5
+              },
+              {
+                "assembly_id": 6,
+                "generation": 5,
+                "surface": "حليب",
+                "score": 0.200564,
+                "size": 7,
+                "eligible_count": 7
+              },
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.0,
+                "size": 12,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              }
+            ]
+          },
+          {
+            "step_index": 1,
+            "winner_assembly_id": 1,
+            "winner_generation": 10,
+            "emitted_surface": "<EOS>",
+            "readout_status": "OK",
+            "margin": 0.355377,
+            "ranked": [
+              {
+                "assembly_id": 1,
+                "generation": 10,
+                "surface": "<EOS>",
+                "score": 0.355377,
+                "size": 12,
+                "eligible_count": 8
+              },
+              {
+                "assembly_id": 2,
+                "generation": 12,
+                "surface": "UNATTESTED",
+                "score": 0.0,
+                "size": 14,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 3,
+                "generation": 9,
+                "surface": "يشرب",
+                "score": 0.0,
+                "size": 11,
+                "eligible_count": 0
+              },
+              {
+                "assembly_id": 4,
+                "generation": 3,
+                "surface": "ماء",
+                "score": 0.0,
+                "size": 5,
+                "eligible_count": 0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "root_56_step0_p1": {
+    "winner_assembly_id": 4,
+    "winner_surface": "ماء",
+    "asm4_water_score": 0.633882,
+    "asm6_milk_score": 0.30248
+  },
+  "root_57_binding_transition": {
+    "binding_8320_graduated": true,
+    "anchor_id": 8327,
+    "target_cells": [
+      9319,
+      9325
+    ],
+    "assembly6_members": [
+      9183,
+      9319,
+      9325,
+      10903,
+      11191,
+      11220,
+      11463
+    ],
+    "muted_uncovered_cells": [
+      9183,
+      10903,
+      11191,
+      11220,
+      11463
+    ],
+    "p1_step0_asm6_score": 0.027585,
+    "p1_step0_status": "NO_MATCH"
+  },
+  "root_112_step1_eos_comparison": {
+    "p2_trace": {
+      "prompt": "النسر يشرب",
+      "step0_winner_assembly_id": 4,
+      "step0_winner_surface": "ماء",
+      "step1_status": "NO_MATCH",
+      "step1_winner_assembly_id": null,
+      "asm1_score": 0.036007,
+      "asm1_member_count": 12,
+      "asm1_eligible_count": 8,
+      "asm1_a_prev_mean": 0.395471,
+      "asm1_a_ctrl_elig_mean": 0.785115,
+      "asm1_a_full_elig_mean": 0.839126,
+      "asm1_diff_gain_sum": 0.432089,
+      "members_breakdown": [
+        {
+          "cell_id": 8728,
+          "P_T": 0.775904,
+          "A_prev": 0.461615,
+          "A_full": 0.906675,
+          "A_ctrl": 0.890609,
+          "diff_gain": 0.016066,
+          "eligible": true,
+          "contrib": 0.001339
+        },
+        {
+          "cell_id": 8834,
+          "P_T": 0.0,
+          "A_prev": 0.474142,
+          "A_full": 0.916693,
+          "A_ctrl": 0.904526,
+          "diff_gain": 0.012167,
+          "eligible": false,
+          "contrib": 0.001014
+        },
+        {
+          "cell_id": 9209,
+          "P_T": 0.0,
+          "A_prev": 0.474136,
+          "A_full": 0.916676,
+          "A_ctrl": 0.903366,
+          "diff_gain": 0.01331,
+          "eligible": false,
+          "contrib": 0.001109
+        },
+        {
+          "cell_id": 10417,
+          "P_T": 0.872953,
+          "A_prev": 0.121833,
+          "A_full": 0.661304,
+          "A_ctrl": 0.484409,
+          "diff_gain": 0.176895,
+          "eligible": true,
+          "contrib": 0.014741
+        },
+        {
+          "cell_id": 10570,
+          "P_T": 0.893846,
+          "A_prev": 0.474091,
+          "A_full": 0.916616,
+          "A_ctrl": 0.897966,
+          "diff_gain": 0.01865,
+          "eligible": true,
+          "contrib": 0.001554
+        },
+        {
+          "cell_id": 10646,
+          "P_T": 0.0,
+          "A_prev": 0.47413,
+          "A_full": 0.916638,
+          "A_ctrl": 0.90148,
+          "diff_gain": 0.015158,
+          "eligible": false,
+          "contrib": 0.001263
+        },
+        {
+          "cell_id": 10915,
+          "P_T": 0.526915,
+          "A_prev": 0.474132,
+          "A_full": 0.916651,
+          "A_ctrl": 0.901482,
+          "diff_gain": 0.01517,
+          "eligible": true,
+          "contrib": 0.001264
+        },
+        {
+          "cell_id": 11153,
+          "P_T": 0.894883,
+          "A_prev": 0.514744,
+          "A_full": 0.94768,
+          "A_ctrl": 0.928549,
+          "diff_gain": 0.01913,
+          "eligible": true,
+          "contrib": 0.001594
+        },
+        {
+          "cell_id": 11583,
+          "P_T": 0.894535,
+          "A_prev": 0.501661,
+          "A_full": 0.937197,
+          "A_ctrl": 0.911984,
+          "diff_gain": 0.025214,
+          "eligible": true,
+          "contrib": 0.002101
+        },
+        {
+          "cell_id": 11859,
+          "P_T": 0.877115,
+          "A_prev": 0.173302,
+          "A_full": 0.703332,
+          "A_ctrl": 0.58179,
+          "diff_gain": 0.121542,
+          "eligible": true,
+          "contrib": 0.010128
+        },
+        {
+          "cell_id": 12116,
+          "P_T": 0.0,
+          "A_prev": 0.342767,
+          "A_full": 0.765506,
+          "A_ctrl": 0.736712,
+          "diff_gain": 0.028794,
+          "eligible": false,
+          "contrib": 0.0024
+        },
+        {
+          "cell_id": 12117,
+          "P_T": 0.875143,
+          "A_prev": 0.259097,
+          "A_full": 0.723556,
+          "A_ctrl": 0.684134,
+          "diff_gain": 0.039422,
+          "eligible": true,
+          "contrib": 0.003285
+        }
+      ]
+    },
+    "p4_trace": {
+      "prompt": "الطفل يشرب",
+      "step0_winner_assembly_id": 4,
+      "step0_winner_surface": "ماء",
+      "step1_status": "OK",
+      "step1_winner_assembly_id": 1,
+      "asm1_score": 0.355377,
+      "asm1_member_count": 12,
+      "asm1_eligible_count": 8,
+      "asm1_a_prev_mean": 0.0,
+      "asm1_a_ctrl_elig_mean": 0.0,
+      "asm1_a_full_elig_mean": 0.533066,
+      "asm1_diff_gain_sum": 4.264526,
+      "members_breakdown": [
+        {
+          "cell_id": 8728,
+          "P_T": 0.775904,
+          "A_prev": 0.0,
+          "A_full": 0.534911,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.534911,
+          "eligible": true,
+          "contrib": 0.044576
+        },
+        {
+          "cell_id": 8834,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.530614,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.530614,
+          "eligible": false,
+          "contrib": 0.044218
+        },
+        {
+          "cell_id": 9209,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.525195,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.525195,
+          "eligible": false,
+          "contrib": 0.043766
+        },
+        {
+          "cell_id": 10417,
+          "P_T": 0.872953,
+          "A_prev": 0.0,
+          "A_full": 0.552629,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.552629,
+          "eligible": true,
+          "contrib": 0.046052
+        },
+        {
+          "cell_id": 10570,
+          "P_T": 0.893846,
+          "A_prev": 0.0,
+          "A_full": 0.529901,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.529901,
+          "eligible": true,
+          "contrib": 0.044158
+        },
+        {
+          "cell_id": 10646,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.515305,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.515305,
+          "eligible": false,
+          "contrib": 0.042942
+        },
+        {
+          "cell_id": 10915,
+          "P_T": 0.526915,
+          "A_prev": 0.0,
+          "A_full": 0.523174,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.523174,
+          "eligible": true,
+          "contrib": 0.043598
+        },
+        {
+          "cell_id": 11153,
+          "P_T": 0.894883,
+          "A_prev": 0.0,
+          "A_full": 0.528629,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.528629,
+          "eligible": true,
+          "contrib": 0.044052
+        },
+        {
+          "cell_id": 11583,
+          "P_T": 0.894535,
+          "A_prev": 0.0,
+          "A_full": 0.528577,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.528577,
+          "eligible": true,
+          "contrib": 0.044048
+        },
+        {
+          "cell_id": 11859,
+          "P_T": 0.877115,
+          "A_prev": 0.0,
+          "A_full": 0.553262,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.553262,
+          "eligible": true,
+          "contrib": 0.046105
+        },
+        {
+          "cell_id": 12116,
+          "P_T": 0.0,
+          "A_prev": 0.0,
+          "A_full": 0.426866,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.426866,
+          "eligible": false,
+          "contrib": 0.035572
+        },
+        {
+          "cell_id": 12117,
+          "P_T": 0.875143,
+          "A_prev": 0.0,
+          "A_full": 0.513443,
+          "A_ctrl": 0.0,
+          "diff_gain": 0.513443,
+          "eligible": true,
+          "contrib": 0.042787
+        }
+      ]
+    }
+  },
+  "invariants": {
+    "ZERO_SELECTION_LEAKAGE": true,
+    "NO_SEMANTIC_LEAKAGE": true,
+    "DETERMINISM_VERIFIED": true
+  }
+}
