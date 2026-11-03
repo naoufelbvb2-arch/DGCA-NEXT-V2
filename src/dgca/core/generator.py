@@ -21,7 +21,7 @@ from dgca.core.readout import (
     evaluate_full_vs_control_readout,
 )
 from dgca.core.sic_v1 import project_core_event_v1
-from dgca.core.state import ExecutionMode, MachineState
+from dgca.core.state import EGCPMode, ExecutionMode, MachineState
 from dgca.encoder.envelope import (
     CoreEventPayloadV1,
     EventOrigin,
@@ -96,6 +96,7 @@ def generate_episode(
     theta_read: float = THETA_READ,
     m_read: float = M_READ,
     override_winner_generation_by_step: dict[int, int] | None = None,
+    egcp_mode: EGCPMode | str | None = None,
 ) -> GenerateEpisodeResult:
     """Execute a bounded read-only GENERATE_EPISODE rollout (Core §9.3, LLA §7.1).
 
@@ -119,6 +120,8 @@ def generate_episode(
 
     scratch_state = state.clone()
     scratch_state.R.reset_cold()
+    if egcp_mode is not None:
+        scratch_state.egcp_mode = EGCPMode(egcp_mode)
     ledger_snapshot = ledger.clone()
 
     prompt_results: list[EventExecutionResult] = []
@@ -153,6 +156,7 @@ def generate_episode(
             scratch_state,
             theta_read=theta_read,
             m_read=m_read,
+            egcp_mode=scratch_state.egcp_mode,
         )
         if readout_res.status != StatusCode.OK:
             stop_code = _map_readout_failure_to_gen_stop(readout_res.status)

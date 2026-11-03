@@ -146,6 +146,7 @@ from dgca.core.sic_v1 import (
     simulate_cold_language_event,
 )
 from dgca.core.state import (
+    EGCPMode,
     Assembly,
     AssemblyStatus,
     AttractorRuntimeState,
@@ -195,6 +196,7 @@ __all__ = [
     "E_MAX",
     "EligibilityEntry",
     "EventExecutionResult",
+    "EGCPMode",
     "ExecutionMode",
     "FIXED_LOCAL_SLOTS",
     "FIXED_TOPOGRAPHIC_SLOTS",

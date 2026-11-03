@@ -198,7 +198,7 @@ from dgca.core.dynamics import (
 )
 from dgca.core.latent_index import LatentNeighborhoodTable
 from dgca.core.sic_v1 import SICProjectionResult, project_core_event_v1
-from dgca.core.state import ExecutionMode, HSlowState, MachineState, WState
+from dgca.core.state import EGCPMode, ExecutionMode, HSlowState, MachineState, WState
 from dgca.encoder.decomposer import (
     EOS_CANONICAL_FEATURES,
     decompose_lexical_token,
@@ -583,6 +583,7 @@ class ExposureTransactionManager:
         allow_headless_events: bool = False,
         enable_birth_time_grow: bool = False,
         enable_cross_clique_diversification: bool = False,
+        egcp_mode: EGCPMode | str = EGCPMode.OFF,
     ) -> None:
         self.state: MachineState = state
         self.theta_create: float = theta_create
@@ -597,6 +598,8 @@ class ExposureTransactionManager:
         self.allow_headless_events: bool = allow_headless_events
         self.enable_birth_time_grow: bool = enable_birth_time_grow
         self.enable_cross_clique_diversification: bool = enable_cross_clique_diversification
+        self.egcp_mode: EGCPMode = EGCPMode(egcp_mode)
+        self.state.egcp_mode = self.egcp_mode
 
         self.open_journal: OpenExposureJournal | None = None
         self._publication_view = TransactionPublicationView(
@@ -714,6 +717,13 @@ class ExposureTransactionManager:
         """Register a post-evidence shadow transaction hook (used by Phase 4/5/6 operators)."""
         self._end_exposure_hooks.append(hook)
 
+    def set_egcp_mode(self, mode: EGCPMode | str) -> None:
+        """Configure EGCP mode at exposure boundary. Switching during OPEN root is forbidden."""
+        if self.open_journal is not None and self.open_journal.status == ExposureStatus.OPEN:
+            raise ValueError("Switching EGCP_MODE during an OPEN exposure is forbidden.")
+        self.egcp_mode = EGCPMode(mode)
+        self.state.egcp_mode = self.egcp_mode
+
     def begin_exposure(self, exposure_id: int) -> OpenExposureJournal:
         """Execute atomic BEGIN_EXPOSURE(root) (Core §10.1, LLA §7 rule 1).
 
@@ -743,6 +753,7 @@ class ExposureTransactionManager:
             )
 
         # FIFR-B06 LAB POLICY A: capture immutable H_slow_BEGIN before any root-local adaptation
+        self.state.egcp_mode = self.egcp_mode
         h_begin = self.state.H_slow.clone()
         # R2-A01 Patch 3: capture immutable LatentNeighborhoodTable at BEGIN
         latent_begin = self.state.W.latent_table.clone()

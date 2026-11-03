@@ -20,6 +20,7 @@ from dgca.core.assembly import (
 )
 from dgca.core.dynamics import execute_two_pass_event
 from dgca.core.state import (
+    EGCPMode,
     Assembly,
     AssemblyStatus,
     ExecutionMode,
@@ -96,6 +97,7 @@ def evaluate_full_vs_control_readout(
     *,
     theta_read: float = THETA_READ,
     m_read: float = M_READ,
+    egcp_mode: EGCPMode | str | None = None,
 ) -> ReadoutEvaluationResult:
     """Execute one read-only FULL vs CONTROL scratch comparison from state (Core §9.2).
 
@@ -111,6 +113,9 @@ def evaluate_full_vs_control_readout(
     """
     scratch_full = state.clone()
     scratch_ctrl = state.clone()
+    if egcp_mode is not None:
+        scratch_full.egcp_mode = EGCPMode(egcp_mode)
+        scratch_ctrl.egcp_mode = EGCPMode(egcp_mode)
 
     res_full = execute_two_pass_event(
         scratch_full,

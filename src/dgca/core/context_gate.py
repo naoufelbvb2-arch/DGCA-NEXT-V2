@@ -22,6 +22,7 @@ from dgca.core.anatomy import (
     THETA_S,
 )
 from dgca.core.state import (
+    EGCPMode,
     BindingStatus,
     CandidatePhase,
     ContextCandidateDescriptor,
@@ -468,13 +469,19 @@ def compute_directed_mu_ij(
     target_id: int,
     mu_prev_source_mask: dict[int, int],
     w: WState,
+    *,
+    egcp_mode: EGCPMode | str = EGCPMode.OFF,
 ) -> int:
     """Compute RC4.1 target-scoped temporal mask mu_ij(t-1) = mu_i(t-1) * 1[not ContextTarget(j, t)] (Core §5.2).
 
-    Temporarily masks generic outgoing ASSOCIATIVE contribution to ordinary/non-contextual targets,
-    while preserving mu_ij = 0 for every legitimate gated contextual target (including incomplete
-    candidates and COMPLETE depth > 1 descendants).
+    Under EGCP E1 (egcp_mode == EGCPMode.E1_PRESERVE_GENERIC):
+    Effective directed suppression mask is 0 (generic ASSOCIATIVE attenuation disabled).
+    Under legacy/default OFF (egcp_mode == EGCPMode.OFF):
+    Retains exact frozen original mu_ij(t-1).
     """
+    if EGCPMode(egcp_mode) == EGCPMode.E1_PRESERVE_GENERIC:
+        return 0
+
     mu_i = mu_prev_source_mask.get(source_id, 0)
     if mu_i == 0:
         return 0

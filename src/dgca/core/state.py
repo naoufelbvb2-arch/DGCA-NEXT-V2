@@ -41,6 +41,18 @@ class ExecutionMode(StrEnum):
     GENERATE = "GENERATE"
 
 
+class EGCPMode(StrEnum):
+    """EGCP operational mode (DGCA-NEXT-V2-EGCP-SPEC §2.1).
+
+    OFF: frozen native Core/LLA behavior with exact historical mu and no EGCP state.
+    E1_PRESERVE_GENERIC: native contextual activation and positive links;
+        experimental generic associative drive preservation (mu_effective = 0).
+    """
+
+    OFF = "OFF"
+    E1_PRESERVE_GENERIC = "E1_PRESERVE_GENERIC"
+
+
 class ContributionLane(StrEnum):
     """Tagged causal contribution lanes per event (Core §6, LLA §2.2)."""
 
@@ -669,10 +681,12 @@ class MachineState:
         w: WState | None = None,
         r: RState | None = None,
         h_slow: HSlowState | None = None,
+        egcp_mode: EGCPMode | str = EGCPMode.OFF,
     ) -> None:
         self.W: WState = w if w is not None else WState()
         self.R: RState = r if r is not None else RState()
         self.H_slow: HSlowState = h_slow if h_slow is not None else HSlowState()
+        self.egcp_mode: EGCPMode = EGCPMode(egcp_mode)
 
     def clone(self) -> MachineState:
         """Create a complete isolated deep copy of (W, R, H_slow)."""
@@ -680,6 +694,7 @@ class MachineState:
             w=self.W.clone(),
             r=self.R.clone(),
             h_slow=self.H_slow.clone(),
+            egcp_mode=self.egcp_mode,
         )
 
     def get_dumb_cell_view(self, cell_id: int) -> DumbCellView:

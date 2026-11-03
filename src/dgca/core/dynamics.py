@@ -36,6 +36,7 @@ from dgca.core.context_gate import (
 from dgca.core.homeostasis import update_slow_homeostasis
 from dgca.core.sic_v1 import CELLS_PER_MICROCOLUMN, CellAddress
 from dgca.core.state import (
+    EGCPMode,
     CandidatePhase,
     ContributionLane,
     ContributionRecord,
@@ -94,6 +95,7 @@ def compute_next_step_temporal_drive(
     a_prev_by_cell: dict[int, float],
     mu_prev_source_mask: dict[int, int],
     mask_nonconsolidated: bool = False,
+    egcp_mode: EGCPMode | str | None = None,
 ) -> tuple[dict[int, float], dict[int, list[tuple[int, float]]]]:
     """Compute one-step temporal drive P_j^T(t) from frozen F_step(t-1) and frozen mu_i(t-1) (Core §5, §5.2).
 
@@ -102,6 +104,7 @@ def compute_next_step_temporal_drive(
     where mu_ij(t-1) = mu_i(t-1) * 1[not ContextTarget(j, t)] (RC4.1).
     """
     w = state.W
+    eff_egcp_mode = getattr(state, "egcp_mode", EGCPMode.OFF) if egcp_mode is None else EGCPMode(egcp_mode)
     contribs_by_target: dict[int, list[tuple[int, int, tuple[int, int, SynapseScope], float]]] = {}
     source_pairs_by_target: dict[int, list[tuple[int, float]]] = {}
 
@@ -119,7 +122,7 @@ def compute_next_step_temporal_drive(
             q_val = syn.Q
             if q_val <= 0.0:
                 continue
-            mu_ij = compute_directed_mu_ij(src_id, tgt_id, mu_prev_source_mask, w)
+            mu_ij = compute_directed_mu_ij(src_id, tgt_id, mu_prev_source_mask, w, egcp_mode=eff_egcp_mode)
             if mu_ij == 1:
                 continue
             val = (1.0 - float(mu_ij)) * a_src * q_val * get_k_neural(SynapseScope.ASSOCIATIVE, 1)
