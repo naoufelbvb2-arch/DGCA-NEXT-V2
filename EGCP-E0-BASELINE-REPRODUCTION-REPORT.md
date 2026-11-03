@@ -28,7 +28,7 @@ In accordance with authorization `DGCA-NEXT-V2-EGCP-SPEC` (RC2-C01) and architec
    - **Root 112:** P1 remains silent (`GEN_STOP_NO_MATCH`), P2 emits `ماء` (`GEN_STOP_NO_MATCH`), P3 emits `تفاح` (`GEN_STOP_NO_MATCH`), P4 emits `ماء` $\to$ `<EOS>` (`GEN_STOP_EOS`).
 6. **Causal Mechanisms Confirmed:**
    - **Root 56 P1 Competition:** Assembly 4 (`ماء`, size 5) achieves score $0.633882$ vs Assembly 6 (`حليب`, size 7) score $0.302480$, selecting the wrong branch due to un-gated generic associative drive into a smaller assembly.
-   - **Root 57 Contextual Gating:** Candidate `8320` graduated under anchor `8327` with target keys `[9319, 9325]`. Core §5.2 muting generic links ($\mu_{ij}=0$) to the remaining 5 members of Assembly 6 (`[9183, 10903, 11191, 11220, 11463]`) collapses causal gain from $2.1174$ to $0.1921$ and score from $0.302480$ to $0.027585 < 0.08 \implies \text{NO\_MATCH}$.
+   - **Root 57 Contextual Gating:** Candidate `8320` graduated under anchor `8327` with target keys `[9319, 9325]`. Core §5.2 suppressing generic links ($\mu_{ij}=1$, where $\mu_{ij}=1$ suppresses generic ASSOCIATIVE transmission and $\mu_{ij}=0$ preserves it) to the remaining 5 members of Assembly 6 (`[9183, 10903, 11191, 11220, 11463]`) collapses causal gain from $2.1174$ to $0.1921$ and score from $0.302480$ to $0.027585 < 0.08 \implies \text{NO\_MATCH}$.
    - **Root 112 Step 1 EOS Asymmetry:** In P2, prompt-phase cross-talk from cell `11191` in `النسر` drives Assembly 1 cells `11153` and `11583`, seeding residual activation that saturates the control pass ($A_{\text{ctrl}} \approx 0.7851$, peak $> 0.86$), collapsing differential gain and yielding score $0.036007 < 0.08$ (`GEN_STOP_NO_MATCH`). In P4, prompt drive is zero ($A_{\text{ctrl}} = 0.0000$), preserving differential gain $\sum \Delta a_j = 4.2645$ and score $0.355377 > 0.08 \implies \text{GEN\_STOP\_EOS}$.
 7. **Scientific Invariants:** `ZERO_SELECTION_LEAKAGE`, `NO_SEMANTIC_LEAKAGE`, and `DETERMINISM_VERIFIED` all hold without exception.
 
@@ -184,14 +184,18 @@ StableBinding 8320:
 However, Assembly 6 (`حليب`) contains **7 physical cells**:
 `[9183, 9319, 9325, 10903, 11191, 11220, 11463]`.
 
-### The Core §5.2 Generic Muting Effect
+### The Core §5.2 Generic Suppression Effect & Directed Mask Polarity
 
-Under Core §5.2, once a contextual owner graduates, generic associative drive from the anchor toward the domain is gated by:
+Under Core §5.2, once a contextual owner graduates, generic associative transmission from the anchor toward ordinary targets is gated by the directed temporal mask:
 $$\mu_{ij}(t-1) = \mu_i(t-1) \cdot \mathbf{1}[\neg \text{ContextTarget}(j, t)]$$
 
-Because `ContextTarget` is defined at the **cell** level rather than the assembly level:
-- For target cells $j \in \{9319, 9325\}$: Contextual drive $P_{zj}^{\text{ctx}}$ is active.
-- For the remaining 5 cells $j \in \{9183, 10903, 11191, 11220, 11463\}$: Generic drive is **muted** ($\mu_{ij} = 0$), but no contextual $z \to j$ links exist.
+The generic transmission factor in one-step temporal drive is $(1 - \mu_{ij}(t-1))$:
+- **$\mu_{ij} = 1$:** generic ASSOCIATIVE contribution is **suppressed** ($(1 - \mu_{ij}) = 0$).
+- **$\mu_{ij} = 0$:** generic ASSOCIATIVE contribution is **preserved** ($(1 - \mu_{ij}) = 1$).
+
+Because `ContextTarget` is defined at the physical **cell** level rather than the assembly level:
+- For target cells $j \in \{9319, 9325\}$: $\text{ContextTarget}(j, t) = \text{True} \implies \mu_{ij} = 0$ (generic contribution preserved if present) and contextual drive $P_{zj}^{\text{ctx}}$ is active.
+- For the remaining 5 cells $j \in \{9183, 10903, 11191, 11220, 11463\}$: $\text{ContextTarget}(j, t) = \text{False} \implies \mu_{ij} = 1$ (generic contribution is **suppressed**), but no contextual $z \to j$ links exist.
 
 ```mermaid
 graph TD
