@@ -216,10 +216,15 @@ def generate_event_link_proposals(
             if a_src_prev_final <= 0.0:
                 continue
 
+            is_ctx = w.is_contextual_cell(src_id)
             for tgt_id in sorted(curr_event.l_frontier):
                 if src_id == tgt_id:
                     continue
                 key = (src_id, tgt_id, SynapseScope.ASSOCIATIVE)
+                if is_ctx and not is_candidate_reserved_key(key, w):
+                    # Contextual cells only propose their own reserved candidate roles during probation;
+                    # completed owners cannot propose unreserved ordinary associative links (LLA §7.3, EGCP RC2 §3.1).
+                    continue
                 if not w.latent_table.is_eligible(src_id, tgt_id):
                     continue
                 if not validate_v_ext(key, curr_event, prev_event, prev_prev_event, w):

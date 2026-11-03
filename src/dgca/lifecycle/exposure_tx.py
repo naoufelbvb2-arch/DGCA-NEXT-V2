@@ -203,7 +203,15 @@ from dgca.core.egcp_opportunity import (
 )
 from dgca.core.latent_index import LatentNeighborhoodTable
 from dgca.core.sic_v1 import SICProjectionResult, project_core_event_v1
-from dgca.core.state import EGCPMode, ExecutionMode, HSlowState, MachineState, WState
+from dgca.core.state import (
+    BindingStatus,
+    ContributionLane,
+    EGCPMode,
+    ExecutionMode,
+    HSlowState,
+    MachineState,
+    WState,
+)
 from dgca.encoder.decomposer import (
     EOS_CANONICAL_FEATURES,
     decompose_lexical_token,
@@ -499,6 +507,7 @@ def _update_coactive_latent_neighborhoods_for_event(
     prev_event: EventExecutionResult | None,
     protected_in_open_root: set[tuple[int, int]],
     enable_cross_clique_diversification: bool = False,
+    enable_contextual_coactive_latent: bool = False,
 ) -> None:
     """Populate co-active latent neighborhood slots (0..5 intra, 12..17 inter) for active cells (Core §1.3, Encoder §2.1).
 
@@ -520,6 +529,28 @@ def _update_coactive_latent_neighborhoods_for_event(
         else []
     )
 
+    # Extract verified completed contextual owners from t-1 (Pillar 1)
+    eligible_context_owners: list[int] = []
+    if enable_contextual_coactive_latent and prev_event is not None and not curr_event.boundary:
+        for z_id in sorted(w.stable_bindings.keys()):
+            sb = w.stable_bindings[z_id]
+            if (
+                sb.status == BindingStatus.ACTIVE
+                and z_id in prev_event.f_step
+                and z_id in prev_event.ctx_event_match_cells
+            ):
+                rec = prev_event.typed_supports.get(z_id)
+                if (
+                    rec is not None
+                    and rec.origin_kind == ContributionLane.DERIVED_EXTERNAL_CONTEXT.value
+                    and rec.parent_proof_verified
+                    and rec.o_train > 0.0
+                ):
+                    a_z_prev = prev_event.a_plus_by_cell.get(z_id, 0.0)
+                    if a_z_prev > 0.0:
+                        eligible_context_owners.append(z_id)
+        eligible_context_owners.sort(key=lambda zid: (-prev_event.a_plus_by_cell.get(zid, 0.0), zid))
+
     top_curr_clique = active_curr[:4]
     secondary_curr_clique = active_curr[4:]
 
@@ -534,10 +565,18 @@ def _update_coactive_latent_neighborhoods_for_event(
 
         # Partition top-4 F0 clique from secondary sub-lexical peers so F0 cells maintain high Spec(x, A) >= 0.20
         peer_pool = top_curr_clique if cid in top_curr_clique else secondary_curr_clique
-        same_event_limit = 3 if active_prev else 6
-        same_peers = [p for p in peer_pool if p != cid][:same_event_limit]
-        prev_peers = [p for p in active_prev if p != cid and p not in same_peers][:3]
-        desired_partners = same_peers + prev_peers
+        if eligible_context_owners:
+            # Pillar 2: 1 dedicated contextual owner + 3 same-event sensory + 2 prior sensory = 6 slots
+            best_owner = eligible_context_owners[0]
+            context_partner = [best_owner] if best_owner != cid else []
+            same_peers = [p for p in peer_pool if p != cid and p != best_owner][:3]
+            prev_peers = [p for p in active_prev if p != cid and p != best_owner and p not in same_peers][:2]
+            desired_partners = context_partner + same_peers + prev_peers
+        else:
+            same_event_limit = 3 if active_prev else 6
+            same_peers = [p for p in peer_pool if p != cid][:same_event_limit]
+            prev_peers = [p for p in active_prev if p != cid and p not in same_peers][:3]
+            desired_partners = same_peers + prev_peers
 
         cross_peer = None
         if enable_cross_clique_diversification:
@@ -548,8 +587,13 @@ def _update_coactive_latent_neighborhoods_for_event(
                 desired_partners.append(cross_peer)
 
         for partner_id in desired_partners:
-            is_cross = (partner_id == cross_peer)
-            reason = "CROSS_CLIQUE_DIVERSIFICATION" if is_cross else "ORDINARY_COACTIVE"
+            if partner_id in eligible_context_owners:
+                reason = "CONTEXTUAL_COACTIVE"
+            elif partner_id == cross_peer:
+                reason = "CROSS_CLIQUE_DIVERSIFICATION"
+            else:
+                reason = "ORDINARY_COACTIVE"
+
             if w.latent_table.is_eligible(cid, partner_id):
                 protected_in_open_root.add((cid, partner_id))
                 protected_in_open_root.add((partner_id, cid))
@@ -589,6 +633,7 @@ class ExposureTransactionManager:
         allow_headless_events: bool = False,
         enable_birth_time_grow: bool = False,
         enable_cross_clique_diversification: bool = False,
+        enable_contextual_coactive_latent: bool = False,
         egcp_mode: EGCPMode | str = EGCPMode.OFF,
     ) -> None:
         self.state: MachineState = state
@@ -604,6 +649,7 @@ class ExposureTransactionManager:
         self.allow_headless_events: bool = allow_headless_events
         self.enable_birth_time_grow: bool = enable_birth_time_grow
         self.enable_cross_clique_diversification: bool = enable_cross_clique_diversification
+        self.enable_contextual_coactive_latent: bool = enable_contextual_coactive_latent
         self.egcp_mode: EGCPMode = EGCPMode(egcp_mode)
         self.state.egcp_mode = self.egcp_mode
 
@@ -913,19 +959,10 @@ class ExposureTransactionManager:
             k_r_budget=K_R_PER_EVENT,
         )
 
-        # 2.5 Measure E2a prediction opportunities (observation & measurement only; Core RC2 §3.2, §3.3)
-        e2a_meas = measure_e2_prediction_opportunities(
-            pre_obs_snapshots,
-            ev_result,
-            self.state.W,
-            egcp_mode=self.egcp_mode,
-        )
-        journal.e2a_measurements.append(e2a_meas)
-
         prev_event = journal.event_results[-1] if journal.event_results else None
         prev_prev_event = journal.event_results[-2] if len(journal.event_results) >= 2 else None
 
-        # 3. Populate ordinary co-active latent slots if enabled
+        # 3. Populate co-active latent slots if enabled
         if self.auto_coactive_latent:
             _update_coactive_latent_neighborhoods_for_event(
                 self.state.W,
@@ -933,7 +970,17 @@ class ExposureTransactionManager:
                 prev_event,
                 self._protected_open_root_pairs,
                 enable_cross_clique_diversification=self.enable_cross_clique_diversification,
+                enable_contextual_coactive_latent=self.enable_contextual_coactive_latent,
             )
+
+        # 3.5 Measure E2a prediction opportunities (observation & measurement only; Core RC2 §3.2, §3.3)
+        e2a_meas = measure_e2_prediction_opportunities(
+            pre_obs_snapshots,
+            ev_result,
+            self.state.W,
+            egcp_mode=self.egcp_mode,
+        )
+        journal.e2a_measurements.append(e2a_meas)
 
         # 4. Generate and stage LINK_PROPOSALs in the OPEN journal
         new_proposals, next_ord = generate_event_link_proposals(
