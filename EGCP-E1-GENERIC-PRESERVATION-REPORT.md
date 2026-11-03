@@ -90,7 +90,7 @@ else if EGCP_MODE == E1_PRESERVE_GENERIC:
 | **Assembly 6 (`حليب`) — Uncovered Cells** | `[9183, 10903, 11191, 11220, 11463]` | 1 | **0** | **Suppression Removed (Preserved)** |
 | **Assembly 4 (`ماء`) — Competing Cells** | `[8242, 8809, 9854, 11638, 11984]` | 1 | **0** | **Suppression Removed (Preserved)** |
 
-*\*Note: In baseline `compute_directed_mu_ij`, `is_context_target(target_id)` returns True only if the target is in `w.context_targets`. Candidate 8320 claims targets at graduation, but anchor 8327's generic mask evaluates against target identity.*
+*\*Note: In baseline `compute_directed_mu_ij`, `w.is_context_target(target_id)` evaluates whether `target_id` is an active contextual candidate or an active completed owner with a `StableBinding` (Core §5.2, `WState.is_context_target`). Because sensory receiver cells (including milk cells `9319, 9325`) are not contextual candidate/owner cells, `w.is_context_target` returns False for all of them; consequently, anchor 8327's generic mask evaluates to $\mu_{8327, j} = 1 \cdot 1 = 1$ under `OFF`. Under `E1_PRESERVE_GENERIC`, generic attenuation is disabled and $\mu_{ij} = 0$ across all targets.*
 
 ---
 

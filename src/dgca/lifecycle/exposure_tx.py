@@ -1212,6 +1212,7 @@ def run_read_only_episode(
         w=state.W,  # read-only reference; never mutated when mode == RETRIEVE
         r=state.R.clone(),
         h_slow=state.H_slow.clone(),
+        egcp_mode=getattr(state, "egcp_mode", EGCPMode.OFF),
     )
     scratch_state.R.reset_cold()
 
