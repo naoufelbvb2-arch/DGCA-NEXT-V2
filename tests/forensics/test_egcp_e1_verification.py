@@ -211,4 +211,7 @@ def test_08_scientific_invariants_and_zero_selection_leakage():
     import dgca.core.state as s
     assert not hasattr(s, "E2GrowthTable")
     assert not hasattr(s, "BetaSuppressionLedger")
-    assert [m.value for m in s.EGCPMode] == ["OFF", "E1_PRESERVE_GENERIC"]
+    assert [m.value for m in s.EGCPMode] in (
+        ["OFF", "E1_PRESERVE_GENERIC"],
+        ["OFF", "E1_PRESERVE_GENERIC", "E2_GROWTH"],
+    )

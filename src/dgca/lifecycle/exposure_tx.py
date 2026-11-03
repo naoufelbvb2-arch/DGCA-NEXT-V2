@@ -196,6 +196,11 @@ from dgca.core.dynamics import (
     compute_next_step_temporal_drive,
     execute_two_pass_event,
 )
+from dgca.core.egcp_opportunity import (
+    E2OpportunityMeasurementResult,
+    capture_pre_obs_context_snapshots,
+    measure_e2_prediction_opportunities,
+)
 from dgca.core.latent_index import LatentNeighborhoodTable
 from dgca.core.sic_v1 import SICProjectionResult, project_core_event_v1
 from dgca.core.state import EGCPMode, ExecutionMode, HSlowState, MachineState, WState
@@ -460,6 +465,7 @@ class OpenExposureJournal:
         default_factory=dict
     )
     event_identities: dict[int, EventIdentityKey] = field(default_factory=dict)
+    e2a_measurements: list[E2OpportunityMeasurementResult] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -613,6 +619,7 @@ class ExposureTransactionManager:
         self._protected_open_root_pairs: set[tuple[int, int]] = set()
         self._end_exposure_hooks: list[EndExposureHook] = []
         self._fault_injection_point: str | None = None
+        self.last_e2a_measurements: list[E2OpportunityMeasurementResult] = []
 
     @property
     def publication_view(self) -> TransactionPublicationView:
@@ -881,6 +888,15 @@ class ExposureTransactionManager:
         # Snapshot pre-event H_slow for proposal y_positive calculation (before event's slow adaptation)
         h_slow_pre_event = self.state.H_slow.clone()
 
+        # 1.5 Capture immutable E2a pre-observation contextual snapshots BEFORE executing event (RC2 §3.1)
+        prev_event_pre_snap = journal.event_results[-1] if journal.event_results else None
+        pre_obs_snapshots = capture_pre_obs_context_snapshots(
+            self.state.W,
+            prev_event=prev_event_pre_snap,
+            target_event_order=core_event.event_order,
+            exposure_id=journal.exposure_id,
+        )
+
         # 2. Execute two-pass neural dynamics
         ev_result = execute_two_pass_event(
             self.state,
@@ -896,6 +912,15 @@ class ExposureTransactionManager:
             admit_uncommitted_sensory=True,
             k_r_budget=K_R_PER_EVENT,
         )
+
+        # 2.5 Measure E2a prediction opportunities (observation & measurement only; Core RC2 §3.2, §3.3)
+        e2a_meas = measure_e2_prediction_opportunities(
+            pre_obs_snapshots,
+            ev_result,
+            self.state.W,
+            egcp_mode=self.egcp_mode,
+        )
+        journal.e2a_measurements.append(e2a_meas)
 
         prev_event = journal.event_results[-1] if journal.event_results else None
         prev_prev_event = journal.event_results[-2] if len(journal.event_results) >= 2 else None
@@ -1139,6 +1164,7 @@ class ExposureTransactionManager:
         self.state.W = new_view.W
         journal.status = ExposureStatus.COMPLETED
         self._protected_open_root_pairs.clear()
+        self.last_e2a_measurements = list(journal.e2a_measurements)
         self.open_journal = None
 
         # Step 7: Post-Commit Peripheral Dispatch Phase

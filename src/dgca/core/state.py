@@ -47,10 +47,12 @@ class EGCPMode(StrEnum):
     OFF: frozen native Core/LLA behavior with exact historical mu and no EGCP state.
     E1_PRESERVE_GENERIC: native contextual activation and positive links;
         experimental generic associative drive preservation (mu_effective = 0).
+    E2_GROWTH: witnessed local opportunity and completed-owner Y-growth (E2a/E2b/E2c).
     """
 
     OFF = "OFF"
     E1_PRESERVE_GENERIC = "E1_PRESERVE_GENERIC"
+    E2_GROWTH = "E2_GROWTH"
 
 
 class ContributionLane(StrEnum):

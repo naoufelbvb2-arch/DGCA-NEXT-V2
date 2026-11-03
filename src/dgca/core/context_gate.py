@@ -479,7 +479,7 @@ def compute_directed_mu_ij(
     Under legacy/default OFF (egcp_mode == EGCPMode.OFF):
     Retains exact frozen original mu_ij(t-1).
     """
-    if EGCPMode(egcp_mode) == EGCPMode.E1_PRESERVE_GENERIC:
+    if EGCPMode(egcp_mode) in (EGCPMode.E1_PRESERVE_GENERIC, EGCPMode.E2_GROWTH):
         return 0
 
     mu_i = mu_prev_source_mask.get(source_id, 0)

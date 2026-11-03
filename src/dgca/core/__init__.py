@@ -112,6 +112,23 @@ from dgca.core.generator import (
     evaluate_g1_g2_g3_separated,
     generate_episode,
 )
+from dgca.core.egcp_opportunity import (
+    E2OpportunityCandidate,
+    E2OpportunityMeasurementResult,
+    MAX_PENDING_KEYS_PER_OWNER,
+    PreObsContextSnapshot,
+    REFUSAL_CAPACITY_BLOCKED,
+    REFUSAL_EGCP_FRONTIER_LIMIT,
+    REFUSAL_EXISTING_LIVE_KEY,
+    REFUSAL_ILLEGAL_TEMPORAL_BOUNDARY,
+    REFUSAL_INCOMPLETE_OBSERVATION,
+    REFUSAL_NO_LEGAL_LOCAL_PATH,
+    REFUSAL_NONE,
+    REFUSAL_STALE_OWNER,
+    REFUSAL_UNRESOLVED_PROVENANCE,
+    capture_pre_obs_context_snapshots,
+    measure_e2_prediction_opportunities,
+)
 from dgca.core.homeostasis import update_slow_homeostasis
 from dgca.core.latent_index import (
     COACTIVE_INTER_SLOTS,
@@ -196,6 +213,8 @@ __all__ = [
     "E_MAX",
     "EligibilityEntry",
     "EventExecutionResult",
+    "E2OpportunityCandidate",
+    "E2OpportunityMeasurementResult",
     "EGCPMode",
     "ExecutionMode",
     "FIXED_LOCAL_SLOTS",
@@ -222,6 +241,7 @@ __all__ = [
     "OwnerState",
     "PHI_INT_CAP",
     "ParentContextRef",
+    "PreObsContextSnapshot",
     "REGION_PARAMS",
     "RHO_CELL_TARGET",
     "RHO_S",
