@@ -215,7 +215,7 @@ class ContextCandidateDescriptor:
 
 @dataclass(slots=True)
 class StableBinding:
-    """Permanent post-graduation binding StableBindingV2 (depth=1) or StableBindingV3 (depth>1) (Core §7.6)."""
+    """Permanent post-graduation binding StableBindingV2 (depth=1), V3 (depth>1), or V4 (EGCP RC2 §6)."""
 
     schema_version: int
     z_cell_id: int
@@ -236,23 +236,31 @@ class StableBinding:
         WitnessSourceKind.DIRECT,
     )
     parent_refs: dict[int, ParentContextRef] = field(default_factory=dict)
+    structural_revision: int = 0
+    growth_key_manifest_digest: str = ""
 
     def __post_init__(self) -> None:
-        if self.schema_version not in (2, 3):
+        if self.schema_version not in (2, 3, 4):
             raise DGCAError(
                 StatusCode.UNSUPPORTED_BINDING_SCHEMA,
-                f"StableBinding schema_version must be 2 or 3, got {self.schema_version}",
+                f"StableBinding schema_version must be 2, 3, or 4, got {self.schema_version}",
             )
-        if self.depth > 1 and self.schema_version != 3:
+        if self.depth > 1 and self.schema_version not in (3, 4):
             raise DGCAError(
                 StatusCode.UNSUPPORTED_BINDING_SCHEMA,
-                "Depth > 1 contextual binding requires StableBindingV3 (schema_version=3)",
+                "Depth > 1 contextual binding requires StableBindingV3 or V4 (schema_version in {3, 4})",
             )
-        if self.depth == 1 and self.schema_version != 2:
+        if self.depth == 1 and self.schema_version not in (2, 4):
             raise DGCAError(
                 StatusCode.UNSUPPORTED_BINDING_SCHEMA,
-                "Depth = 1 contextual binding requires StableBindingV2 (schema_version=2)",
+                "Depth = 1 contextual binding requires StableBindingV2 or V4 (schema_version in {2, 4})",
             )
+        if self.schema_version == 4:
+            if self.structural_revision < 0:
+                raise DGCAError(
+                    StatusCode.UNSUPPORTED_BINDING_SCHEMA,
+                    f"StableBindingV4 structural_revision must be >= 0, got {self.structural_revision}",
+                )
 
     @property
     def owner_id(self) -> tuple[int, int]:
@@ -288,7 +296,58 @@ class StableBinding:
             depth=self.depth,
             p_source_kinds=self.p_source_kinds,
             parent_refs=dict(self.parent_refs),
+            structural_revision=self.structural_revision,
+            growth_key_manifest_digest=self.growth_key_manifest_digest,
         )
+
+
+def compute_y_keys_manifest_digest(y_keys: object) -> str:
+    """Compute deterministic SHA256 integrity digest of canonically sorted physical Y keys (EGCP RC2 §6.1)."""
+    import hashlib
+    canonical = sorted(
+        y_keys,
+        key=lambda k: (k[0], k[1], k[2].value if hasattr(k[2], "value") else str(k[2])),
+    )
+    serialized = ",".join(
+        f"{src}->{tgt}:{scope.value if hasattr(scope, 'value') else scope}"
+        for src, tgt, scope in canonical
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def convert_to_stable_binding_v4(
+    binding: StableBinding,
+    additional_y_keys: object = (),
+) -> StableBinding:
+    """Explicit transactional upgrade from V2/V3 to StableBindingV4 (EGCP RC2 §6.1, §6.2)."""
+    canonical_y = tuple(
+        sorted(
+            set(binding.y_keys) | set(additional_y_keys),
+            key=lambda k: (k[0], k[1], k[2].value if hasattr(k[2], "value") else str(k[2])),
+        )
+    )
+    digest = compute_y_keys_manifest_digest(canonical_y)
+    new_rev = (binding.structural_revision + 1) if binding.schema_version == 4 else 1
+    return StableBinding(
+        schema_version=4,
+        z_cell_id=binding.z_cell_id,
+        anchor_id=binding.anchor_id,
+        owner_seq=binding.owner_seq,
+        binding_generation=binding.binding_generation,
+        p_keys=binding.p_keys,
+        l_z_q6=binding.l_z_q6,
+        u_z_q6=binding.u_z_q6,
+        tau_ctx_q6=binding.tau_ctx_q6,
+        c_keys=binding.c_keys,
+        y_keys=canonical_y,
+        anchor_source_set=binding.anchor_source_set,
+        status=binding.status,
+        depth=binding.depth,
+        p_source_kinds=binding.p_source_kinds,
+        parent_refs=dict(binding.parent_refs),
+        structural_revision=new_rev,
+        growth_key_manifest_digest=digest,
+    )
 
 
 class EGCPGrowthState(StrEnum):
@@ -296,6 +355,7 @@ class EGCPGrowthState(StrEnum):
 
     PENDING_LEARNING = "PENDING_LEARNING"
     READY_FOR_PROMOTION = "READY_FOR_PROMOTION"
+    PROMOTED = "PROMOTED"
     EXPIRED = "EXPIRED"
     REJECTED = "REJECTED"
 

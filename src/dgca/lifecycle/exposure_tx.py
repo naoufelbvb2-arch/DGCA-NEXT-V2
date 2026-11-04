@@ -1126,6 +1126,17 @@ class ExposureTransactionManager:
             recruitments.extend(rec_res)
             diagnostics.extend(ctx_diags)
 
+        # EGCP E2 Pre-Assembly Shadow Promotion Stage (EGCP RC2 §5.3, §7)
+        egcp_promotion_report: object | None = None
+        if self.egcp_mode == EGCPMode.E2_GROWTH:
+            from dgca.lla.egcp_promotion import execute_egcp_pre_assembly_shadow_stage
+
+            egcp_promotion_report = execute_egcp_pre_assembly_shadow_stage(
+                w_shadow,
+                exposure_id=exposure_id,
+                w_pre_close=w_pre_close,
+            )
+
         # Step 5 (Core §10.2 & §2.0): Bounded Assembly MAINTAIN -> GROW -> FORM -> MERGE -> SPLIT
         asm_report: object | None = None
         if self.enable_assembly_pipeline:

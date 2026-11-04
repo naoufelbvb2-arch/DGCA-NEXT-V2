@@ -175,8 +175,14 @@ def test_04_pending_growth_allocation_and_evidence_accumulation():
     assert p112.state == EGCPGrowthState.PENDING_LEARNING  # E < 3.0 at Root 112
 
 
-def test_05_transition_to_ready_for_promotion():
+def test_05_transition_to_ready_for_promotion(monkeypatch):
     """E2B-T05: Verify state transitions from PENDING_LEARNING to READY_FOR_PROMOTION upon consolidation."""
+    # In E2c, pre-assembly promotion would immediately promote READY_FOR_PROMOTION candidates.
+    # To isolate the E2b state transition to READY_FOR_PROMOTION prior to promotion:
+    monkeypatch.setattr(
+        "dgca.lla.egcp_promotion.execute_egcp_pre_assembly_shadow_stage",
+        lambda *args, **kwargs: None,
+    )
     st149, _, _ = _run_schedule(149, egcp_mode=EGCPMode.E2_GROWTH)
     w149 = st149.W
 

@@ -238,6 +238,8 @@ def _snapshot_binding(b: StableBinding) -> dict[str, Any]:
         "depth": b.depth,
         "p_source_kinds": b.p_source_kinds,
         "parent_refs": {cid: _snapshot_parent_context_ref(ref) for cid, ref in sorted(b.parent_refs.items())},
+        "structural_revision": getattr(b, "structural_revision", 0),
+        "growth_key_manifest_digest": getattr(b, "growth_key_manifest_digest", ""),
     }
     missing = {f.name for f in dataclasses.fields(StableBinding)} - set(snap.keys())
     assert not missing, f"_snapshot_binding missing dataclass fields: {missing}"
@@ -400,6 +402,10 @@ def snapshot_w(w: WState) -> dict[str, Any]:
         "global_event_clock": w.global_event_clock,
         "close_serial": w.close_serial,
     }
+    if hasattr(w, "egcp_mode"):
+        snap["egcp_mode"] = w.egcp_mode
+    if hasattr(w, "egcp_pending_growth"):
+        snap["egcp_pending_growth"] = {k: (p.owner_id, p.owner_z_id, p.state, p.accepted_root_count) for k, p in sorted(w.egcp_pending_growth.items())}
     missing_w = set(vars(w).keys()) - set(snap.keys())
     assert not missing_w, f"snapshot_w missing fields: {missing_w}"
     return snap

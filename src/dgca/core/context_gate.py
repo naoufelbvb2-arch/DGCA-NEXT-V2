@@ -151,6 +151,10 @@ def validate_and_refresh_stable_binding(
             binding.status = BindingStatus.STALE
         return False, code
 
+    from dgca.core.state import EGCPMode
+    if getattr(w, "egcp_mode", EGCPMode.OFF) == EGCPMode.OFF and binding.schema_version == 4:
+        return _fail(StatusCode.UNSUPPORTED_BINDING_SCHEMA)
+
     if not is_valid_calibration_triple(binding.l_z_q6, binding.u_z_q6, binding.tau_ctx_q6):
         return _fail(StatusCode.INVALID_CONTEXT_THRESHOLD)
     if binding.z_cell_id not in w.committed_cells:
