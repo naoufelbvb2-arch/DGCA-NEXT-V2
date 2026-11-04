@@ -652,6 +652,7 @@ class ExposureTransactionManager:
         self.enable_contextual_coactive_latent: bool = enable_contextual_coactive_latent
         self.egcp_mode: EGCPMode = EGCPMode(egcp_mode)
         self.state.egcp_mode = self.egcp_mode
+        self.state.W.egcp_mode = self.egcp_mode
 
         self.open_journal: OpenExposureJournal | None = None
         self._publication_view = TransactionPublicationView(
@@ -776,6 +777,7 @@ class ExposureTransactionManager:
             raise ValueError("Switching EGCP_MODE during an OPEN exposure is forbidden.")
         self.egcp_mode = EGCPMode(mode)
         self.state.egcp_mode = self.egcp_mode
+        self.state.W.egcp_mode = self.egcp_mode
 
     def begin_exposure(self, exposure_id: int) -> OpenExposureJournal:
         """Execute atomic BEGIN_EXPOSURE(root) (Core §10.1, LLA §7 rule 1).
@@ -1084,6 +1086,7 @@ class ExposureTransactionManager:
             w_shadow,
             w_conf=self.w_conf,
             w_conf_context=self.w_conf_context,
+            egcp_mode=self.egcp_mode,
         )
         diagnostics.extend(prop_diags)
 
@@ -1197,6 +1200,7 @@ class ExposureTransactionManager:
             exposure_id,
         )
         w_shadow.completed_roots_high_watermark = new_high_watermark
+        w_shadow.egcp_mode = self.egcp_mode
 
         new_view = TransactionPublicationView(
             W=w_shadow,

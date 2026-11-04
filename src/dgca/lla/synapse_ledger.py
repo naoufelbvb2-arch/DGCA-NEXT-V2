@@ -24,7 +24,12 @@ from dgca.core.anatomy import (
     THETA_S,
 )
 from dgca.core.sic_v1 import CellAddress
-from dgca.core.state import WState
+from dgca.core.state import (
+    EGCPGrowthState,
+    EGCPMode,
+    EGCPPendingGrowthV1,
+    WState,
+)
 from dgca.lla.proposals import (
     LinkProposal,
     OMEGA_ROOT_REPLAY,
@@ -123,15 +128,19 @@ def apply_root_proposals_to_shadow_w(
     *,
     w_conf: int = W_CONF_ORDINARY,
     w_conf_context: int = W_CONF_CONTEXT,
+    egcp_mode: EGCPMode | str = EGCPMode.OFF,
 ) -> tuple[list[ProposalApplicationOutcome], list[StatusCode]]:
     """Reduce and apply staged root proposals to w_shadow at END_EXPOSURE (Core §10.2, LLA §5).
 
     Checks D_close == 1 against frozen w_pre_close, enforces outgoing capacity B_i (64) and
     cross capacity B_i^x (12) without double-debiting reserved candidate keys.
+    Under EGCPMode.E2_GROWTH, routes post-graduation contextual link candidates to quarantined
+    w_shadow.egcp_pending_growth (EGCP RC2 §5.2A).
     """
     winners = reduce_within_root_proposals(staged_proposals)
     outcomes: list[ProposalApplicationOutcome] = []
     diagnostics: list[StatusCode] = []
+    eff_egcp_mode = EGCPMode(egcp_mode) if egcp_mode else EGCPMode.OFF
 
     for prop in winners:
         key = prop.link_key
@@ -148,6 +157,115 @@ def apply_root_proposals_to_shadow_w(
                 )
             )
             diagnostics.append(StatusCode.STALE_LATENT_ELIGIBILITY)
+            continue
+
+        # EGCP RC2 §5.2A: Completed owner post-graduation growth candidate interception
+        is_completed_owner_growth = (
+            eff_egcp_mode == EGCPMode.E2_GROWTH
+            and scope == SynapseScope.ASSOCIATIVE
+            and w_shadow.is_contextual_cell(src_id)
+            and src_id in w_shadow.stable_bindings
+            and key not in w_shadow.synapses
+        )
+        if is_completed_owner_growth:
+            if key in w_shadow.egcp_pending_growth:
+                # Update existing pending growth candidate
+                pending = w_shadow.egcp_pending_growth[key]
+                consolidated_now = apply_weighted_synapse_update(
+                    pending.synapse,
+                    prop.q_raw,
+                    prop.y_positive,
+                    is_external=True,
+                    exposure_id=prop.exposure_id,
+                    event_id=w_shadow.global_event_clock,
+                )
+                pending.last_credited_root_id = prop.exposure_id
+                pending.accepted_root_count += 1
+                if (
+                    pending.synapse.S >= THETA_S
+                    and (pending.synapse.E / E_MAX) >= THETA_E
+                    and pending.synapse.external_count >= 2
+                ):
+                    pending.state = EGCPGrowthState.READY_FOR_PROMOTION
+                outcomes.append(
+                    ProposalApplicationOutcome(
+                        proposal=prop,
+                        status=StatusCode.OK,
+                        created_new=False,
+                        consolidated_now=consolidated_now,
+                    )
+                )
+                continue
+
+            # First creation of pending growth reservation
+            already_claimed = key in w_shadow.unique_claimed_outgoing_keys(src_id)
+            if not already_claimed and w_shadow.available_outgoing_headroom(src_id) <= 0:
+                outcomes.append(
+                    ProposalApplicationOutcome(
+                        proposal=prop,
+                        status=StatusCode.SOURCE_OUTGOING_CAPACITY,
+                        created_new=False,
+                        consolidated_now=False,
+                    )
+                )
+                diagnostics.append(StatusCode.SOURCE_OUTGOING_CAPACITY)
+                continue
+
+            pending_count = sum(
+                1
+                for k, p in w_shadow.egcp_pending_growth.items()
+                if k[0] == src_id
+                and p.state in (EGCPGrowthState.PENDING_LEARNING, EGCPGrowthState.READY_FOR_PROMOTION)
+            )
+            if pending_count >= 8:
+                outcomes.append(
+                    ProposalApplicationOutcome(
+                        proposal=prop,
+                        status=StatusCode.SOURCE_OUTGOING_CAPACITY,
+                        created_new=False,
+                        consolidated_now=False,
+                    )
+                )
+                diagnostics.append(StatusCode.SOURCE_OUTGOING_CAPACITY)
+                continue
+
+            sb = w_shadow.stable_bindings[src_id]
+            new_syn = Synapse(
+                key=key,
+                S=prop.y_positive,
+                E_ext=min(E_MAX, prop.q_raw),
+                E_int=0.0,
+                external_count=1,
+                state=SynapseState.CANDIDATE,
+                created_event_id=w_shadow.global_event_clock,
+                created_exposure_id=prop.exposure_id,
+                last_external_event_id=w_shadow.global_event_clock,
+                last_evidence_root=prop.exposure_id,
+                candidate_deadline=w_shadow.completed_external_events_count + 2000,
+                internally_supported=False,
+                confirmed_roots=(prop.exposure_id,),
+            )
+            pending = EGCPPendingGrowthV1(
+                state_schema_version=1,
+                owner_id=(sb.anchor_id, sb.owner_seq),
+                owner_z_id=src_id,
+                owner_binding_generation=sb.binding_generation,
+                key=key,
+                first_root_id=prop.exposure_id,
+                last_credited_root_id=prop.exposure_id,
+                accepted_root_count=1,
+                synapse=new_syn,
+                state=EGCPGrowthState.PENDING_LEARNING,
+            )
+            w_shadow.egcp_pending_growth[key] = pending
+            outcomes.append(
+                ProposalApplicationOutcome(
+                    proposal=prop,
+                    status=StatusCode.OK,
+                    created_new=True,
+                    consolidated_now=False,
+                )
+            )
             continue
 
         existing_syn = w_shadow.synapses.get(key)

@@ -29,6 +29,7 @@ from dgca.core.dynamics import (
 )
 from dgca.core.state import (
     BindingStatus,
+    EGCPMode,
     ExecutionMode,
     MachineState,
     ParentContextRef,
@@ -546,6 +547,7 @@ def evaluate_counterfactual_pred_margin(
         a_prev_by_cell=res_b.a_plus_by_cell,
         mu_prev_source_mask=res_b.mu_source_mask,
         mask_nonconsolidated=mask_nonconsolidated,
+        egcp_mode=EGCPMode.OFF,
     )
 
     _, score_correct = compute_pred_score(pt_next, branch.y_target_cells)

@@ -21,7 +21,7 @@ from dgca.core.anatomy import (
 )
 from dgca.core.dynamics import EventExecutionResult
 from dgca.core.sic_v1 import CellAddress
-from dgca.core.state import ExecutionMode, HSlowState, WState
+from dgca.core.state import EGCPMode, ExecutionMode, HSlowState, WState
 from dgca.lla.witness import validate_v_ext
 
 THETA_CREATE_DEFAULT: float = 0.20  # RC3/RC4.1 LAB default (RC2 comparator = 0.30)
@@ -221,10 +221,19 @@ def generate_event_link_proposals(
                 if src_id == tgt_id:
                     continue
                 key = (src_id, tgt_id, SynapseScope.ASSOCIATIVE)
-                if is_ctx and not is_candidate_reserved_key(key, w):
-                    # Contextual cells only propose their own reserved candidate roles during probation;
-                    # completed owners cannot propose unreserved ordinary associative links (LLA §7.3, EGCP RC2 §3.1).
-                    continue
+
+                if is_ctx:
+                    if is_candidate_reserved_key(key, w):
+                        pass
+                    elif (
+                        getattr(w, "egcp_mode", EGCPMode.OFF) == EGCPMode.E2_GROWTH
+                        and src_id in w.stable_bindings
+                    ):
+                        # EGCP RC2 §5.2A: Completed owners may generate proposals under E2_GROWTH;
+                        # they are intercepted into quarantined EGCPPendingGrowthV1 at root close.
+                        pass
+                    else:
+                        continue
                 if not w.latent_table.is_eligible(src_id, tgt_id):
                     continue
                 if not validate_v_ext(key, curr_event, prev_event, prev_prev_event, w):
@@ -232,7 +241,8 @@ def generate_event_link_proposals(
 
                 a_tgt_final = curr_event.a_plus_by_cell[tgt_id]
                 coactivity = a_src_prev_final * a_tgt_final
-                if coactivity < theta_create:
+                is_existing_pending = key in getattr(w, "egcp_pending_growth", {})
+                if not is_existing_pending and coactivity < theta_create:
                     continue
 
                 q_raw = compute_raw_evidence_q(

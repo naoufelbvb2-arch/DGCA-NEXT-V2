@@ -30,6 +30,7 @@ from dgca.core.state import (
     BindingStatus,
     CandidatePhase,
     ContextCandidateDescriptor,
+    EGCPMode,
     ExecutionMode,
     MachineState,
     OwnerState,
@@ -269,6 +270,7 @@ def _run_cold_trial(
         a_prev_by_cell=res_b.a_plus_by_cell,
         mu_prev_source_mask=res_b.mu_source_mask,
         mask_nonconsolidated=mask_nonconsolidated,
+        egcp_mode=EGCPMode.OFF,
     )
 
     _, score_owned_val = compute_pred_score(pt_next, owned_y_targets)

@@ -163,7 +163,9 @@ from dgca.core.sic_v1 import (
     simulate_cold_language_event,
 )
 from dgca.core.state import (
+    EGCPGrowthState,
     EGCPMode,
+    EGCPPendingGrowthV1,
     Assembly,
     AssemblyStatus,
     AttractorRuntimeState,
@@ -205,6 +207,8 @@ __all__ = [
     "ContributionRecord",
     "DEFAULT_OUTGOING_BUDGET_B_I",
     "DumbCellView",
+    "EGCPGrowthState",
+    "EGCPPendingGrowthV1",
     "EPISODIC_OUTGOING_CAP",
     "EPS_DEAD",
     "ETA_B_PROBE",

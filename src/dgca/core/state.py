@@ -291,6 +291,55 @@ class StableBinding:
         )
 
 
+class EGCPGrowthState(StrEnum):
+    """Lifecycle state of an EGCP pending growth reservation (EGCP RC2 §4.3)."""
+
+    PENDING_LEARNING = "PENDING_LEARNING"
+    READY_FOR_PROMOTION = "READY_FOR_PROMOTION"
+    EXPIRED = "EXPIRED"
+    REJECTED = "REJECTED"
+
+
+@dataclass(slots=True)
+class EGCPPendingGrowthV1:
+    """Quarantined post-graduation Y-growth reservation (EGCP RC2 §4.3)."""
+
+    state_schema_version: int = 1
+    owner_id: tuple[int, int] = (0, 0)
+    owner_z_id: int = 0
+    owner_binding_generation: int = 1
+    owner_structural_revision_at_admission: int = 1
+    key: SynapseKey = (0, 0, SynapseScope.ASSOCIATIVE)
+    first_root_id: int = 0
+    last_credited_root_id: int = 0
+    accepted_root_count: int = 0
+    max_last_root_opportunity_q6: int = 0
+    unresolved_count_bounded: int = 0
+    synapse: Synapse = field(default_factory=lambda: Synapse((0, 0, SynapseScope.ASSOCIATIVE)))
+    state: EGCPGrowthState = EGCPGrowthState.PENDING_LEARNING
+    admission_w_revision: int = 0
+    reason_code: str = ""
+
+    def clone(self) -> EGCPPendingGrowthV1:
+        return EGCPPendingGrowthV1(
+            state_schema_version=self.state_schema_version,
+            owner_id=self.owner_id,
+            owner_z_id=self.owner_z_id,
+            owner_binding_generation=self.owner_binding_generation,
+            owner_structural_revision_at_admission=self.owner_structural_revision_at_admission,
+            key=self.key,
+            first_root_id=self.first_root_id,
+            last_credited_root_id=self.last_credited_root_id,
+            accepted_root_count=self.accepted_root_count,
+            max_last_root_opportunity_q6=self.max_last_root_opportunity_q6,
+            unresolved_count_bounded=self.unresolved_count_bounded,
+            synapse=self.synapse.clone(),
+            state=self.state,
+            admission_w_revision=self.admission_w_revision,
+            reason_code=self.reason_code,
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ContributionRecord:
     """Single tagged causal contribution lane entry for an event (Core §6, LLA §2.2)."""
@@ -412,6 +461,10 @@ class WState:
         self.global_event_clock: int = 0
         self.close_serial: int = 0
 
+        # EGCP E2 Pending Growth Compartment (EGCP RC2 §4.3, §5.2)
+        self.egcp_pending_growth: dict[SynapseKey, EGCPPendingGrowthV1] = {}
+        self.egcp_mode: EGCPMode = EGCPMode.OFF
+
     def clone(self) -> WState:
         """Return an isolated deep copy of WState for shadow transactions or scratch tests."""
         copy_w = WState(
@@ -454,6 +507,10 @@ class WState:
         copy_w.completed_external_events_count = self.completed_external_events_count
         copy_w.global_event_clock = self.global_event_clock
         copy_w.close_serial = self.close_serial
+        copy_w.egcp_pending_growth = {
+            key: pending.clone() for key, pending in self.egcp_pending_growth.items()
+        }
+        copy_w.egcp_mode = self.egcp_mode
         return copy_w
 
     def is_committed(self, cell_id: int) -> bool:
@@ -486,16 +543,23 @@ class WState:
                 self.incoming_by_target[syn.target_id].discard(key)
 
     def get_protected_bidirectional_neighbors(self, cell_id: int) -> set[int]:
-        """Return all cells j that share a live synapse (cell_id -> j or j -> cell_id)."""
+        """Return all cells j that share a live synapse (cell_id -> j or j -> cell_id) or active EGCP pending key."""
         neighbors: set[int] = set()
         for key in self.outgoing_by_source.get(cell_id, ()):
             neighbors.add(key[1])
         for key in self.incoming_by_target.get(cell_id, ()):
             neighbors.add(key[0])
+        # Pillar 4: Protect coactive latent slots for pending growth candidates
+        for key, pending in self.egcp_pending_growth.items():
+            if pending.state in (EGCPGrowthState.PENDING_LEARNING, EGCPGrowthState.READY_FOR_PROMOTION):
+                if key[0] == cell_id:
+                    neighbors.add(key[1])
+                elif key[1] == cell_id:
+                    neighbors.add(key[0])
         return neighbors
 
     def unique_claimed_outgoing_keys(self, source_id: int) -> set[SynapseKey]:
-        """Return the union of live outgoing synapse keys and unique reserved candidate keys from source_id.
+        """Return the union of live outgoing synapse keys, unique reserved candidate keys, and pending growth keys.
 
         Core §1.3 & §10.2 Capacity invariant:
         Do not count a role twice if a live identical directed key already exists.
@@ -505,6 +569,10 @@ class WState:
             for k in keys:
                 if k[0] == source_id:
                     claimed.add(k)
+        for key, pending in self.egcp_pending_growth.items():
+            if pending.state in (EGCPGrowthState.PENDING_LEARNING, EGCPGrowthState.READY_FOR_PROMOTION):
+                if key[0] == source_id:
+                    claimed.add(key)
         return claimed
 
     def available_outgoing_headroom(self, source_id: int) -> int:
@@ -688,7 +756,11 @@ class MachineState:
         self.W: WState = w if w is not None else WState()
         self.R: RState = r if r is not None else RState()
         self.H_slow: HSlowState = h_slow if h_slow is not None else HSlowState()
-        self.egcp_mode: EGCPMode = EGCPMode(egcp_mode)
+        if w is not None and egcp_mode == EGCPMode.OFF and getattr(w, "egcp_mode", EGCPMode.OFF) != EGCPMode.OFF:
+            self.egcp_mode: EGCPMode = w.egcp_mode
+        else:
+            self.egcp_mode: EGCPMode = EGCPMode(egcp_mode)
+        self.W.egcp_mode = self.egcp_mode
 
     def clone(self) -> MachineState:
         """Create a complete isolated deep copy of (W, R, H_slow)."""
